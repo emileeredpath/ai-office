@@ -4,7 +4,7 @@ import { OfficeSidebar } from '@/components/layout/OfficeSidebar';
 import { OfficePage } from '@/pages/OfficePage';
 import { EmployeePage } from '@/pages/EmployeePage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
-import { OfficeScene } from '@/components/3d/OfficeScene';
+import { SceneController } from '@/components/SceneController';
 
 function AppRoutes() {
   const location = useLocation();
@@ -18,7 +18,7 @@ function AppRoutes() {
         <main className={is3DOffice ? 'flex-1' : 'flex-1 overflow-y-auto'}>
           <Routes>
             <Route path="/" element={<OfficePage />} />
-            <Route path="/3d-office" element={<OfficeScene />} />
+            <Route path="/3d-office" element={<SceneController />} />
             <Route path="/employee/:id" element={<EmployeePage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
           </Routes>
