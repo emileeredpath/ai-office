@@ -19,6 +19,9 @@ interface OfficeStore {
   setWorkload: (id: string, percent: number) => void;
   addTask: (employeeId: string, task: Task) => void;
   completeCurrentTask: (employeeId: string) => void;
+  moveToCurrentTask: (employeeId: string) => void;
+  reassignTask: (taskId: string, fromId: string, toId: string) => void;
+  removeTask: (employeeId: string, taskId: string, bucket: 'current' | 'queue' | 'completed') => void;
 }
 
 export const useOfficeStore = create<OfficeStore>((set) => ({
@@ -66,6 +69,63 @@ export const useOfficeStore = create<OfficeStore>((set) => ({
           taskQueue: remaining,
           completedWork: [completed, ...e.completedWork],
         };
+      }),
+    })),
+
+  moveToCurrentTask: (employeeId) =>
+    set((state) => ({
+      employees: state.employees.map((e) => {
+        if (e.id !== employeeId || e.taskQueue.length === 0) return e;
+        const [next, ...remaining] = e.taskQueue;
+        const completed = e.currentTask
+          ? { ...e.currentTask, completedAt: new Date().toISOString() }
+          : null;
+        return {
+          ...e,
+          currentTask: next,
+          taskQueue: remaining,
+          completedWork: completed ? [completed, ...e.completedWork] : e.completedWork,
+        };
+      }),
+    })),
+
+  reassignTask: (taskId, fromId, toId) =>
+    set((state) => ({
+      employees: state.employees.map((e) => {
+        if (e.id === fromId) {
+          return {
+            ...e,
+            currentTask: e.currentTask?.id === taskId ? null : e.currentTask,
+            taskQueue: e.taskQueue.filter((t) => t.id !== taskId),
+            completedWork: e.completedWork.filter((t) => t.id !== taskId),
+          };
+        }
+        if (e.id === toId) {
+          const task = state.employees
+            .find((emp) => emp.id === fromId)
+            ?.taskQueue.find((t) => t.id === taskId) ||
+            state.employees.find((emp) => emp.id === fromId)?.currentTask;
+          return task ? { ...e, taskQueue: [...e.taskQueue, task] } : e;
+        }
+        return e;
+      }),
+    })),
+
+  removeTask: (employeeId, taskId, bucket) =>
+    set((state) => ({
+      employees: state.employees.map((e) => {
+        if (e.id !== employeeId) return e;
+        if (bucket === 'current') {
+          const [next, ...remaining] = e.taskQueue;
+          return { ...e, currentTask: next ?? null, taskQueue: remaining };
+        }
+        if (bucket === 'queue') {
+          return { ...e, taskQueue: e.taskQueue.filter((t) => t.id !== taskId) };
+        }
+        if (bucket === 'completed') {
+          return { ...e, completedWork: e.completedWork.filter((t) => t.id !== taskId) };
+        }
+        return e;
       }),
     })),
 }));
