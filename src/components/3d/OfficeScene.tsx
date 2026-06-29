@@ -25,7 +25,8 @@ export function OfficeScene() {
 
       {/* Characters at desks */}
       {employees.map((employee, index) => {
-        const position = deskPositions[String(index + 1)] || [0, 0.5, 0];
+        const deskId = String(index + 1);
+        const position = deskPositions[deskId] || [0, 0.5, 0];
         return (
           <Character
             key={employee.id}
@@ -33,6 +34,7 @@ export function OfficeScene() {
             name={employee.name}
             position={position}
             color={employee.accentColor}
+            deskId={deskId}
           />
         );
       })}
