@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutGrid, BarChart3, Settings } from 'lucide-react';
+import { LayoutGrid, BarChart3, Settings, Box } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutGrid, label: 'Office Floor' },
+  { to: '/3d-office', icon: Box, label: '3D Office' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
