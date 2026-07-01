@@ -1,5 +1,27 @@
-node_modules
-dist
+# Node
+node_modules/
+
+# Build
+dist/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Local config
 *.local
+
+# Netlify
 .netlify/
