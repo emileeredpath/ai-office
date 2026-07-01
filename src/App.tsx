@@ -1,12 +1,1 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { SandyInterface } from '@/components/SandyInterface';
-
-export default function App() {
-  return (
-    <BrowserRouter basename="/mtech-ai-office">
-      <Routes>
-        <Route path="/" element={<SandyInterface />} />
-      </Routes>
-    </BrowserRouter>
-  );
-}
+aW1wb3J0IHsgQnJvd3NlclJvdXRlciwgUm91dGVzLCBSb3V0ZSB9IGZyb20gJ3JlYWN0LXJvdXRlci1kb20nOwppbXBvcnQgeyBTYW5keUludGVyZmFjZSB9IGZyb20gJ0AvY29tcG9uZW50cy9TYW5keUludGVyZmFjZSc7CgpleHBvcnQgZGVmYXVsdCBmdW5jdGlvbiBBcHAoKSB7CiAgcmV0dXJuICgKICAgIDxCcm93c2VyUm91dGVyIGJhc2VuYW1lPSIvYWktb2ZmaWNlIj4KICAgICAgPFJvdXRlcz4KICAgICAgICA8Um91dGUgcGF0aD0iLyIgZWxlbWVudD17PFNhbmR5SW50ZXJmYWNlIC8+fSAvPgogICAgICA8L1JvdXRlcz4KICAgIDwvQnJvd3NlclJvdXRlcj4KICApOwp9Cg==
