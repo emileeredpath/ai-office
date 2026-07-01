@@ -1,17 +1,21 @@
 import { useState } from 'react';
-import { OfficeFloorCards } from '@/components/office/OfficeFloorCards';
+import { IsometricOffice } from '@/components/office3d/IsometricOffice';
+import { RoomDetailDrawer } from '@/components/office3d/RoomDetailDrawer';
 import { BoardRoomPanel } from '@/components/BoardRoomPanel';
-import { SandyAgent } from '@/components/SandyAgent';
-import { SandySyncPanel } from '@/components/SandySyncPanel';
-import { SandyTodoPanel } from '@/components/SandyTodoPanel';
+import { RightPanel } from '@/components/RightPanel';
+import { BottomPanel } from '@/components/BottomPanel';
+import { AskSandyBar } from '@/components/AskSandyBar';
+import { LeftSidebar, type NavKey } from '@/components/layout/LeftSidebar';
+import { TopBar, type TopTab } from '@/components/layout/TopBar';
+import { PlaceholderModal } from '@/components/PlaceholderModal';
+import { TasksBoard } from '@/components/TasksBoard';
 import { WorkflowTrail } from '@/components/WorkflowTrail';
 import { SandyResponse } from '@/components/SandyResponse';
-import { MainLayout } from '@/components/layout/MainLayout';
-import { Send } from 'lucide-react';
 import { useOfficeStore } from '@/store/officeStore';
 import { RoutingEngine } from '@/systems/RoutingEngine';
 import { WorkflowEngine } from '@/systems/WorkflowEngine';
 import type { RoutingResult } from '@/systems/RoutingEngine';
+import { rooms, roomForEmployee } from '@/data/rooms';
 
 export function SandyInterface() {
   const [taskInput, setTaskInput] = useState('');
@@ -21,9 +25,45 @@ export function SandyInterface() {
   const [currentRequest, setCurrentRequest] = useState<string>('');
   const [taskCount, setTaskCount] = useState(0);
   const [showResponse, setShowResponse] = useState(false);
+  const [navTab, setNavTab] = useState<NavKey>('home');
+  const [topTab, setTopTab] = useState<TopTab>('office');
+  const [placeholderTitle, setPlaceholderTitle] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [activeRoomIds, setActiveRoomIds] = useState<string[]>([]);
+  const [sandyMessage, setSandyMessage] = useState<string | undefined>();
+
+  const NAV_LABELS: Record<NavKey, string> = {
+    home: 'Home',
+    team: 'Team',
+    messages: 'Messages',
+    tasks: 'Tasks',
+    calendar: 'Calendar',
+    files: 'Files',
+    campaigns: 'Campaigns',
+    analytics: 'Analytics',
+    help: 'Help',
+  };
+
+  const handleNavSelect = (key: NavKey) => {
+    setNavTab(key);
+    if (key === 'home') {
+      setTopTab('office');
+      return;
+    }
+    if (key === 'analytics') {
+      setTopTab('analytics');
+      return;
+    }
+    if (key === 'tasks') {
+      setTopTab('tasks');
+      return;
+    }
+    setPlaceholderTitle(NAV_LABELS[key]);
+  };
 
   const employees = useOfficeStore((state) => state.employees);
   const assignTask = useOfficeStore((state) => state.assignTask);
+  const logActivity = useOfficeStore((state) => state.logActivity);
 
   const handleAskSandy = async () => {
     if (!taskInput.trim() || isProcessing) return;
@@ -31,24 +71,25 @@ export function SandyInterface() {
     setIsProcessing(true);
     setShowResponse(false);
     setCurrentRequest(taskInput);
+    setSandyMessage(`Routing: "${taskInput.trim()}"`);
+    logActivity(`Sandy received: "${taskInput.trim()}"`);
 
     try {
-      // Route the request
       const routingEngine = new RoutingEngine(employees);
       const routing = routingEngine.route(taskInput, employees);
       setCurrentRouting(routing);
-
-      // Show primary assignee highlight
       setAssigningEmployeeId(routing.primaryAssignee.id);
 
-      // Create workflow
+      const involvedRoomIds = [routing.primaryAssignee, ...routing.suggestedCollaborators]
+        .map((emp) => roomForEmployee(emp.id)?.id)
+        .filter((id): id is string => Boolean(id));
+      setActiveRoomIds(involvedRoomIds);
+
       const workflowEngine = new WorkflowEngine();
       const campaign = workflowEngine.createCampaign(taskInput, routing, employees);
 
-      // Simulate task assignment with delay for visual effect
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      // Assign tasks
       let totalTasks = 0;
       routing.taskBreakdown.forEach((item) => {
         item.subtasks.forEach((subtask, idx) => {
@@ -66,12 +107,21 @@ export function SandyInterface() {
       setTaskCount(totalTasks);
       setShowResponse(true);
       setTaskInput('');
+      setSandyMessage(`Assigned to ${routing.primaryAssignee.name}`);
+      logActivity(
+        `Sandy routed the request to ${routing.primaryAssignee.name}${
+          routing.suggestedCollaborators.length
+            ? ` with support from ${routing.suggestedCollaborators.map((c) => c.name).join(', ')}`
+            : ''
+        }`
+      );
 
-      // Auto-hide response after 6 seconds
       setTimeout(() => {
         setShowResponse(false);
         setAssigningEmployeeId(undefined);
         setCurrentRouting(undefined);
+        setActiveRoomIds([]);
+        setSandyMessage(undefined);
       }, 6000);
 
       setIsProcessing(false);
@@ -81,105 +131,78 @@ export function SandyInterface() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAskSandy();
-    }
-  };
-
   return (
-    <MainLayout rightPanel={<BoardRoomPanel />}>
-      {/* Workflow Trail */}
-      {currentRouting && <WorkflowTrail routing={currentRouting} isActive={!showResponse} />}
+    <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: '#070A0F' }}>
+      <LeftSidebar active={navTab} onSelect={handleNavSelect} />
 
-      {/* Office Floor with Employee Desks */}
-      <div className="w-full h-full flex flex-col relative">
-        <div className="flex-1 relative overflow-hidden">
-          <OfficeFloorCards assigningEmployeeId={assigningEmployeeId} />
-        </div>
-
-        {/* Sandy Response Display */}
-        {showResponse && currentRouting && (
-          <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-2xl px-6 pointer-events-none">
-            <SandyResponse routing={currentRouting} taskCount={taskCount} originalRequest={currentRequest} />
-          </div>
-        )}
-
-        {/* Sandy Interaction Panel - Bottom Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
-          <div className="max-w-2xl mx-auto pointer-events-auto">
-            {/* Sandy Prompt Label */}
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-lg"
-                style={{ backgroundColor: '#F9701F' }}
-              >
-                🧠
-              </div>
-              <label htmlFor="sandy-input" className="text-sm font-medium text-[#F0F4F8]">
-                Ask Sandy
-              </label>
-            </div>
-
-            {/* Input Box */}
-            <div className="flex gap-2 items-end">
-              <textarea
-                id="sandy-input"
-                value={taskInput}
-                onChange={(e) => setTaskInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Tell Sandy what needs to happen..."
-                className="flex-1 px-4 py-3 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#F9701F] transition-all"
-                style={{
-                  backgroundColor: '#1D2A3A',
-                  color: '#F0F4F8',
-                  borderColor: '#3a4f6a',
-                  border: '1px solid #3a4f6a',
-                }}
-                rows={2}
-                disabled={isProcessing}
-              />
-              <button
-                onClick={handleAskSandy}
-                disabled={isProcessing || !taskInput.trim()}
-                className="px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap"
-                style={{
-                  backgroundColor: taskInput.trim() && !isProcessing ? '#F9701F' : '#F9701F80',
-                  color: '#FFFFFF',
-                  cursor: taskInput.trim() && !isProcessing ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {isProcessing ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Send size={16} />
-                    <span>Ask</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Gradient Fade */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-48 pointer-events-none"
-          style={{
-            background: 'linear-gradient(to top, rgba(17, 27, 38, 0.95), transparent)',
-          }}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar active={topTab} onSelect={setTopTab} />
+        <AskSandyBar
+          value={taskInput}
+          onChange={setTaskInput}
+          onSubmit={handleAskSandy}
+          isProcessing={isProcessing}
         />
+
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            {currentRouting && <WorkflowTrail routing={currentRouting} isActive={!showResponse} />}
+
+            <div className="flex-1 relative overflow-hidden">
+              {topTab === 'office' && (
+                <IsometricOffice
+                  activeRoomIds={activeRoomIds}
+                  sandyThinking={isProcessing}
+                  sandyMessage={sandyMessage}
+                  selectedRoomId={selectedRoomId}
+                  onSelectRoom={setSelectedRoomId}
+                />
+              )}
+              {topTab === 'board-room' && <BoardRoomPanel />}
+              {topTab === 'tasks' && <TasksBoard />}
+              {topTab === 'reports' && <PlaceholderPanel title="Reports" />}
+              {topTab === 'analytics' && <PlaceholderPanel title="Analytics" />}
+              {topTab === 'settings' && <PlaceholderPanel title="Settings" />}
+
+              {topTab === 'office' && selectedRoomId && (
+                <RoomDetailDrawer
+                  room={rooms.find((r) => r.id === selectedRoomId)!}
+                  onClose={() => setSelectedRoomId(null)}
+                />
+              )}
+
+              {showResponse && currentRouting && (
+                <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-2xl px-6 pointer-events-none">
+                  <SandyResponse routing={currentRouting} taskCount={taskCount} originalRequest={currentRequest} />
+                </div>
+              )}
+            </div>
+
+            <BottomPanel />
+          </div>
+
+          <RightPanel />
+        </div>
       </div>
 
-      {/* Sandy Agent */}
-      <SandyAgent activeMessage={isProcessing ? '🧠 Analyzing your request...' : undefined} />
+      {placeholderTitle && (
+        <PlaceholderModal title={placeholderTitle} onClose={() => setPlaceholderTitle(null)} />
+      )}
+    </div>
+  );
+}
 
-      {/* Sandy Sync Panel */}
-      <SandySyncPanel />
-
-      {/* Sandy's To-Do List */}
-      <SandyTodoPanel />
-    </MainLayout>
+function PlaceholderPanel({ title }: { title: string }) {
+  return (
+    <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#0A0E14' }}>
+      <div className="text-center">
+        <p className="text-lg font-semibold" style={{ color: '#E8ECF1' }}>
+          {title}
+        </p>
+        <p className="text-sm mt-1" style={{ color: '#5C6879' }}>
+          Coming soon
+        </p>
+      </div>
+    </div>
   );
 }
