@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Employee, EmployeeStatus, Task } from '@/types/employee';
+import type { Employee, EmployeeStatus, Task, TaskStatus } from '@/types/employee';
 import { employees as seedEmployees } from '@/data/employees';
 
 function getOfficeTime(): 'morning' | 'afternoon' | 'evening' {
@@ -10,8 +10,38 @@ function getOfficeTime(): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
+// Employee status is derived from the state of their tasks, unless
+// manually overridden (e.g. someone marks themselves Blocked directly).
+// "Working" is only ever set by an explicit start-task action — never
+// implied just because Sandy assigned something.
+function deriveEmployeeStatus(tasks: Task[]): EmployeeStatus {
+  const active = tasks.filter((t) => t.status !== 'complete');
+  if (active.length === 0) return 'available';
+  if (active.some((t) => t.status === 'in_progress')) return 'working';
+  if (active.some((t) => t.status === 'blocked')) return 'blocked';
+  if (
+    active.some(
+      (t) =>
+        t.status === 'waiting_john_approval' ||
+        t.status === 'waiting_customer' ||
+        t.status === 'waiting_review'
+    )
+  )
+    return 'waiting_approval';
+  if (active.some((t) => t.status === 'awaiting_brief')) return 'awaiting_brief';
+  return 'has_assigned_work';
+}
+
+function touch(task: Task, status: TaskStatus): Task {
+  return {
+    ...task,
+    status,
+    updatedAt: new Date().toISOString(),
+    completedAt: status === 'complete' ? new Date().toISOString() : task.completedAt,
+  };
+}
+
 function getInitialEmployees(): Employee[] {
-  // Check if we have saved data
   const saved = localStorage.getItem('mtech-office-employees');
   if (saved) {
     try {
@@ -29,13 +59,17 @@ interface OfficeStore {
   officeTime: 'morning' | 'afternoon' | 'evening';
 
   selectEmployee: (id: string | null) => void;
-  updateStatus: (id: string, status: EmployeeStatus) => void;
-  setWorkload: (id: string, percent: number) => void;
-  addTask: (employeeId: string, task: Task) => void;
-  completeCurrentTask: (employeeId: string) => void;
-  moveToCurrentTask: (employeeId: string) => void;
-  reassignTask: (taskId: string, fromId: string, toId: string) => void;
-  removeTask: (employeeId: string, taskId: string, bucket: 'current' | 'queue' | 'completed') => void;
+  setEmployeeStatus: (id: string, status: EmployeeStatus) => void;
+
+  assignTask: (
+    employeeId: string,
+    task: Omit<Task, 'status' | 'updatedAt' | 'notes'> & { status?: TaskStatus }
+  ) => void;
+  startTask: (employeeId: string, taskId: string) => void;
+  setTaskStatus: (employeeId: string, taskId: string, status: TaskStatus) => void;
+  completeTask: (employeeId: string, taskId: string) => void;
+  addTaskNote: (employeeId: string, taskId: string, text: string) => void;
+  removeTask: (employeeId: string, taskId: string) => void;
 }
 
 export const useOfficeStore = create<OfficeStore>()(
@@ -45,103 +79,82 @@ export const useOfficeStore = create<OfficeStore>()(
       selectedEmployeeId: null,
       officeTime: getOfficeTime(),
 
-          selectEmployee: (id) => set({ selectedEmployeeId: id }),
+      selectEmployee: (id) => set({ selectedEmployeeId: id }),
 
-      updateStatus: (id, status) =>
+      setEmployeeStatus: (id, status) =>
         set((state) => ({
-          employees: state.employees.map((e) =>
-            e.id === id ? { ...e, status } : e
-          ),
+          employees: state.employees.map((e) => (e.id === id ? { ...e, status } : e)),
         })),
 
-      setWorkload: (id, percent) =>
-        set((state) => ({
-          employees: state.employees.map((e) =>
-            e.id === id ? { ...e, workloadPercent: Math.min(100, Math.max(0, percent)) } : e
-          ),
-        })),
-
-      addTask: (employeeId, task) =>
-        set((state) => ({
-          employees: state.employees.map((e) =>
-            e.id === employeeId
-              ? { ...e, taskQueue: [...e.taskQueue, task] }
-              : e
-          ),
-        })),
-
-      completeCurrentTask: (employeeId) =>
-        set((state) => ({
-          employees: state.employees.map((e) => {
-            if (e.id !== employeeId || !e.currentTask) return e;
-            const completed: Task = {
-              ...e.currentTask,
-              completedAt: new Date().toISOString(),
-            };
-            const [next, ...remaining] = e.taskQueue;
-            return {
-              ...e,
-              currentTask: next ?? null,
-              taskQueue: remaining,
-              completedWork: [completed, ...e.completedWork],
-            };
-          }),
-        })),
-
-      moveToCurrentTask: (employeeId) =>
-        set((state) => ({
-          employees: state.employees.map((e) => {
-            if (e.id !== employeeId || e.taskQueue.length === 0) return e;
-            const [next, ...remaining] = e.taskQueue;
-            const completed = e.currentTask
-              ? { ...e.currentTask, completedAt: new Date().toISOString() }
-              : null;
-            return {
-              ...e,
-              currentTask: next,
-              taskQueue: remaining,
-              completedWork: completed ? [completed, ...e.completedWork] : e.completedWork,
-            };
-          }),
-        })),
-
-      reassignTask: (taskId, fromId, toId) =>
-        set((state) => ({
-          employees: state.employees.map((e) => {
-            if (e.id === fromId) {
-              return {
-                ...e,
-                currentTask: e.currentTask?.id === taskId ? null : e.currentTask,
-                taskQueue: e.taskQueue.filter((t) => t.id !== taskId),
-                completedWork: e.completedWork.filter((t) => t.id !== taskId),
-              };
-            }
-            if (e.id === toId) {
-              const task = state.employees
-                .find((emp) => emp.id === fromId)
-                ?.taskQueue.find((t) => t.id === taskId) ||
-                state.employees.find((emp) => emp.id === fromId)?.currentTask;
-              return task ? { ...e, taskQueue: [...e.taskQueue, task] } : e;
-            }
-            return e;
-          }),
-        })),
-
-      removeTask: (employeeId, taskId, bucket) =>
+      assignTask: (employeeId, task) =>
         set((state) => ({
           employees: state.employees.map((e) => {
             if (e.id !== employeeId) return e;
-            if (bucket === 'current') {
-              const [next, ...remaining] = e.taskQueue;
-              return { ...e, currentTask: next ?? null, taskQueue: remaining };
-            }
-            if (bucket === 'queue') {
-              return { ...e, taskQueue: e.taskQueue.filter((t) => t.id !== taskId) };
-            }
-            if (bucket === 'completed') {
-              return { ...e, completedWork: e.completedWork.filter((t) => t.id !== taskId) };
-            }
-            return e;
+            const newTask: Task = {
+              ...task,
+              status: task.status ?? 'assigned',
+              updatedAt: new Date().toISOString(),
+              notes: [],
+              assignedBy: task.assignedBy ?? 'sandy',
+            };
+            const tasks = [...e.tasks, newTask];
+            return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
+          }),
+        })),
+
+      startTask: (employeeId, taskId) =>
+        set((state) => ({
+          employees: state.employees.map((e) => {
+            if (e.id !== employeeId) return e;
+            const tasks = e.tasks.map((t) => (t.id === taskId ? touch(t, 'in_progress') : t));
+            return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
+          }),
+        })),
+
+      setTaskStatus: (employeeId, taskId, status) =>
+        set((state) => ({
+          employees: state.employees.map((e) => {
+            if (e.id !== employeeId) return e;
+            const tasks = e.tasks.map((t) => (t.id === taskId ? touch(t, status) : t));
+            return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
+          }),
+        })),
+
+      completeTask: (employeeId, taskId) =>
+        set((state) => ({
+          employees: state.employees.map((e) => {
+            if (e.id !== employeeId) return e;
+            const tasks = e.tasks.map((t) => (t.id === taskId ? touch(t, 'complete') : t));
+            return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
+          }),
+        })),
+
+      addTaskNote: (employeeId, taskId, text) =>
+        set((state) => ({
+          employees: state.employees.map((e) => {
+            if (e.id !== employeeId) return e;
+            const tasks = e.tasks.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    notes: [
+                      ...t.notes,
+                      { id: `note-${Date.now()}`, text, createdAt: new Date().toISOString() },
+                    ],
+                    updatedAt: new Date().toISOString(),
+                  }
+                : t
+            );
+            return { ...e, tasks };
+          }),
+        })),
+
+      removeTask: (employeeId, taskId) =>
+        set((state) => ({
+          employees: state.employees.map((e) => {
+            if (e.id !== employeeId) return e;
+            const tasks = e.tasks.filter((t) => t.id !== taskId);
+            return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
           }),
         })),
     }),

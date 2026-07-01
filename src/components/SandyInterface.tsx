@@ -3,6 +3,7 @@ import { OfficeFloorCards } from '@/components/office/OfficeFloorCards';
 import { BoardRoomPanel } from '@/components/BoardRoomPanel';
 import { SandyAgent } from '@/components/SandyAgent';
 import { SandySyncPanel } from '@/components/SandySyncPanel';
+import { SandyTodoPanel } from '@/components/SandyTodoPanel';
 import { WorkflowTrail } from '@/components/WorkflowTrail';
 import { SandyResponse } from '@/components/SandyResponse';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -22,7 +23,7 @@ export function SandyInterface() {
   const [showResponse, setShowResponse] = useState(false);
 
   const employees = useOfficeStore((state) => state.employees);
-  const addTask = useOfficeStore((state) => state.addTask);
+  const assignTask = useOfficeStore((state) => state.assignTask);
 
   const handleAskSandy = async () => {
     if (!taskInput.trim() || isProcessing) return;
@@ -51,13 +52,13 @@ export function SandyInterface() {
       let totalTasks = 0;
       routing.taskBreakdown.forEach((item) => {
         item.subtasks.forEach((subtask, idx) => {
-          const task = {
+          assignTask(item.assignee.id, {
             id: `task-${campaign.id}-${item.assignee.id}-${idx}`,
             title: subtask,
             priority: idx === 0 ? ('high' as const) : ('medium' as const),
             createdAt: new Date().toISOString(),
-          };
-          addTask(item.assignee.id, task);
+            assignedBy: 'sandy',
+          });
           totalTasks++;
         });
       });
@@ -176,6 +177,9 @@ export function SandyInterface() {
 
       {/* Sandy Sync Panel */}
       <SandySyncPanel />
+
+      {/* Sandy's To-Do List */}
+      <SandyTodoPanel />
     </MainLayout>
   );
 }

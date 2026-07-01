@@ -1,15 +1,25 @@
 import { useState } from 'react';
 import { Upload, X, Check } from 'lucide-react';
 import { useOfficeStore } from '@/store/officeStore';
-import type { Task } from '@/types/employee';
+import type { TaskStatus } from '@/types/employee';
 
 interface SandyUpdate {
   employeeName: string;
   currentTask?: string;
   taskQueue: string[];
   priority: string;
-  workload: number;
-  status: 'available' | 'busy' | 'in-review' | 'idle' | 'offline';
+  taskStatus: TaskStatus;
+}
+
+function parseTaskStatus(value: string): TaskStatus {
+  if (value.includes('progress') || value.includes('working')) return 'in_progress';
+  if (value.includes('john')) return 'waiting_john_approval';
+  if (value.includes('customer')) return 'waiting_customer';
+  if (value.includes('review')) return 'waiting_review';
+  if (value.includes('blocked')) return 'blocked';
+  if (value.includes('complete') || value.includes('done')) return 'complete';
+  if (value.includes('brief')) return 'awaiting_brief';
+  return 'assigned';
 }
 
 export function SandySyncPanel() {
@@ -19,18 +29,15 @@ export function SandySyncPanel() {
   const [statusMessage, setStatusMessage] = useState('');
 
   const employees = useOfficeStore((state) => state.employees);
-  const addTask = useOfficeStore((state) => state.addTask);
-  const updateStatus = useOfficeStore((state) => state.updateStatus);
-  const setWorkload = useOfficeStore((state) => state.setWorkload);
+  const assignTask = useOfficeStore((state) => state.assignTask);
 
   const parseSandyUpdate = (text: string): SandyUpdate[] => {
-    // Parse Sandy's task assignments from pasted content
-    // Format expected:
+    // Expected format per block:
     // Employee: Name
-    // Status: working/available
+    // Status: in progress / waiting for john / waiting for customer / blocked / complete
     // Task: title
     // Todo: item1, item2
-    // Workload: 50%
+    // Priority: high/medium/low
 
     const updates: SandyUpdate[] = [];
     const sections = text.split(/Employee:|---/g).filter((s) => s.trim());
@@ -43,36 +50,30 @@ export function SandySyncPanel() {
         employeeName: '',
         taskQueue: [],
         priority: 'medium',
-        workload: 0,
-        status: 'available',
+        taskStatus: 'assigned',
       };
 
-      lines.forEach((line) => {
+      lines.forEach((line, idx) => {
         const [key, ...valueParts] = line.split(':');
         const value = valueParts.join(':').trim().toLowerCase();
 
-        if (key.includes('Name') || key.trim() === '') {
+        if (idx === 0 && !line.includes(':')) {
+          update.employeeName = line.trim();
+        }
+        if (key.includes('Name')) {
           const name = line.replace('Name:', '').trim();
           if (name) update.employeeName = name;
         }
         if (key.includes('Status')) {
-          if (value.includes('busy') || value.includes('working'))
-            update.status = 'busy';
-          else if (value.includes('review')) update.status = 'in-review';
-          else if (value.includes('idle')) update.status = 'idle';
-          else update.status = 'available';
+          update.taskStatus = parseTaskStatus(value);
         }
         if (key.includes('Task') && !key.includes('Todo')) {
           const task = line.replace(/Task:?/i, '').trim();
-          if (task && !task.startsWith('-')) update.currentTask = task;
+          if (task) update.currentTask = task;
         }
         if (key.includes('Todo') || key.includes('Queue')) {
           const items = value.split(',').map((s) => s.trim());
           update.taskQueue = items.filter((s) => s.length > 0);
-        }
-        if (key.includes('Workload') || key.includes('Load')) {
-          const num = parseInt(value);
-          if (!isNaN(num)) update.workload = Math.min(100, num);
         }
         if (key.includes('Priority')) {
           if (value.includes('high')) update.priority = 'high';
@@ -80,6 +81,10 @@ export function SandySyncPanel() {
           else update.priority = 'medium';
         }
       });
+
+      if (!update.employeeName && lines[0]) {
+        update.employeeName = lines[0].trim();
+      }
 
       if (update.employeeName) {
         updates.push(update);
@@ -107,48 +112,47 @@ export function SandySyncPanel() {
         return;
       }
 
-      // Apply updates to store
       let successCount = 0;
       updates.forEach((update) => {
         const employee = employees.find(
           (e) => e.name.toLowerCase() === update.employeeName.toLowerCase()
         );
 
-        if (employee) {
-          // Update status
-          updateStatus(employee.id, update.status);
+        if (!employee) return;
 
-          // Update workload
-          setWorkload(employee.id, update.workload);
-
-          // Add current task
-          if (update.currentTask) {
-            const currentTask: Task = {
-              id: `task-sandy-${Date.now()}-${employee.id}`,
-              title: update.currentTask,
-              priority: (update.priority as 'low' | 'medium' | 'high') || 'medium',
-              createdAt: new Date().toISOString(),
-            };
-            addTask(employee.id, currentTask);
-          }
-
-          // Add queue tasks
-          update.taskQueue.forEach((taskTitle, idx) => {
-            const queueTask: Task = {
-              id: `task-queue-${Date.now()}-${employee.id}-${idx}`,
-              title: taskTitle,
-              priority: 'medium',
-              createdAt: new Date().toISOString(),
-            };
-            addTask(employee.id, queueTask);
+        if (update.currentTask) {
+          assignTask(employee.id, {
+            id: `task-sandy-${Date.now()}-${employee.id}`,
+            title: update.currentTask,
+            priority: (update.priority as 'low' | 'medium' | 'high') || 'medium',
+            createdAt: new Date().toISOString(),
+            status: update.taskStatus,
+            assignedBy: 'sandy',
           });
-
-          successCount++;
         }
+
+        update.taskQueue.forEach((taskTitle, idx) => {
+          assignTask(employee.id, {
+            id: `task-queue-${Date.now()}-${employee.id}-${idx}`,
+            title: taskTitle,
+            priority: 'medium',
+            createdAt: new Date().toISOString(),
+            status: 'assigned',
+            assignedBy: 'sandy',
+          });
+        });
+
+        successCount++;
       });
 
+      if (successCount === 0) {
+        setSyncStatus('error');
+        setStatusMessage('No matching employee names found');
+        return;
+      }
+
       setSyncStatus('success');
-      setStatusMessage(`✅ Synced ${successCount} employees from Sandy`);
+      setStatusMessage(`✅ Synced ${successCount} employee${successCount !== 1 ? 's' : ''} from Sandy`);
       setPastedContent('');
 
       setTimeout(() => {
@@ -192,10 +196,7 @@ export function SandySyncPanel() {
           <h3 className="font-bold text-[#F0F4F8]">Sync from Sandy</h3>
           <p className="text-xs text-[#8F9194]">Paste task updates from Claude</p>
         </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="p-1 hover:bg-[#2E3B4A] rounded"
-        >
+        <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-[#2E3B4A] rounded">
           <X size={18} className="text-[#8F9194]" />
         </button>
       </div>
@@ -208,16 +209,14 @@ export function SandySyncPanel() {
 
 Example format:
 Employee: Sarah
-Status: working
+Status: assigned
 Task: Update website prices
-Todo: Research competitor pricing, Update database, Test checkout flow
-Workload: 75%
+Todo: Research competitor pricing, Update database
+Priority: high
 
 Employee: Tisha
-Status: busy
-Task: Announce product update
-Todo: Create social post, Schedule email
-Workload: 60%"
+Status: in progress
+Task: Announce product update"
         className="w-full h-40 p-3 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#F9701F] mb-4"
         style={{
           backgroundColor: '#111B26',
@@ -232,18 +231,11 @@ Workload: 60%"
         <div
           className="mb-4 p-3 rounded text-sm flex items-center gap-2"
           style={{
-            backgroundColor:
-              syncStatus === 'success'
-                ? 'rgba(76, 175, 80, 0.2)'
-                : 'rgba(255, 107, 107, 0.2)',
+            backgroundColor: syncStatus === 'success' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 107, 107, 0.2)',
             color: syncStatus === 'success' ? '#4CAF50' : '#FF6B6B',
           }}
         >
-          {syncStatus === 'success' ? (
-            <Check size={16} />
-          ) : (
-            <X size={16} />
-          )}
+          {syncStatus === 'success' ? <Check size={16} /> : <X size={16} />}
           {statusMessage}
         </div>
       )}
@@ -253,10 +245,7 @@ Workload: 60%"
         <button
           onClick={handleSync}
           className="flex-1 px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-          style={{
-            backgroundColor: '#F9701F',
-            color: '#FFFFFF',
-          }}
+          style={{ backgroundColor: '#F9701F', color: '#FFFFFF' }}
         >
           <Upload size={16} />
           Sync Tasks
@@ -267,10 +256,7 @@ Workload: 60%"
             setIsOpen(false);
           }}
           className="flex-1 px-4 py-2 rounded-lg font-medium transition-all"
-          style={{
-            backgroundColor: '#2E3B4A',
-            color: '#F0F4F8',
-          }}
+          style={{ backgroundColor: '#2E3B4A', color: '#F0F4F8' }}
         >
           Cancel
         </button>

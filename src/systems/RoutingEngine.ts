@@ -98,7 +98,7 @@ export class RoutingEngine {
 
     return employees.map((emp) => ({
       ...roleToCapabilities[emp.id],
-      currentLoad: emp.workloadPercent,
+      currentLoad: emp.tasks.filter((t) => t.status !== 'complete').length,
     }));
   }
 

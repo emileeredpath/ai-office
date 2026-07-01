@@ -1,4 +1,4 @@
-import type { Employee, Task } from '@/types/employee';
+import type { Employee } from '@/types/employee';
 import type { RoutingResult } from './RoutingEngine';
 
 export interface WorkflowEvent {
@@ -54,74 +54,6 @@ export class WorkflowEngine {
     });
 
     return campaign;
-  }
-
-  assignTasks(
-    campaignId: string,
-    taskBreakdown: RoutingResult['taskBreakdown'],
-    employees: Employee[]
-  ): Task[] {
-    const campaign = this.campaigns.get(campaignId);
-    if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
-
-    const createdTasks: Task[] = [];
-    const now = new Date().toISOString();
-
-    taskBreakdown.forEach((item, index) => {
-      item.subtasks.forEach((subtask, subtaskIdx) => {
-        const taskId = `task-${campaignId}-${index}-${subtaskIdx}`;
-        const task: Task = {
-          id: taskId,
-          title: subtask,
-          description: `Part of ${campaign.name}`,
-          priority: index === 0 ? 'high' : 'medium',
-          createdAt: now,
-        };
-
-        createdTasks.push(task);
-
-        // Emit task assigned event
-        this.emitEvent({
-          id: `event-${Date.now()}-${subtaskIdx}`,
-          timestamp: new Date(),
-          type: 'task_assigned',
-          employeeId: item.assignee.id,
-          employeeName: item.assignee.name,
-          message: `Task: "${subtask}"`,
-          taskId,
-        });
-
-        // Brief delay before next event for staggered effect
-        setTimeout(() => {}, 100 * subtaskIdx);
-      });
-    });
-
-    // Emit collaboration suggestions
-    campaign.routing.suggestedCollaborators.forEach((collaborator) => {
-      this.emitEvent({
-        id: `event-${Date.now()}-collab`,
-        timestamp: new Date(Date.now() + 1000),
-        type: 'collaboration_suggested',
-        employeeId: collaborator.id,
-        employeeName: collaborator.name,
-        message: `Suggested to collaborate with ${campaign.routing.primaryAssignee.name}`,
-      });
-    });
-
-    campaign.events = [
-      ...campaign.events,
-      ...createdTasks.map((task) => ({
-        id: `event-${task.id}`,
-        timestamp: new Date(),
-        type: 'task_assigned' as const,
-        employeeId: '',
-        employeeName: '',
-        message: task.title,
-        taskId: task.id,
-      })),
-    ];
-
-    return createdTasks;
   }
 
   generateSandyResponse(campaign: Campaign): string {
