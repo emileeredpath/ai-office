@@ -1,4 +1,5 @@
 import { EmployeeDeskCard } from './EmployeeDeskCard';
+import { CollaborationPaths } from './CollaborationPaths';
 import { useOfficeStore } from '@/store/officeStore';
 
 interface OfficeFloorCardsProps {
@@ -24,8 +25,11 @@ export function OfficeFloorCards({ showCollaborationPaths = false, onEmployeeAct
       </div>
 
       {/* Employees Grid */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-max">
+      <div className="flex-1 overflow-auto p-6 relative">
+        {/* Collaboration Paths Overlay */}
+        <CollaborationPaths />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-max pt-16">
           {employees.map((emp) => (
             <EmployeeDeskCard
               key={emp.id}

@@ -1,4 +1,5 @@
 import { MessageSquare, Share2, HelpCircle } from 'lucide-react';
+import { SpeechBubble } from './SpeechBubble';
 
 interface Task {
   id: string;
@@ -45,12 +46,23 @@ export function EmployeeDeskCard({
 
   return (
     <div
-      className="rounded-lg overflow-hidden border shadow-lg hover:shadow-xl transition-shadow cursor-pointer group"
+      className="rounded-lg overflow-visible border shadow-lg hover:shadow-xl transition-shadow cursor-pointer group relative"
       style={{
         backgroundColor: '#1D2A3A',
         borderColor: '#3a4f6a',
       }}
     >
+      {/* Speech Bubble for Current Task */}
+      {currentTask && (
+        <div className="absolute -top-20 left-1/2 transform -translate-x-1/2 w-full px-2">
+          <SpeechBubble
+            message={currentTask.title}
+            type="task"
+            accentColor={statusColors[status]}
+          />
+        </div>
+      )}
+
       {/* Card Header with Avatar */}
       <div className="relative p-4 bg-gradient-to-r from-[#2E3B4A] to-[#1D2A3A]">
         {/* Avatar */}
