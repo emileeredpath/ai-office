@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Employee, EmployeeStatus, Task, TaskStatus } from '@/types/employee';
+import { TASK_STATUS_LABELS } from '@/types/employee';
 import { employees as seedEmployees } from '@/data/employees';
 
 function getOfficeTime(): 'morning' | 'afternoon' | 'evening' {
@@ -53,10 +54,17 @@ function getInitialEmployees(): Employee[] {
   return seedEmployees;
 }
 
+export interface ActivityEntry {
+  id: string;
+  timestamp: string;
+  message: string;
+}
+
 interface OfficeStore {
   employees: Employee[];
   selectedEmployeeId: string | null;
   officeTime: 'morning' | 'afternoon' | 'evening';
+  activityLog: ActivityEntry[];
 
   selectEmployee: (id: string | null) => void;
   setEmployeeStatus: (id: string, status: EmployeeStatus) => void;
@@ -70,23 +78,33 @@ interface OfficeStore {
   completeTask: (employeeId: string, taskId: string) => void;
   addTaskNote: (employeeId: string, taskId: string, text: string) => void;
   removeTask: (employeeId: string, taskId: string) => void;
+  logActivity: (message: string) => void;
 }
 
 export const useOfficeStore = create<OfficeStore>()(
   persist<OfficeStore>(
-    (set) => ({
+    (set, get) => ({
       employees: getInitialEmployees(),
       selectedEmployeeId: null,
       officeTime: getOfficeTime(),
+      activityLog: [],
 
       selectEmployee: (id) => set({ selectedEmployeeId: id }),
+
+      logActivity: (message) =>
+        set((state) => ({
+          activityLog: [
+            ...state.activityLog,
+            { id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, timestamp: new Date().toISOString(), message },
+          ].slice(-100),
+        })),
 
       setEmployeeStatus: (id, status) =>
         set((state) => ({
           employees: state.employees.map((e) => (e.id === id ? { ...e, status } : e)),
         })),
 
-      assignTask: (employeeId, task) =>
+      assignTask: (employeeId, task) => {
         set((state) => ({
           employees: state.employees.map((e) => {
             if (e.id !== employeeId) return e;
@@ -100,34 +118,50 @@ export const useOfficeStore = create<OfficeStore>()(
             const tasks = [...e.tasks, newTask];
             return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
           }),
-        })),
+        }));
+        const employee = get().employees.find((e) => e.id === employeeId);
+        if (employee) get().logActivity(`${employee.name} was assigned "${task.title}"`);
+      },
 
-      startTask: (employeeId, taskId) =>
+      startTask: (employeeId, taskId) => {
         set((state) => ({
           employees: state.employees.map((e) => {
             if (e.id !== employeeId) return e;
             const tasks = e.tasks.map((t) => (t.id === taskId ? touch(t, 'in_progress') : t));
             return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
           }),
-        })),
+        }));
+        const employee = get().employees.find((e) => e.id === employeeId);
+        const task = employee?.tasks.find((t) => t.id === taskId);
+        if (employee && task) get().logActivity(`${employee.name} started "${task.title}"`);
+      },
 
-      setTaskStatus: (employeeId, taskId, status) =>
+      setTaskStatus: (employeeId, taskId, status) => {
         set((state) => ({
           employees: state.employees.map((e) => {
             if (e.id !== employeeId) return e;
             const tasks = e.tasks.map((t) => (t.id === taskId ? touch(t, status) : t));
             return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
           }),
-        })),
+        }));
+        const employee = get().employees.find((e) => e.id === employeeId);
+        const task = employee?.tasks.find((t) => t.id === taskId);
+        if (employee && task)
+          get().logActivity(`${employee.name} marked "${task.title}" as ${TASK_STATUS_LABELS[status]}`);
+      },
 
-      completeTask: (employeeId, taskId) =>
+      completeTask: (employeeId, taskId) => {
         set((state) => ({
           employees: state.employees.map((e) => {
             if (e.id !== employeeId) return e;
             const tasks = e.tasks.map((t) => (t.id === taskId ? touch(t, 'complete') : t));
             return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
           }),
-        })),
+        }));
+        const employee = get().employees.find((e) => e.id === employeeId);
+        const task = employee?.tasks.find((t) => t.id === taskId);
+        if (employee && task) get().logActivity(`${employee.name} completed "${task.title}"`);
+      },
 
       addTaskNote: (employeeId, taskId, text) =>
         set((state) => ({
