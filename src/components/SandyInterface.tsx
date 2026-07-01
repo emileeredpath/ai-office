@@ -1,30 +1,72 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { OfficeFloorCards } from '@/components/office/OfficeFloorCards';
 import { BoardRoomPanel } from '@/components/BoardRoomPanel';
 import { SandyAgent } from '@/components/SandyAgent';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Send } from 'lucide-react';
-import { globalWorkflowOrchestrator, WorkflowTask } from '@/systems/WorkflowOrchestrator';
+import { useOfficeStore } from '@/store/officeStore';
+import { RoutingEngine } from '@/systems/RoutingEngine';
+import { WorkflowEngine, type WorkflowEvent } from '@/systems/WorkflowEngine';
 
 export function SandyInterface() {
   const [taskInput, setTaskInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeWorkflow, setActiveWorkflow] = useState<WorkflowTask | null>(null);
+  const [sandyMessage, setSandyMessage] = useState<string | undefined>();
+  const [workflowEvents, setWorkflowEvents] = useState<WorkflowEvent[]>([]);
+
+  const employees = useOfficeStore((state) => state.employees);
+  const addTask = useOfficeStore((state) => state.addTask);
 
   const handleAskSandy = async () => {
     if (!taskInput.trim() || isProcessing) return;
 
     setIsProcessing(true);
+    setWorkflowEvents([]);
 
     try {
-      const workflow = globalWorkflowOrchestrator.createWorkflow(taskInput);
-      globalWorkflowOrchestrator.executeWorkflow(workflow.id);
+      // Route the request
+      const routingEngine = new RoutingEngine(employees);
+      const routing = routingEngine.route(taskInput, employees);
 
-      setActiveWorkflow(workflow);
+      // Create workflow
+      const workflowEngine = new WorkflowEngine();
+      const campaign = workflowEngine.createCampaign(taskInput, routing, employees);
+
+      // Listen for workflow events
+      workflowEngine.onEvent((event) => {
+        setWorkflowEvents((prev) => [...prev, event]);
+        setSandyMessage(event.message);
+      });
+
+      // Assign tasks
+      const tasks = workflowEngine.assignTasks(
+        campaign.id,
+        campaign.routing.taskBreakdown,
+        employees
+      );
+
+      // Add tasks to employees in the store
+      campaign.routing.taskBreakdown.forEach((item) => {
+        item.subtasks.forEach((subtask, idx) => {
+          const task = {
+            id: `task-${campaign.id}-${item.assignee.id}-${idx}`,
+            title: subtask,
+            priority: idx === 0 ? ('high' as const) : ('medium' as const),
+            createdAt: new Date().toISOString(),
+          };
+          addTask(item.assignee.id, task);
+        });
+      });
+
+      // Generate Sandy's response
+      const sandyResponse = workflowEngine.generateSandyResponse(campaign);
+      setSandyMessage(sandyResponse);
+
       setTaskInput('');
-      setTimeout(() => setIsProcessing(false), 500);
+      setTimeout(() => setIsProcessing(false), 2000);
     } catch (error) {
       console.error('Error creating workflow:', error);
+      setSandyMessage('Error processing request. Please try again.');
       setIsProcessing(false);
     }
   };
@@ -35,10 +77,6 @@ export function SandyInterface() {
       handleAskSandy();
     }
   };
-
-  const sandyMessage = activeWorkflow
-    ? `Routing: ${activeWorkflow.description} → Assigned to team members`
-    : undefined;
 
   return (
     <MainLayout rightPanel={<BoardRoomPanel />}>
@@ -127,7 +165,7 @@ export function SandyInterface() {
       </div>
 
       {/* Sandy Agent - Always visible */}
-      <SandyAgent activeMessage={sandyMessage} />
+      <SandyAgent activeMessage={sandyMessage || (workflowEvents[workflowEvents.length - 1]?.message)} />
     </MainLayout>
   );
 }
