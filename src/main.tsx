@@ -1,1 +1,17 @@
-aW1wb3J0IFJlYWN0IGZyb20gJ3JlYWN0JzsKaW1wb3J0IFJlYWN0RE9NIGZyb20gJ3JlYWN0LWRvbS9jbGllbnQnOwppbXBvcnQgQXBwIGZyb20gJy4vQXBwJzsKaW1wb3J0IHsgRXJyb3JCb3VuZGFyeSB9IGZyb20gJy4vY29tcG9uZW50cy9FcnJvckJvdW5kYXJ5JzsKaW1wb3J0ICcuL2luZGV4LmNzcyc7Cgpjb25zb2xlLmxvZygn8J+agCBBSSBPZmZpY2UgaXMgc3RhcnRpbmcuLi4nKTsKClJlYWN0RE9NLmNyZWF0ZVJvb3QoZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Jvb3QnKSEpLnJlbmRlcigKICA8UmVhY3QuU3RyaWN0TW9kZT4KICAgIDxFcnJvckJvdW5kYXJ5PgogICAgICA8QXBwIC8+CiAgICA8L0Vycm9yQm91bmRhcnk+CiAgPC9SZWFjdC5TdHJpY3RNb2RlPgopOwoKY29uc29sZS5sb2coJ+KckyBBcHAgbW91bnRlZCB0byBET00nKTsK
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import './index.css';
+
+console.log('🚀 AI Office is starting...');
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </React.StrictMode>
+);
+
+console.log('✓ App mounted to DOM');
