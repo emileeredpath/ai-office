@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { OfficeScene } from '@/components/3d/OfficeScene';
+import { OfficeFloorCards } from '@/components/office/OfficeFloorCards';
 import { SandyResponsePanel } from '@/components/SandyResponsePanel';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Send } from 'lucide-react';
@@ -40,10 +40,14 @@ export function SandyInterface() {
       {/* Sandy Response Panel */}
       <SandyResponsePanel workflow={activeWorkflow} onClose={() => setActiveWorkflow(null)} />
 
-      {/* 3D Office Scene */}
+      {/* Office Floor with Employee Desks */}
       <div className="w-full h-full flex flex-col relative">
-        <div className="flex-1 relative">
-          <OfficeScene />
+        <div className="flex-1 relative overflow-hidden">
+          <OfficeFloorCards
+            onEmployeeAction={(employeeId, action) => {
+              console.log(`Employee action: ${employeeId} - ${action}`);
+            }}
+          />
         </div>
 
         {/* Sandy Interaction Panel - Bottom Overlay */}
