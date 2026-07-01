@@ -1,13 +1,1 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
-
-export default defineConfig({
-  base: '/mtech-ai-office/',
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
+aW1wb3J0IHsgZGVmaW5lQ29uZmlnIH0gZnJvbSAndml0ZScKaW1wb3J0IHJlYWN0IGZyb20gJ0B2aXRlanMvcGx1Z2luLXJlYWN0JwppbXBvcnQgcGF0aCBmcm9tICdwYXRoJwoKZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHsKICBiYXNlOiAnL2FpLW9mZmljZS8nLAogIHBsdWdpbnM6IFtyZWFjdCgpXSwKICByZXNvbHZlOiB7CiAgICBhbGlhczogewogICAgICAnQCc6IHBhdGgucmVzb2x2ZShfX2Rpcm5hbWUsICcuL3NyYycpLAogICAgfSwKICB9LAp9KQo=
