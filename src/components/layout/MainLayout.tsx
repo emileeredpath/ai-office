@@ -6,9 +6,10 @@ import { RightSidebar } from './RightSidebar';
 interface MainLayoutProps {
   children: ReactNode;
   showRightSidebar?: boolean;
+  rightPanel?: ReactNode;
 }
 
-export function MainLayout({ children, showRightSidebar = true }: MainLayoutProps) {
+export function MainLayout({ children, showRightSidebar = true, rightPanel }: MainLayoutProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: '#111B26' }}>
       {/* Left Sidebar */}
@@ -23,8 +24,8 @@ export function MainLayout({ children, showRightSidebar = true }: MainLayoutProp
         <div className="flex-1 overflow-hidden flex">
           <div className="flex-1 overflow-auto">{children}</div>
 
-          {/* Right Sidebar */}
-          {showRightSidebar && <RightSidebar />}
+          {/* Right Sidebar or Custom Panel */}
+          {rightPanel || (showRightSidebar && <RightSidebar />)}
         </div>
       </div>
     </div>

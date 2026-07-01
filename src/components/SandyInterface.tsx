@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { OfficeFloorCards } from '@/components/office/OfficeFloorCards';
-import { SandyResponsePanel } from '@/components/SandyResponsePanel';
+import { BoardRoomPanel } from '@/components/BoardRoomPanel';
+import { SandyAgent } from '@/components/SandyAgent';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Send } from 'lucide-react';
 import { globalWorkflowOrchestrator, WorkflowTask } from '@/systems/WorkflowOrchestrator';
@@ -35,10 +36,12 @@ export function SandyInterface() {
     }
   };
 
+  const sandyMessage = activeWorkflow
+    ? `Routing: ${activeWorkflow.description} → Assigned to team members`
+    : undefined;
+
   return (
-    <MainLayout showRightSidebar={!activeWorkflow}>
-      {/* Sandy Response Panel */}
-      <SandyResponsePanel workflow={activeWorkflow} onClose={() => setActiveWorkflow(null)} />
+    <MainLayout rightPanel={<BoardRoomPanel />}>
 
       {/* Office Floor with Employee Desks */}
       <div className="w-full h-full flex flex-col relative">
@@ -122,6 +125,9 @@ export function SandyInterface() {
           }}
         />
       </div>
+
+      {/* Sandy Agent - Always visible */}
+      <SandyAgent activeMessage={sandyMessage} />
     </MainLayout>
   );
 }
