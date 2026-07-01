@@ -1,1 +1,60 @@
-aW1wb3J0IHsgTWVudSwgQmVsbCB9IGZyb20gJ2x1Y2lkZS1yZWFjdCc7CgpleHBvcnQgZnVuY3Rpb24gVG9wSGVhZGVyKCkgewogIHJldHVybiAoCiAgICA8ZGl2CiAgICAgIGNsYXNzTmFtZT0iaC0xNiBmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWJldHdlZW4gcHgtNiBib3JkZXItYiBmbGV4LXNocmluay0wIgogICAgICBzdHlsZT17ewogICAgICAgIGJhY2tncm91bmRDb2xvcjogJyMxMTFCMjYnLAogICAgICAgIGJvcmRlckNvbG9yOiAnIzJFM0I0QScsCiAgICAgIH19CiAgICA+CiAgICAgIHsvKiBMZWZ0IFNlY3Rpb24gKi99CiAgICAgIDxkaXYgY2xhc3NOYW1lPSJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtNCI+CiAgICAgICAgPGJ1dHRvbiBjbGFzc05hbWU9InAtMiBob3ZlcjpiZy1bIzFEMkEzQV0gcm91bmRlZC1sZyB0cmFuc2l0aW9uLWNvbG9ycyI+CiAgICAgICAgICA8TWVudSBzaXplPXsyMH0gY2xhc3NOYW1lPSJ0ZXh0LVsjOEY5MTk0XSIgLz4KICAgICAgICA8L2J1dHRvbj4KICAgICAgICA8ZGl2PgogICAgICAgICAgPGgxIGNsYXNzTmFtZT0idGV4dC1sZyBmb250LWJvbGQgdGV4dC1bI0YwRjRGOF0iPkFJIE9mZmljZTwvaDE+CiAgICAgICAgICA8cCBjbGFzc05hbWU9InRleHQteHMgdGV4dC1bIzhGOTE5NF0iPk1hcmtldGluZyBEZXBhcnRtZW50PC9wPgogICAgICAgIDwvZGl2PgogICAgICA8L2Rpdj4KCiAgICAgIHsvKiBDZW50ZXIgU2VjdGlvbiAtIE5hdmlnYXRpb24gVGFicyAqL30KICAgICAgPGRpdiBjbGFzc05hbWU9ImhpZGRlbiBtZDpmbGV4IGl0ZW1zLWNlbnRlciBnYXAtNiI+CiAgICAgICAge1sKICAgICAgICAgIHsgaWNvbjogJ/Cfk4onLCBsYWJlbDogJ09mZmljZSBGbG9vcicgfSwKICAgICAgICAgIHsgaWNvbjogJ/Cfj5vvuI8nLCBsYWJlbDogJ0JvYXJkIFJvb20nIH0sCiAgICAgICAgICB7IGljb246ICfwn5OIJywgbGFiZWw6ICdSZXBvcnRzJyB9LAogICAgICAgICAgeyBpY29uOiAn4pqZ77iPJywgbGFiZWw6ICdTZXR0aW5ncycgfSwKICAgICAgICBdLm1hcCgodGFiLCBpKSA9PiAoCiAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgIGtleT17aX0KICAgICAgICAgICAgY2xhc3NOYW1lPSJweC0zIHB5LTIgdGV4dC1zbSB0ZXh0LVsjOEY5MTk0XSBob3Zlcjp0ZXh0LVsjRjk3MDFGXSB0cmFuc2l0aW9uLWNvbG9ycyBmbGV4IGl0ZW1zLWNlbnRlciBnYXAtMiIKICAgICAgICAgID4KICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPSJ0ZXh0LWxnIj57dGFiLmljb259PC9zcGFuPgogICAgICAgICAgICB7dGFiLmxhYmVsfQogICAgICAgICAgPC9idXR0b24+CiAgICAgICAgKSl9CiAgICAgIDwvZGl2PgoKICAgICAgey8qIFJpZ2h0IFNlY3Rpb24gKi99CiAgICAgIDxkaXYgY2xhc3NOYW1lPSJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtNCI+CiAgICAgICAgPGJ1dHRvbiBjbGFzc05hbWU9InJlbGF0aXZlIHAtMiBob3ZlcjpiZy1bIzFEMkEzQV0gcm91bmRlZC1sZyB0cmFuc2l0aW9uLWNvbG9ycyI+CiAgICAgICAgICA8QmVsbCBzaXplPXsyMH0gY2xhc3NOYW1lPSJ0ZXh0LVsjOEY5MTk0XSIgLz4KICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT0iYWJzb2x1dGUgdG9wLTEgcmlnaHQtMSB3LTIgaC0yIGJnLVsjRjk3MDFGXSByb3VuZGVkLWZ1bGwiIC8+CiAgICAgICAgPC9idXR0b24+CgogICAgICAgIDxkaXYgY2xhc3NOYW1lPSJmbGV4IGl0ZW1zLWNlbnRlciBnYXAtMyI+CiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT0idGV4dC1yaWdodCBoaWRkZW4gc206YmxvY2siPgogICAgICAgICAgICA8cCBjbGFzc05hbWU9InRleHQtc20gZm9udC1tZWRpdW0gdGV4dC1bI0YwRjRGOF0iPkVtaWxlZTwvcD4KICAgICAgICAgICAgPHAgY2xhc3NOYW1lPSJ0ZXh0LXhzIHRleHQtWyM4RjkxOTRdIj5NYXJrZXRpbmcgRGlyZWN0b3I8L3A+CiAgICAgICAgICA8L2Rpdj4KICAgICAgICAgIDxidXR0b24gY2xhc3NOYW1lPSJ3LTEwIGgtMTAgcm91bmRlZC1mdWxsIGJnLWdyYWRpZW50LXRvLWJyIGZyb20tWyNGOTcwMUZdIHRvLVsjRkY5RTY0XSB0ZXh0LXdoaXRlIGZvbnQtYm9sZCBob3ZlcjpvcGFjaXR5LTgwIHRyYW5zaXRpb24tb3BhY2l0eSI+CiAgICAgICAgICAgIEUKICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgIDwvZGl2PgogICAgICA8L2Rpdj4KICAgIDwvZGl2PgogICk7Cn0K
+import { Menu, Bell } from 'lucide-react';
+
+export function TopHeader() {
+  return (
+    <div
+      className="h-16 flex items-center justify-between px-6 border-b flex-shrink-0"
+      style={{
+        backgroundColor: '#111B26',
+        borderColor: '#2E3B4A',
+      }}
+    >
+      {/* Left Section */}
+      <div className="flex items-center gap-4">
+        <button className="p-2 hover:bg-[#1D2A3A] rounded-lg transition-colors">
+          <Menu size={20} className="text-[#8F9194]" />
+        </button>
+        <div>
+          <h1 className="text-lg font-bold text-[#F0F4F8]">AI Office</h1>
+          <p className="text-xs text-[#8F9194]">Marketing Department</p>
+        </div>
+      </div>
+
+      {/* Center Section - Navigation Tabs */}
+      <div className="hidden md:flex items-center gap-6">
+        {[
+          { icon: '📊', label: 'Office Floor' },
+          { icon: '🏛️', label: 'Board Room' },
+          { icon: '📈', label: 'Reports' },
+          { icon: '⚙️', label: 'Settings' },
+        ].map((tab, i) => (
+          <button
+            key={i}
+            className="px-3 py-2 text-sm text-[#8F9194] hover:text-[#F9701F] transition-colors flex items-center gap-2"
+          >
+            <span className="text-lg">{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Right Section */}
+      <div className="flex items-center gap-4">
+        <button className="relative p-2 hover:bg-[#1D2A3A] rounded-lg transition-colors">
+          <Bell size={20} className="text-[#8F9194]" />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-[#F9701F] rounded-full" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-medium text-[#F0F4F8]">Emilee</p>
+            <p className="text-xs text-[#8F9194]">Marketing Director</p>
+          </div>
+          <button className="w-10 h-10 rounded-full bg-gradient-to-br from-[#F9701F] to-[#FF9E64] text-white font-bold hover:opacity-80 transition-opacity">
+            E
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
