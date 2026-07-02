@@ -1,5 +1,5 @@
 import type { Employee } from '@/types/employee';
-import { Character3DDetailed } from './Character3DDetailed';
+import { CharacterIllustrated } from './CharacterIllustrated';
 import { TaskCard } from '../components/TaskCard';
 
 interface Desk3DProps {
@@ -28,20 +28,20 @@ export function Desk3D({ employee, x, z, isSelected, isActive, onClick }: Desk3D
       <div
         style={{
           position: 'relative',
-          width: '200px',
-          height: '110px',
+          width: '240px',
+          height: '130px',
           backgroundColor: '#9B7E6B',
-          background: 'linear-gradient(135deg, #C4A574 0%, #B8945F 20%, #9B7E6B 50%, #7A6347 100%)',
-          borderRadius: '8px',
-          border: isSelected ? '3px solid #F97021' : '1px solid rgba(0,0,0,0.3)',
+          background: 'linear-gradient(135deg, #D4B89F 0%, #C4A574 25%, #9B7E6B 55%, #7A6347 100%)',
+          borderRadius: '6px',
+          border: isSelected ? '3px solid #F97021' : '1px solid rgba(0,0,0,0.25)',
           boxShadow: `
-            0 25px 50px rgba(0,0,0,0.35),
-            inset 0 1px 3px rgba(255,255,255,0.25),
-            inset -3px -3px 10px rgba(0,0,0,0.25)
+            0 30px 60px rgba(0,0,0,0.4),
+            inset 0 1px 3px rgba(255,255,255,0.3),
+            inset -2px -2px 8px rgba(0,0,0,0.2)
           `,
           overflow: 'visible',
           transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          transform: isSelected ? 'translateY(-15px) scale(1.08)' : 'translateY(0)',
+          transform: isSelected ? 'translateY(-18px) scale(1.1)' : 'translateY(0)',
         }}
       >
         {/* Wood grain texture */}
@@ -63,17 +63,17 @@ export function Desk3D({ employee, x, z, isSelected, isActive, onClick }: Desk3D
         <div
           style={{
             position: 'absolute',
-            left: '12px',
-            top: '12px',
-            width: '65px',
-            height: '52px',
+            left: '15px',
+            top: '15px',
+            width: '85px',
+            height: '65px',
             backgroundColor: '#1a1a2e',
-            borderRadius: '6px',
-            border: `3px solid ${employee.accentColor}`,
+            borderRadius: '8px',
+            border: `4px solid ${employee.accentColor}`,
             boxShadow: `
-              0 8px 16px rgba(0,0,0,0.4),
-              0 0 20px ${employee.accentColor}88,
-              inset 0 0 12px ${employee.accentColor}44
+              0 10px 25px rgba(0,0,0,0.45),
+              0 0 25px ${employee.accentColor}99,
+              inset 0 0 15px ${employee.accentColor}44
             `,
             overflow: 'hidden',
           }}
@@ -168,12 +168,13 @@ export function Desk3D({ employee, x, z, isSelected, isActive, onClick }: Desk3D
         style={{
           position: 'absolute',
           left: '50%',
-          top: '20%',
-          transform: 'translate(-50%, -100%)',
+          top: '-10%',
+          transform: 'translate(-50%, -100%) scale(1.35)',
           zIndex: 15,
+          transformOrigin: 'center bottom',
         }}
       >
-        <Character3DDetailed employee={employee} isSelected={isSelected} isTyping={isActive} />
+        <CharacterIllustrated employee={employee} isSelected={isSelected} isTyping={isActive} />
       </div>
 
       {/* Task card below desk */}
@@ -183,8 +184,9 @@ export function Desk3D({ employee, x, z, isSelected, isActive, onClick }: Desk3D
           top: '100%',
           left: '50%',
           transform: 'translateX(-50%)',
-          marginTop: '12px',
-          minWidth: '160px',
+          marginTop: '20px',
+          minWidth: '220px',
+          zIndex: 8,
         }}
       >
         <TaskCard employee={employee} isActive={isActive} />

@@ -14,15 +14,15 @@ export function TaskCard({ employee, isActive }: TaskCardProps) {
   return (
     <div
       style={{
-        width: '160px',
+        width: '100%',
         backgroundColor: 'var(--bg-secondary)',
-        borderRadius: '8px',
-        border: `1px solid var(--border-color)`,
-        padding: '8px',
-        boxShadow: isActive ? '0 8px 16px rgba(249,112,31,0.2)' : '0 2px 8px rgba(0,0,0,0.1)',
+        borderRadius: '10px',
+        border: `1.5px solid var(--border-color)`,
+        padding: '12px',
+        boxShadow: isActive ? '0 12px 24px rgba(249,112,31,0.25)' : '0 4px 12px rgba(0,0,0,0.15)',
         transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        transform: isActive ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
-        fontSize: '11px',
+        transform: isActive ? 'translateY(-6px) scale(1.04)' : 'translateY(0) scale(1)',
+        fontSize: '12px',
         color: 'var(--text-secondary)',
       }}
     >

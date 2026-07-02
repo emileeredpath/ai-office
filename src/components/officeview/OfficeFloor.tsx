@@ -13,16 +13,21 @@ interface OfficeFloorProps {
   onSelectRoom: (roomId: string | null) => void;
 }
 
-// Desk positions in 3D office space
+// Desk positions in 3D office space - redesigned for better composition
 const DESK_POSITIONS = [
-  { employeeId: 'marketing-director', x: 15, z: 20 },
-  { employeeId: 'seo-ppc-manager', x: 35, z: 20 },
-  { employeeId: 'website-auditor', x: 55, z: 20 },
-  { employeeId: 'social-media-manager', x: 12, z: 60 },
-  { employeeId: 'proposal-writer', x: 40, z: 60 },
-  { employeeId: 'case-study-writer', x: 68, z: 60 },
-  { employeeId: 'email-marketing-manager', x: 25, z: 75 },
-  { employeeId: 'funding-rewards-manager', x: 55, z: 75 },
+  // Front row - prominent positions
+  { employeeId: 'marketing-director', x: 20, z: 25 },
+  { employeeId: 'seo-ppc-manager', x: 50, z: 28 },
+  { employeeId: 'website-auditor', x: 78, z: 26 },
+
+  // Middle row - conversational grouping
+  { employeeId: 'social-media-manager', x: 15, z: 50 },
+  { employeeId: 'proposal-writer', x: 50, z: 52 },
+  { employeeId: 'case-study-writer', x: 85, z: 50 },
+
+  // Back row - subtle depth
+  { employeeId: 'email-marketing-manager', x: 35, z: 70 },
+  { employeeId: 'funding-rewards-manager', x: 70, z: 72 },
 ];
 
 const SPEECH_MESSAGES: Record<string, string> = {
