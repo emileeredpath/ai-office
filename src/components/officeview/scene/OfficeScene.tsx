@@ -21,7 +21,7 @@ export function OfficeScene({ children }: OfficeSceneProps) {
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, #e8dcc8 0%, #dcc8b8 50%, #d0bca8 100%)',
+          background: 'linear-gradient(180deg, #e8dcc8 0%, #e0d4c0 40%, #d4bfa8 100%)',
           pointerEvents: 'none',
         }}
       />
@@ -48,16 +48,66 @@ export function OfficeScene({ children }: OfficeSceneProps) {
               top: `${15 + i * 20}%`,
               width: '140px',
               height: '80px',
-              backgroundColor: 'rgba(200,230,255,0.25)',
-              border: '3px solid rgba(100,160,220,0.4)',
-              borderRadius: '8px',
-              boxShadow: 'inset 0 0 20px rgba(200,230,255,0.3), 0 10px 30px rgba(0,0,0,0.15)',
-              background: 'linear-gradient(135deg, rgba(220,240,255,0.4) 0%, rgba(150,200,255,0.2) 100%)',
+              border: '3px solid #8B7355',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              boxShadow: '0 15px 35px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3)',
             }}
           >
-            {/* Window panes */}
-            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', backgroundColor: 'rgba(100,160,220,0.3)' }} />
-            <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: '1px', backgroundColor: 'rgba(100,160,220,0.3)' }} />
+            {/* Window glass with outdoor view */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(135deg, rgba(180,200,220,0.6) 0%, rgba(150,180,210,0.5) 50%, rgba(120,160,200,0.4) 100%)',
+                backgroundImage: `
+                  linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 30%),
+                  linear-gradient(45deg, rgba(100,150,200,0.1) 25%, transparent 25%, transparent 75%, rgba(100,150,200,0.1) 75%),
+                  linear-gradient(45deg, rgba(100,150,200,0.1) 25%, transparent 25%, transparent 75%, rgba(100,150,200,0.1) 75%)
+                `,
+                backgroundSize: '100% 100%, 4px 4px, 4px 4px',
+              }}
+            />
+
+            {/* Window frame divider - vertical */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: '50%',
+                width: '2px',
+                backgroundColor: '#6B5344',
+                boxShadow: 'inset 1px 0 2px rgba(0,0,0,0.5)',
+              }}
+            />
+
+            {/* Window frame divider - horizontal */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: 0,
+                right: 0,
+                height: '2px',
+                backgroundColor: '#6B5344',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
+              }}
+            />
+
+            {/* Glass reflection */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '5%',
+                left: '10%',
+                width: '30%',
+                height: '25%',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.1) 100%)',
+                borderRadius: '2px',
+                filter: 'blur(2px)',
+              }}
+            />
           </div>
         ))}
       </div>
@@ -69,15 +119,15 @@ export function OfficeScene({ children }: OfficeSceneProps) {
           bottom: 0,
           left: 0,
           right: 0,
-          height: '45%',
-          background: 'linear-gradient(135deg, #d4a574 0%, #c29564 20%, #b8845c 40%, #a67650 70%, #9a6a48 100%)',
+          height: '50%',
+          background: 'linear-gradient(to bottom, #c9a876 0%, #b8956b 30%, #a68560 60%, #8b6f47 100%)',
           backgroundImage: `
-            linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.05) 50%, transparent 100%),
-            repeating-linear-gradient(0deg, transparent 0%, transparent 40px, rgba(0,0,0,0.03) 40px, rgba(0,0,0,0.03) 80px),
-            repeating-linear-gradient(90deg, transparent 0%, transparent 60px, rgba(0,0,0,0.02) 60px, rgba(0,0,0,0.02) 120px),
-            linear-gradient(135deg, #d4a574 0%, #c29564 20%, #b8845c 40%, #a67650 70%, #9a6a48 100%)
+            radial-gradient(ellipse 1600px 400px at 50% -100px, rgba(255,255,255,0.15) 0%, transparent 50%),
+            linear-gradient(90deg, rgba(139,111,71,0.1) 0%, transparent 30%, transparent 70%, rgba(139,111,71,0.1) 100%),
+            repeating-linear-gradient(0deg, transparent 0%, transparent 80px, rgba(0,0,0,0.05) 80px, rgba(0,0,0,0.05) 160px),
+            repeating-linear-gradient(90deg, transparent 0%, transparent 100px, rgba(0,0,0,0.03) 100px, rgba(0,0,0,0.03) 200px)
           `,
-          boxShadow: 'inset 0 -30px 60px rgba(0,0,0,0.2), inset 0 30px 80px rgba(255,255,255,0.08)',
+          boxShadow: 'inset 0 0 120px rgba(0,0,0,0.35), inset 0 50px 150px rgba(255,255,255,0.12)',
         }}
       />
 
@@ -85,13 +135,27 @@ export function OfficeScene({ children }: OfficeSceneProps) {
       <div
         style={{
           position: 'absolute',
-          top: '-5%',
+          top: '-10%',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '80%',
-          height: '50%',
-          background: 'radial-gradient(ellipse at center, rgba(255,200,100,0.15) 0%, transparent 70%)',
-          filter: 'blur(50px)',
+          width: '90%',
+          height: '60%',
+          background: 'radial-gradient(ellipse 1200px 600px at center, rgba(255,220,150,0.2) 0%, rgba(255,200,120,0.1) 40%, transparent 80%)',
+          filter: 'blur(80px)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Secondary ambient lighting from windows */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '-5%',
+          right: '-5%',
+          width: '40%',
+          height: '80%',
+          background: 'radial-gradient(ellipse 800px 600px at right, rgba(200,220,255,0.15) 0%, transparent 70%)',
+          filter: 'blur(60px)',
           pointerEvents: 'none',
         }}
       />

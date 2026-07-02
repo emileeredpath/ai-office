@@ -1,5 +1,5 @@
 import type { Employee } from '@/types/employee';
-import { Character3D } from './Character3D';
+import { Character3DDetailed } from './Character3DDetailed';
 import { TaskCard } from '../components/TaskCard';
 
 interface Desk3DProps {
@@ -28,20 +28,20 @@ export function Desk3D({ employee, x, z, isSelected, isActive, onClick }: Desk3D
       <div
         style={{
           position: 'relative',
-          width: '160px',
-          height: '90px',
-          backgroundColor: '#A0826D',
-          background: 'linear-gradient(135deg, #C4B5A0 0%, #B8945F 20%, #A0826D 50%, #8B7355 100%)',
-          borderRadius: '12px',
-          border: isSelected ? '3px solid #F97021' : '2px solid rgba(0,0,0,0.25)',
+          width: '200px',
+          height: '110px',
+          backgroundColor: '#9B7E6B',
+          background: 'linear-gradient(135deg, #C4A574 0%, #B8945F 20%, #9B7E6B 50%, #7A6347 100%)',
+          borderRadius: '8px',
+          border: isSelected ? '3px solid #F97021' : '1px solid rgba(0,0,0,0.3)',
           boxShadow: `
-            0 20px 40px rgba(0,0,0,0.3),
-            inset 0 1px 2px rgba(255,255,255,0.3),
-            inset -2px -2px 8px rgba(0,0,0,0.2)
+            0 25px 50px rgba(0,0,0,0.35),
+            inset 0 1px 3px rgba(255,255,255,0.25),
+            inset -3px -3px 10px rgba(0,0,0,0.25)
           `,
           overflow: 'visible',
           transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          transform: isSelected ? 'translateY(-12px) scale(1.05)' : 'translateY(0)',
+          transform: isSelected ? 'translateY(-15px) scale(1.08)' : 'translateY(0)',
         }}
       >
         {/* Wood grain texture */}
@@ -168,12 +168,12 @@ export function Desk3D({ employee, x, z, isSelected, isActive, onClick }: Desk3D
         style={{
           position: 'absolute',
           left: '50%',
-          top: '25%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 5,
+          top: '20%',
+          transform: 'translate(-50%, -100%)',
+          zIndex: 15,
         }}
       >
-        <Character3D employee={employee} isSelected={isSelected} isTyping={isActive} />
+        <Character3DDetailed employee={employee} isSelected={isSelected} isTyping={isActive} />
       </div>
 
       {/* Task card below desk */}
