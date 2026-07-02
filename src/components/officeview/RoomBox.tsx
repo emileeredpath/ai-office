@@ -68,17 +68,17 @@ export function RoomBox({ room, employees, isActive, onSelect }: RoomBoxProps) {
 
       {/* Room floor (isometric hexagon) */}
       <div
-        className="absolute transition-all"
+        className="absolute transition-all duration-300"
         style={{
           inset: '18% 2% 2% 2%',
           background: isActive
-            ? `linear-gradient(165deg, ${room.color}2E, #10161F 65%)`
-            : 'linear-gradient(165deg, #161D27, #0D131A 65%)',
+            ? `linear-gradient(165deg, ${room.color}2E, var(--bg-tertiary) 65%)`
+            : 'linear-gradient(165deg, var(--bg-tertiary), var(--bg-primary) 65%)',
           clipPath: 'polygon(50% 0%, 96% 22%, 96% 78%, 50% 100%, 4% 78%, 4% 22%)',
-          border: `1px solid ${isActive ? room.color : 'rgba(255,255,255,0.07)'}`,
+          border: `1px solid ${isActive ? room.color : 'var(--border-color)'}`,
           boxShadow: isActive
             ? `0 0 0 1px ${room.color}55, 0 0 26px ${room.color}55, inset 0 0 30px ${room.color}18`
-            : 'inset 0 0 20px rgba(0,0,0,0.4)',
+            : 'inset 0 0 20px rgba(0,0,0,0.2)',
         }}
       >
         {/* Floor grid sheen */}
@@ -95,7 +95,7 @@ export function RoomBox({ room, employees, isActive, onSelect }: RoomBoxProps) {
         <div className="absolute inset-0">
           {employees.length === 0 ? (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-xs" style={{ color: '#4A5568' }}>
+              <span className="text-xs transition-colors duration-300" style={{ color: 'var(--text-tertiary)' }}>
                 Meeting space
               </span>
             </div>
@@ -127,15 +127,15 @@ export function RoomBox({ room, employees, isActive, onSelect }: RoomBoxProps) {
 
       {/* Room label plaque */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 top-0 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap z-20"
+        className="absolute left-1/2 -translate-x-1/2 top-0 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap z-20 transition-all duration-300"
         style={{
-          backgroundColor: 'rgba(8,11,16,0.9)',
-          color: '#E8ECF1',
+          backgroundColor: 'var(--bg-card)',
+          color: 'var(--text-primary)',
           border: `1px solid ${room.color}55`,
         }}
       >
         {room.name}
-        <span className="ml-1.5 font-normal" style={{ color: '#5C6879' }}>
+        <span className="ml-1.5 font-normal transition-colors duration-300" style={{ color: 'var(--text-secondary)' }}>
           {employees.length} {employees.length === 1 ? 'member' : 'members'}
         </span>
       </div>
