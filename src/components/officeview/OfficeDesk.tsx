@@ -8,17 +8,19 @@ interface OfficeDeskProps {
 
 export function OfficeDesk({ employee, isSelected, isActive }: OfficeDeskProps) {
   return (
-    <div className="flex flex-col items-center gap-1 transition-all duration-300">
+    <div className="flex flex-col items-center gap-1 transition-all duration-300 hover:scale-105">
       {/* Wooden Desk */}
       <div
-        className="relative rounded-sm overflow-hidden transition-all duration-300"
+        className="relative rounded-sm overflow-hidden transition-all duration-300 cursor-pointer"
         style={{
           width: '90px',
           height: '60px',
-          background: 'linear-gradient(135deg, #8B6F47 0%, #A0826D 50%, #8B7355 100%)',
+          background: isSelected
+            ? 'linear-gradient(135deg, #A0826D 0%, #B8945F 50%, #9A7E52 100%)'
+            : 'linear-gradient(135deg, #8B6F47 0%, #A0826D 50%, #8B7355 100%)',
           border: `2px solid ${isSelected ? 'var(--accent-orange)' : 'rgba(0,0,0,0.2)'}`,
           boxShadow: isSelected
-            ? `0 0 12px var(--accent-orange), inset 0 0 8px rgba(255,255,255,0.1)`
+            ? `0 0 16px var(--accent-orange), inset 0 0 8px rgba(255,255,255,0.15), 0 4px 12px rgba(0,0,0,0.3)`
             : 'inset 0 0 6px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.2)',
         }}
       >
@@ -42,8 +44,8 @@ export function OfficeDesk({ employee, isSelected, isActive }: OfficeDeskProps) 
             height: '22px',
             backgroundColor: '#0f0f1e',
             borderRadius: '2px',
-            border: '1px solid rgba(249,112,31,0.5)',
-            boxShadow: `0 0 6px ${employee.accentColor}66`,
+            border: `1px solid ${employee.accentColor}`,
+            boxShadow: `0 0 8px ${employee.accentColor}88, inset 0 0 4px ${employee.accentColor}44`,
           }}
         />
 

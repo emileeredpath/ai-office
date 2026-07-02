@@ -64,55 +64,87 @@ export function RightSidebar({ selectedRoomId }: RightSidebarProps) {
 
       {/* Weekly Report Summary */}
       <div
-        className="rounded-lg p-4 flex-1"
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-        }}
-      >
-        <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
-          Week Summary
-        </h3>
-        <div className="space-y-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-          <div
-            className="flex justify-between p-2 rounded"
-            style={{ backgroundColor: 'rgba(249,112,31,0.1)' }}
-          >
-            <span>Tasks Completed</span>
-            <span style={{ fontWeight: 'bold', color: '#10B981' }}>12</span>
-          </div>
-          <div
-            className="flex justify-between p-2 rounded"
-            style={{ backgroundColor: 'rgba(139,92,246,0.1)' }}
-          >
-            <span>Campaigns Active</span>
-            <span style={{ fontWeight: 'bold', color: '#8B5CF6' }}>5</span>
-          </div>
-          <div
-            className="flex justify-between p-2 rounded"
-            style={{ backgroundColor: 'rgba(34,197,94,0.1)' }}
-          >
-            <span>Team Online</span>
-            <span style={{ fontWeight: 'bold', color: '#10B981' }}>9/9</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      <div
         className="rounded-lg p-4"
         style={{
           backgroundColor: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
         }}
       >
-        <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+        <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+          This Week
+        </h3>
+        <div className="space-y-2 text-xs">
+          <div
+            className="flex justify-between p-2 rounded transition-all duration-200 hover:shadow-md"
+            style={{ backgroundColor: 'rgba(249,112,31,0.15)', border: '1px solid rgba(249,112,31,0.3)' }}
+          >
+            <span style={{ color: 'var(--text-secondary)' }}>Tasks Completed</span>
+            <span style={{ fontWeight: 'bold', color: '#F97021' }}>12</span>
+          </div>
+          <div
+            className="flex justify-between p-2 rounded transition-all duration-200 hover:shadow-md"
+            style={{ backgroundColor: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}
+          >
+            <span style={{ color: 'var(--text-secondary)' }}>Active Campaigns</span>
+            <span style={{ fontWeight: 'bold', color: '#8B5CF6' }}>5</span>
+          </div>
+          <div
+            className="flex justify-between p-2 rounded transition-all duration-200 hover:shadow-md"
+            style={{ backgroundColor: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)' }}
+          >
+            <span style={{ color: 'var(--text-secondary)' }}>Team Online</span>
+            <span style={{ fontWeight: 'bold', color: '#10B981' }}>9/9</span>
+          </div>
+          <div
+            className="flex justify-between p-2 rounded transition-all duration-200 hover:shadow-md"
+            style={{ backgroundColor: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)' }}
+          >
+            <span style={{ color: 'var(--text-secondary)' }}>Avg Response</span>
+            <span style={{ fontWeight: 'bold', color: '#3B82F6' }}>2h 15m</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Feed */}
+      <div
+        className="rounded-lg p-4 max-h-32 overflow-y-auto"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+        }}
+      >
+        <h3 className="text-sm font-bold mb-2 sticky top-0" style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}>
           Recent Activity
         </h3>
-        <div className="space-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-          <div>📧 Email campaign launched</div>
-          <div>📊 SEO report updated</div>
-          <div>✅ Website review complete</div>
+        <div className="space-y-1.5 text-xs">
+          <div
+            className="flex gap-2 p-1.5 rounded transition-all duration-200 hover:bg-opacity-50"
+            style={{ backgroundColor: 'rgba(249,112,31,0.1)', color: 'var(--text-secondary)' }}
+          >
+            <span>📧</span>
+            <span className="truncate">Email campaign ready</span>
+          </div>
+          <div
+            className="flex gap-2 p-1.5 rounded transition-all duration-200 hover:bg-opacity-50"
+            style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: 'var(--text-secondary)' }}
+          >
+            <span>📊</span>
+            <span className="truncate">SEO metrics updated</span>
+          </div>
+          <div
+            className="flex gap-2 p-1.5 rounded transition-all duration-200 hover:bg-opacity-50"
+            style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: 'var(--text-secondary)' }}
+          >
+            <span>✅</span>
+            <span className="truncate">Website audit done</span>
+          </div>
+          <div
+            className="flex gap-2 p-1.5 rounded transition-all duration-200 hover:bg-opacity-50"
+            style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: 'var(--text-secondary)' }}
+          >
+            <span>🎯</span>
+            <span className="truncate">Q4 planning started</span>
+          </div>
         </div>
       </div>
     </>

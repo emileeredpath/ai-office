@@ -23,16 +23,16 @@ export function RealisticOfficeView({
 }: RealisticOfficeViewProps) {
   const employees = useOfficeStore((state) => state.employees);
 
-  // Map employees to desks - all in one shared office space
+  // Map employees to desks - arranged in realistic office layout
   const deskPositions = [
-    { x: 10, y: 20, employeeId: 'marketing-director' },
-    { x: 35, y: 15, employeeId: 'website-auditor' },
-    { x: 60, y: 20, employeeId: 'proposal-writer' },
-    { x: 10, y: 50, employeeId: 'email-marketing-manager' },
-    { x: 35, y: 55, employeeId: 'seo-ppc-manager' },
-    { x: 60, y: 50, employeeId: 'social-media-manager' },
-    { x: 10, y: 80, employeeId: 'case-study-writer' },
-    { x: 35, y: 85, employeeId: 'funding-rewards-manager' },
+    { x: 12, y: 30, employeeId: 'marketing-director' },      // Front left
+    { x: 30, y: 25, employeeId: 'website-auditor' },          // Front center-left
+    { x: 48, y: 30, employeeId: 'proposal-writer' },          // Front center-right
+    { x: 66, y: 25, employeeId: 'case-study-writer' },        // Front right
+    { x: 12, y: 65, employeeId: 'email-marketing-manager' },  // Back left
+    { x: 30, y: 70, employeeId: 'seo-ppc-manager' },          // Back center-left
+    { x: 48, y: 65, employeeId: 'social-media-manager' },     // Back center-right
+    { x: 66, y: 70, employeeId: 'funding-rewards-manager' },  // Back right
   ];
 
   const getDeskEmployee = (employeeId: string): Employee | undefined => {
@@ -59,7 +59,7 @@ export function RealisticOfficeView({
           border: '1px solid var(--border-color)',
           background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(249,112,31,0.05) 100%)',
         }}>
-          {/* Warm office background */}
+          {/* Warm office background with lighting */}
           <div
             className="absolute inset-0"
             style={{
@@ -70,6 +70,120 @@ export function RealisticOfficeView({
               pointerEvents: 'none',
             }}
           />
+
+          {/* Windows on right side */}
+          <div className="absolute top-0 right-0 w-1/4 h-full flex flex-col gap-2 p-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={`window-${i}`}
+                className="flex-1 rounded-lg"
+                style={{
+                  backgroundColor: 'rgba(135,206,235,0.3)',
+                  border: '2px solid rgba(135,206,235,0.5)',
+                  boxShadow: 'inset 0 0 8px rgba(135,206,235,0.2)',
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Wall board with team goals on back wall */}
+          <div
+            className="absolute left-8 top-8 rounded-lg p-4"
+            style={{
+              width: '200px',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              border: '2px solid var(--accent-orange)',
+              boxShadow: '0 0 12px var(--accent-orange)44',
+            }}
+          >
+            <div
+              className="text-xs font-bold mb-2"
+              style={{ color: 'var(--accent-orange)' }}
+            >
+              Team Goals
+            </div>
+            <div className="space-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <div>✓ Q4 Campaign Launch</div>
+              <div>✓ Website Redesign</div>
+              <div>✓ Team Growth</div>
+            </div>
+          </div>
+
+          {/* Plant decoration - back left corner */}
+          <div
+            className="absolute bottom-8 left-4"
+            style={{
+              width: '60px',
+              height: '80px',
+            }}
+          >
+            {/* Pot */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '40px',
+                height: '30px',
+                backgroundColor: '#8B6F47',
+                borderRadius: '0 0 4px 4px',
+                border: '1px solid #6B5435',
+              }}
+            />
+            {/* Plant leaves */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '25px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '50px',
+                height: '60px',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                borderRadius: '50% 50% 40% 40%',
+                opacity: 0.8,
+              }}
+            />
+          </div>
+
+          {/* Plant decoration - back right corner */}
+          <div
+            className="absolute bottom-8 right-4"
+            style={{
+              width: '60px',
+              height: '80px',
+            }}
+          >
+            {/* Pot */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '40px',
+                height: '30px',
+                backgroundColor: '#8B6F47',
+                borderRadius: '0 0 4px 4px',
+                border: '1px solid #6B5435',
+              }}
+            />
+            {/* Plant leaves */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '25px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '50px',
+                height: '60px',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                borderRadius: '50% 50% 40% 40%',
+                opacity: 0.8,
+              }}
+            />
+          </div>
 
           {/* Desks in office space */}
           <div className="relative w-full h-full p-8">
