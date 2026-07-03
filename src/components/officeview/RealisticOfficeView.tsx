@@ -1,6 +1,5 @@
 import { useOfficeStore } from '@/store/officeStore';
-import type { Employee } from '@/types/employee';
-import { OfficeFloor } from './OfficeFloor';
+import { LivingOfficeView } from './LivingOfficeView';
 import { OfficeRightSidebar } from './OfficeRightSidebar';
 import { OfficeBottomBar } from './OfficeBottomBar';
 
@@ -10,6 +9,7 @@ interface RealisticOfficeViewProps {
   sandyMessage?: string;
   selectedRoomId: string | null;
   onSelectRoom: (roomId: string | null) => void;
+  onAskSandy?: () => void;
 }
 
 export function RealisticOfficeView({
@@ -18,9 +18,8 @@ export function RealisticOfficeView({
   sandyMessage,
   selectedRoomId,
   onSelectRoom,
+  onAskSandy,
 }: RealisticOfficeViewProps) {
-  const employees = useOfficeStore((state) => state.employees);
-
   return (
     <div
       className="w-full h-full flex flex-col overflow-hidden transition-colors duration-300"
@@ -31,15 +30,14 @@ export function RealisticOfficeView({
     >
       {/* Main office area: floor + right sidebar */}
       <div className="flex-1 flex gap-4 p-6 overflow-hidden">
-        {/* Office Floor - main center area */}
+        {/* Living Office View - main center area */}
         <div className="flex-1 overflow-hidden">
-          <OfficeFloor
-            employees={employees}
-            activeRoomIds={activeRoomIds}
+          <LivingOfficeView
             sandyThinking={sandyThinking}
             sandyMessage={sandyMessage}
             selectedRoomId={selectedRoomId}
             onSelectRoom={onSelectRoom}
+            onAskSandy={onAskSandy}
           />
         </div>
 
