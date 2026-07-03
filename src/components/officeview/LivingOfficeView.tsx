@@ -2,7 +2,6 @@ import { useOfficeStore } from '@/store/officeStore';
 import type { Employee } from '@/types/employee';
 import { OfficeDesk } from './OfficeDesk';
 import { SandyDock } from './SandyDock';
-import { SpeechBubble } from './SpeechBubble';
 import { ROLE_DISPLAY_NAMES } from './OfficeProps';
 
 interface LivingOfficeViewProps {
@@ -13,17 +12,27 @@ interface LivingOfficeViewProps {
   onAskSandy?: () => void;
 }
 
-// Custom desk positions for better layout
-const CUSTOM_DESK_POSITIONS: Record<string, { x: number; y: number }> = {
-  'marketing-director': { x: 10, y: 20 },
-  'website-auditor': { x: 50, y: 15 },
-  'seo-ppc-manager': { x: 32, y: 22 },
-  'email-marketing-manager': { x: 50, y: 68 },
-  'proposal-writer': { x: 70, y: 24 },
-  'social-media-manager': { x: 14, y: 62 },
-  'case-study-writer': { x: 66, y: 62 },
-  'funding-rewards-manager': { x: 86, y: 48 },
+// Desk positions optimized for reference layout
+const DESK_POSITIONS: Record<string, { x: number; y: number }> = {
+  'marketing-director': { x: 8, y: 22 },
+  'seo-ppc-manager': { x: 32, y: 28 },
+  'website-auditor': { x: 52, y: 24 },
+  'social-media-manager': { x: 12, y: 65 },
+  'email-marketing-manager': { x: 42, y: 72 },
+  'case-study-writer': { x: 72, y: 68 },
+  'proposal-writer': { x: 75, y: 28 },
+  'funding-rewards-manager': { x: 85, y: 50 },
 };
+
+// Speech bubbles data
+const SPEECH_BUBBLES = [
+  { text: 'Great work on the social campaign!', x: 22, y: 12, color: '#C4E5FF', position: 'top' },
+  { text: 'Working on keyword research', x: 40, y: 18, color: '#E3F2FF', position: 'top' },
+  { text: 'Found 15 issues checking now', x: 65, y: 14, color: '#FFF3CD', position: 'top' },
+  { text: 'Shall we align on the new campaign?', x: 48, y: 50, color: '#FFE8E8', position: 'center' },
+  { text: 'Interview with client at 2pm', x: 78, y: 45, color: '#E3F2FF', position: 'top' },
+  { text: 'Building our new nurture sequence', x: 38, y: 48, color: '#E8F5E9', position: 'center' },
+];
 
 export function LivingOfficeView({
   sandyThinking,
@@ -45,124 +54,268 @@ export function LivingOfficeView({
         position: 'relative',
         width: '100%',
         height: '100%',
-        backgroundColor: '#A68560',
-        backgroundImage: `
-          linear-gradient(180deg, #DCC8B8 0%, #B89570 30%, #A68560 60%, #9B7A50 100%),
-          repeating-linear-gradient(90deg, #B89570 0px, #B89570 2px, #A68560 2px, #A68560 4px)
+        background: `
+          linear-gradient(180deg,
+            #D4C5B8 0%,
+            #C9B8AD 15%,
+            #B8A899 40%,
+            #A89883 100%)
         `,
-        backgroundSize: '100% 100%, 4px 100%',
-        backgroundPosition: '0 0, 0 0',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
-      {/* Top wall area - warmer */}
+      {/* Top navigation bar */}
       <div
         style={{
-          height: '36px',
-          backgroundColor: '#E0D4C4',
-          backgroundImage: 'linear-gradient(180deg, #F0E8D8 0%, #E0D4C4 100%)',
-          borderBottom: '2px solid #D0C4B4',
+          height: '56px',
+          backgroundColor: '#2B2B3E',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
           display: 'flex',
           alignItems: 'center',
           paddingLeft: '20px',
-          boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.5), 0 2px 6px rgba(0,0,0,0.12)',
+          color: '#fff',
         }}
       >
-        <div style={{ fontSize: '13px', fontWeight: '700', color: '#666' }}>
-          Marketing Office
-        </div>
+        <div style={{ fontSize: '16px', fontWeight: '700' }}>Office Floor</div>
       </div>
 
-      {/* Main office floor */}
+      {/* Main office scene */}
       <div
         style={{
           flex: 1,
           position: 'relative',
           overflow: 'hidden',
           background: `
-            linear-gradient(180deg, #B89A7F 0%, #AA8566 40%, #9B7A55 100%),
-            radial-gradient(ellipse 200% 100% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 70%)
+            linear-gradient(180deg,
+              #C9B8AD 0%,
+              #B8A899 30%,
+              #A89883 70%,
+              #9A8975 100%),
+            linear-gradient(90deg,
+              rgba(180, 140, 100, 0.1) 0%,
+              transparent 50%,
+              rgba(150, 120, 90, 0.15) 100%)
           `,
           backgroundSize: '100% 100%, 100% 100%',
+          perspective: '1200px',
         }}
       >
-        {/* Right wall with windows - warmer with glow */}
+        {/* Far back wall with perspective */}
         <div
           style={{
             position: 'absolute',
-            right: 0,
-            top: '36px',
-            width: '50px',
-            height: 'calc(100% - 36px)',
-            backgroundColor: '#E0D4C4',
-            backgroundImage: 'linear-gradient(90deg, #F0E8D8 0%, #E0D4C4 100%)',
-            borderLeft: '2px solid #D0C4B4',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-start',
-            gap: '10px',
-            padding: '10px 6px',
-            boxShadow: 'inset 2px 0 6px rgba(0,0,0,0.08)',
+            top: '0',
+            left: '0',
+            right: '0',
+            height: '22%',
+            background: `linear-gradient(180deg, #D4C5B8 0%, #C9B8AD 100%)`,
+            boxShadow: 'inset 0 -20px 40px rgba(0,0,0,0.1)',
           }}
         >
-          {/* Windows */}
+          {/* Wall sign */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '8%',
+              top: '12%',
+              width: '200px',
+              padding: '12px 16px',
+              backgroundColor: '#F5F1EB',
+              border: '3px solid #8B7355',
+              borderRadius: '6px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '20px', fontWeight: '900', color: '#2B2B3E', letterSpacing: '2px' }}>
+              MARKETING TEAM
+            </div>
+            <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic', marginTop: '4px' }}>
+              Working together, achieving more 💪
+            </div>
+          </div>
+
+          {/* Wall clock */}
+          <div
+            style={{
+              position: 'absolute',
+              right: '25%',
+              top: '15%',
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: '#F5D4A8',
+              border: '3px solid #8B6F47',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 -2px 4px rgba(0,0,0,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: '#8B6F47',
+            }}
+          >
+            ⏰
+          </div>
+
+          {/* Team Goals whiteboard */}
+          <div
+            style={{
+              position: 'absolute',
+              right: '8%',
+              top: '10%',
+              width: '200px',
+              backgroundColor: '#F5F1EB',
+              border: '3px solid #666',
+              borderRadius: '4px',
+              padding: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#2B2B3E', marginBottom: '8px' }}>
+              Team Goals
+            </div>
+            <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.6' }}>
+              <div>✓ Increase Brand Awareness</div>
+              <div>✓ Generate Quality Leads</div>
+              <div>✓ Improve Conversion Rate</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right wall with windows and light */}
+        <div
+          style={{
+            position: 'absolute',
+            right: '0',
+            top: '0',
+            width: '18%',
+            height: '100%',
+            background: `linear-gradient(90deg, transparent 0%, #C4B5A0 50%, #D4C4B4 100%)`,
+            boxShadow: 'inset -10px 0 30px rgba(200, 180, 150, 0.3)',
+          }}
+        >
+          {/* Windows with light rays */}
           {[0, 1, 2, 3].map((i) => (
             <div
               key={`window-${i}`}
               style={{
-                width: '38px',
-                height: '28px',
+                position: 'absolute',
+                right: '8%',
+                top: `${12 + i * 22}%`,
+                width: '60px',
+                height: '45px',
                 backgroundColor: '#A8D8FF',
+                border: '2px solid #7AC5FF',
                 borderRadius: '3px',
-                border: '1px solid #7AC5FF',
-                boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.5), 0 2px 6px rgba(100,150,200,0.2)',
+                boxShadow: `inset 0 1px 3px rgba(255,255,255,0.6), 0 4px 12px rgba(100,150,200,0.3)`,
               }}
             />
           ))}
         </div>
 
-        {/* Bottom wall/skirting with plants - warmer */}
+        {/* Floor with perspective and gradient */}
         <div
           style={{
             position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: '50px',
-            height: '45px',
-            backgroundColor: '#D4C8B8',
-            borderTop: '2px solid #E4D8C8',
+            bottom: '0',
+            left: '0',
+            right: '0',
+            height: '50%',
+            background: `
+              linear-gradient(180deg,
+                rgba(168, 136, 104, 0.1) 0%,
+                rgba(150, 120, 90, 0.3) 100%),
+              linear-gradient(90deg,
+                #B5926D 0%,
+                #A88663 25%,
+                #9B7952 50%,
+                #8E6F47 75%,
+                #816B3D 100%)
+            `,
+            boxShadow: 'inset 0 10px 40px rgba(0,0,0,0.15)',
+          }}
+        />
+
+        {/* Central collaboration area with rug */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '55%',
+            transform: 'translate(-50%, -50%)',
+            width: '280px',
+            height: '180px',
+            borderRadius: '50%',
+            backgroundColor: '#C9A877',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2), inset 0 -4px 12px rgba(0,0,0,0.15)',
             display: 'flex',
-            alignItems: 'flex-end',
-            paddingBottom: '4px',
-            paddingLeft: '12px',
-            gap: '14px',
-            boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.12)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 5,
           }}
         >
-          {/* Corner plants */}
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div
-              key={`plant-${i}`}
-              style={{
-                width: '14px',
-                height: '28px',
-                backgroundColor: '#2ba876',
-                borderRadius: '2px 2px 0 0',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                flexShrink: 0,
-              }}
-            />
-          ))}
+          {/* Small table in center */}
+          <div
+            style={{
+              width: '80px',
+              height: '60px',
+              backgroundColor: '#8B6F47',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              border: '2px solid #6B5435',
+            }}
+          />
         </div>
+
+        {/* Water cooler */}
+        <div
+          style={{
+            position: 'absolute',
+            left: '6%',
+            bottom: '15%',
+            width: '50px',
+            height: '80px',
+            backgroundColor: '#B3D9FF',
+            borderRadius: '8px',
+            border: '2px solid #5a9bd4',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
+            zIndex: 3,
+          }}
+        />
+
+        {/* Plants scattered around */}
+        {[
+          { left: '4%', bottom: '8%', size: 'large' },
+          { right: '22%', bottom: '12%', size: 'medium' },
+          { left: '90%', bottom: '20%', size: 'medium' },
+        ].map((plant, i) => (
+          <div
+            key={`plant-${i}`}
+            style={{
+              position: 'absolute',
+              left: plant.left,
+              right: plant.right,
+              bottom: plant.bottom,
+              width: plant.size === 'large' ? '60px' : '45px',
+              height: plant.size === 'large' ? '80px' : '65px',
+              backgroundColor: '#2ba876',
+              borderRadius: `${plant.size === 'large' ? '4px 4px 0 0' : '3px 3px 0 0'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              zIndex: 2,
+            }}
+          />
+        ))}
 
         {/* Desks positioned around the office */}
         {employees.map((employee) => {
-          const pos = CUSTOM_DESK_POSITIONS[employee.id];
+          const pos = DESK_POSITIONS[employee.id];
           if (!pos) return null;
 
           const isEmployeeActive = isActive(employee.id);
+          const isEmployeeSelected = isSelected(employee.id);
 
           return (
             <div
@@ -172,174 +325,76 @@ export function LivingOfficeView({
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
                 transform: 'translate(-50%, -50%)',
+                zIndex: 10,
               }}
             >
               <OfficeDesk
                 employee={employee}
-                isSelected={isSelected(employee.id)}
+                isSelected={isEmployeeSelected}
                 isActive={isEmployeeActive}
                 onSelect={() => {
                   selectEmployee(employee.id);
                   onSelectRoom(employee.id);
                 }}
               />
-
-              {/* Speech bubble for active employees */}
-              {isEmployeeActive && employee.status === 'working' && employee.tasks?.[0] && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '-28px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: '100px',
-                    zIndex: 20,
-                  }}
-                >
-                  <div
-                    style={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #999',
-                      borderRadius: '6px',
-                      padding: '5px 7px',
-                      fontSize: '9px',
-                      color: '#333',
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                      position: 'relative',
-                    }}
-                  >
-                    {employee.tasks[0].title}
-                    {/* Tail */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '-5px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '0',
-                        height: '0',
-                        borderLeft: '5px solid transparent',
-                        borderRight: '5px solid transparent',
-                        borderTop: '5px solid #fff',
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '-6px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '0',
-                        height: '0',
-                        borderLeft: '5px solid transparent',
-                        borderRight: '5px solid transparent',
-                        borderTop: '5px solid #999',
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
 
-        {/* Whiteboard with goals - left side */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '24px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: '100px',
-            height: '80px',
-            backgroundColor: '#F5F1E8',
-            borderRadius: '4px',
-            border: '2px solid #999',
-            boxShadow: '0 6px 16px rgba(0,0,0,0.2)',
-            padding: '8px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-          }}
-        >
-          <div style={{ fontSize: '9px', fontWeight: '700', color: '#333' }}>
-            Team Goals
-          </div>
+        {/* Speech bubbles */}
+        {SPEECH_BUBBLES.map((bubble, idx) => (
           <div
-            style={{
-              width: '70%',
-              height: '1px',
-              backgroundColor: '#D84C45',
-            }}
-          />
-          <div
-            style={{
-              width: '70%',
-              height: '1px',
-              backgroundColor: '#2BA876',
-            }}
-          />
-          <div
-            style={{
-              width: '70%',
-              height: '1px',
-              backgroundColor: '#1E5A9F',
-            }}
-          />
-        </div>
-
-        {/* Sandy Dock - bottom center */}
-        <SandyDock onAskSandy={onAskSandy || (() => {})} />
-
-        {/* Speech bubble when Sandy sends a message */}
-        {sandyMessage && <SpeechBubble text={sandyMessage} x={50} y={35} />}
-
-        {/* Sandy thinking indicator */}
-        {sandyThinking && (
-          <div
+            key={`speech-${idx}`}
             style={{
               position: 'absolute',
-              bottom: '90px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 50,
-              display: 'flex',
-              gap: '3px',
-              alignItems: 'center',
+              left: `${bubble.x}%`,
+              top: `${bubble.y}%`,
+              transform: 'translate(-50%, -50%)',
+              maxWidth: '120px',
+              zIndex: 15,
             }}
           >
-            {[0, 1, 2].map((i) => (
+            <div
+              style={{
+                backgroundColor: bubble.color,
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '12px',
+                padding: '8px 12px',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#333',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                position: 'relative',
+              }}
+            >
+              {bubble.text}
+              {/* Tail */}
               <div
-                key={`dot-${i}`}
                 style={{
-                  width: '5px',
-                  height: '5px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--text-secondary)',
-                  animation: `bounce 1.4s infinite ${i * 0.2}s`,
+                  position: 'absolute',
+                  bottom: '-6px',
+                  left: '20px',
+                  width: '0',
+                  height: '0',
+                  borderLeft: '6px solid transparent',
+                  borderRight: '6px solid transparent',
+                  borderTop: `6px solid ${bubble.color}`,
                 }}
               />
-            ))}
+            </div>
           </div>
-        )}
+        ))}
+
+        {/* Sandy Dock - bottom center */}
+        <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 20 }}>
+          <SandyDock onAskSandy={onAskSandy || (() => {})} />
+        </div>
       </div>
 
       <style>{`
-        @keyframes bounce {
-          0%, 80%, 100% {
-            transform: translateY(0);
-            opacity: 1;
-          }
-          40% {
-            transform: translateY(-6px);
-            opacity: 0.6;
-          }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
         }
       `}</style>
     </div>
