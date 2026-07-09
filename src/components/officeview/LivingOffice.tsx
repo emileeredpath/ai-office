@@ -147,42 +147,53 @@ export function LivingOffice({
                   onSelectRoom(employee.id);
                 }}
               >
-                {/* Workstation base - premium desk */}
+                {/* Workstation base - premium desk environment */}
                 <div
                   style={{
                     width: '100%',
                     aspectRatio: '1',
                     position: 'relative',
-                    borderRadius: '16px',
+                    borderRadius: '18px',
                     background: `
                       linear-gradient(135deg,
-                        rgba(255,255,255,0.8) 0%,
-                        rgba(245,240,230,0.6) 50%,
-                        rgba(235,225,210,0.4) 100%),
+                        rgba(255,255,255,0.85) 0%,
+                        rgba(250,245,238,0.7) 30%,
+                        rgba(240,235,225,0.5) 70%,
+                        rgba(230,220,205,0.3) 100%),
                       radial-gradient(
-                        circle at 30% 30%,
-                        rgba(255,255,255,0.4) 0%,
+                        circle at 25% 25%,
+                        rgba(255,255,255,0.5) 0%,
+                        transparent 45%
+                      ),
+                      radial-gradient(
+                        circle at 75% 75%,
+                        rgba(0,0,0,0.03) 0%,
                         transparent 50%
                       )
                     `,
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255,255,255,0.7)',
+                    backdropFilter: 'blur(24px)',
+                    border: '1.5px solid rgba(255,255,255,0.75)',
                     boxShadow: isEmployeeSelected
                       ? `
-                        0 0 40px rgba(249,112,31,0.3),
-                        0 20px 60px rgba(0,0,0,0.12),
-                        inset 0 1px 2px rgba(255,255,255,0.6)
+                        0 0 50px rgba(249,112,31,0.35),
+                        0 25px 70px rgba(0,0,0,0.14),
+                        inset 0 1px 3px rgba(255,255,255,0.7),
+                        inset 0 -1px 2px rgba(0,0,0,0.02)
                       `
                       : `
-                        0 12px 40px rgba(0,0,0,0.08),
-                        inset 0 1px 2px rgba(255,255,255,0.6)
+                        0 14px 48px rgba(0,0,0,0.1),
+                        inset 0 1px 3px rgba(255,255,255,0.7),
+                        inset 0 -1px 2px rgba(0,0,0,0.02)
                       `,
-                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    transform: isEmployeeSelected ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
+                    transition: 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    transform: isEmployeeSelected
+                      ? 'translateY(-12px) scale(1.03)'
+                      : 'translateY(0) scale(1)',
                     display: 'flex',
                     flexDirection: 'column',
-                    padding: '24px',
+                    padding: '26px',
                     gap: '16px',
+                    willChange: 'transform',
                   }}
                 >
                   {/* Employee character - large prominent display */}
@@ -199,14 +210,15 @@ export function LivingOffice({
                     <EmployeeCharacter employee={employee} size="medium" />
                   </div>
 
-                  {/* Employee information card - nested glass effect */}
+                  {/* Employee information card - premium glassmorphism */}
                   <div
                     style={{
-                      backgroundColor: 'rgba(255,255,255,0.5)',
-                      backdropFilter: 'blur(12px)',
+                      backgroundColor: 'rgba(255,255,255,0.55)',
+                      backdropFilter: 'blur(16px)',
                       borderRadius: '12px',
                       padding: '12px 14px',
-                      border: '1px solid rgba(255,255,255,0.8)',
+                      border: '1px solid rgba(255,255,255,0.85)',
+                      boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.05)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '8px',
@@ -298,33 +310,36 @@ export function LivingOffice({
                     </div>
                   </div>
 
-                  {/* Speech bubble - floating above */}
-                  {Math.random() > 0.5 && (
+                  {/* Speech bubble - collaborative message */}
+                  {taskCount > 0 && (
                     <div
                       style={{
-                        backgroundColor: 'rgba(200, 220, 255, 0.7)',
-                        backdropFilter: 'blur(8px)',
-                        borderRadius: '10px',
-                        padding: '8px 12px',
-                        border: '1px solid rgba(255,255,255,0.6)',
+                        backgroundColor: 'rgba(210, 225, 255, 0.75)',
+                        backdropFilter: 'blur(12px)',
+                        borderRadius: '11px',
+                        padding: '9px 13px',
+                        border: '1px solid rgba(255,255,255,0.7)',
                         fontSize: '9px',
-                        color: '#334',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                        fontWeight: '500',
+                        color: '#445',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.08), inset 0 1px 2px rgba(255,255,255,0.5)',
                         position: 'relative',
-                        animation: 'float-up 3s ease-in-out infinite',
+                        animation: 'float-message 3.5s ease-in-out infinite',
+                        lineHeight: '1.3',
                       }}
                     >
-                      {COLLABORATION_MESSAGES[employee.tasks?.length || 0 % COLLABORATION_MESSAGES.length]}
+                      {COLLABORATION_MESSAGES[Math.abs(employee.id.charCodeAt(0)) % COLLABORATION_MESSAGES.length]}
                       <div
                         style={{
                           position: 'absolute',
-                          bottom: '-5px',
-                          left: '12px',
+                          bottom: '-6px',
+                          left: '14px',
                           width: '0',
                           height: '0',
-                          borderLeft: '5px solid transparent',
-                          borderRight: '5px solid transparent',
-                          borderTop: '5px solid rgba(200, 220, 255, 0.7)',
+                          borderLeft: '6px solid transparent',
+                          borderRight: '6px solid transparent',
+                          borderTop: '6px solid rgba(210, 225, 255, 0.75)',
+                          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.05))',
                         }}
                       />
                     </div>
@@ -335,16 +350,16 @@ export function LivingOffice({
           })}
         </div>
 
-        {/* Floating Sandy collaboration center - overlays the grid */}
+        {/* Floating Sandy collaboration center - prominent centerpiece */}
         <div
           style={{
             position: 'fixed',
-            bottom: '40px',
+            bottom: '48px',
             left: '50%',
-            transform: 'translateX(-50%)',
             zIndex: 50,
             animation: 'float-subtle 6s ease-in-out infinite',
-            filter: 'drop-shadow(0 20px 50px rgba(0,0,0,0.15))',
+            filter: 'drop-shadow(0 24px 60px rgba(0,0,0,0.18))',
+            pointerEvents: 'auto',
           }}
         >
           <SandyDock onAskSandy={onAskSandy || (() => {})} />
@@ -356,52 +371,74 @@ export function LivingOffice({
           0%, 100% {
             opacity: 1;
             transform: scale(1);
+            box-shadow: 0 0 8px currentColor;
           }
           50% {
-            opacity: 0.6;
-            transform: scale(1.2);
+            opacity: 0.55;
+            transform: scale(1.25);
+            box-shadow: 0 0 16px currentColor;
           }
         }
 
-        @keyframes float-up {
+        @keyframes float-message {
           0%, 100% {
-            opacity: 0;
-            transform: translateY(0);
+            opacity: 0.3;
+            transform: translateY(2px);
           }
-          10%, 90% {
+          20%, 80% {
             opacity: 1;
+            transform: translateY(-8px);
           }
           50% {
-            transform: translateY(-12px);
+            transform: translateY(-14px);
           }
         }
 
         @keyframes float-subtle {
           0%, 100% {
             transform: translateX(-50%) translateY(0);
+            filter: drop-shadow(0 20px 50px rgba(0,0,0,0.15));
           }
           50% {
-            transform: translateX(-50%) translateY(-8px);
+            transform: translateX(-50%) translateY(-12px);
+            filter: drop-shadow(0 28px 60px rgba(0,0,0,0.18));
           }
         }
 
-        /* Smooth scrolling */
+        /* Premium scrollbar styling */
         main::-webkit-scrollbar {
-          width: 8px;
+          width: 10px;
         }
 
         main::-webkit-scrollbar-track {
-          background: transparent;
+          background: linear-gradient(180deg,
+            rgba(150,130,110,0.02) 0%,
+            transparent 50%,
+            rgba(150,130,110,0.02) 100%);
         }
 
         main::-webkit-scrollbar-thumb {
-          background: rgba(0,0,0,0.15);
-          border-radius: 4px;
-          transition: background 0.2s;
+          background: linear-gradient(180deg,
+            rgba(100,80,60,0.25) 0%,
+            rgba(100,80,60,0.35) 50%,
+            rgba(100,80,60,0.25) 100%);
+          border-radius: 5px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          transition: all 0.2s;
         }
 
         main::-webkit-scrollbar-thumb:hover {
-          background: rgba(0,0,0,0.25);
+          background: linear-gradient(180deg,
+            rgba(80,60,40,0.4) 0%,
+            rgba(80,60,40,0.5) 50%,
+            rgba(80,60,40,0.4) 100%);
+          background-clip: padding-box;
+        }
+
+        /* Smooth transitions */
+        * {
+          transition: color 0.2s ease, background-color 0.2s ease;
         }
       `}</style>
     </div>
