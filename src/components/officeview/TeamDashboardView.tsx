@@ -36,7 +36,18 @@ export function TeamDashboardView({
           .length || 0),
       0
     );
-    return { working, totalTasks, totalApprovals };
+    const blocked = employees.filter((e) => e.status === 'blocked').length;
+    const completedToday = employees.reduce(
+      (sum, e) =>
+        sum +
+        (e.tasks?.filter((t) => t.status === 'complete')
+          .length || 0),
+      0
+    );
+    const avgWorkload = employees.length > 0
+      ? Math.round((totalTasks / employees.length) * 10) / 10
+      : 0;
+    return { working, totalTasks, totalApprovals, blocked, completedToday, avgWorkload };
   }, [employees]);
 
   const isSelected = (id: string) => selectedEmployeeId === id;
@@ -84,51 +95,96 @@ export function TeamDashboardView({
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex gap-6 overflow-hidden p-8">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden p-8">
         {/* Left: Employee Grid */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Sandy Panel */}
+          {/* Sandy Panel - Premium Compact */}
           <div
             className={`${
               darkMode
-                ? 'bg-gradient-to-br from-purple-900 to-purple-800 border-purple-700'
-                : 'bg-gradient-to-br from-purple-100 to-purple-50 border-purple-200'
-            } border rounded-xl p-6 mb-6`}
+                ? 'bg-gradient-to-br from-purple-950 via-purple-900 to-purple-800 border-purple-700'
+                : 'bg-gradient-to-br from-purple-200 via-purple-100 to-purple-50 border-purple-300'
+            } border rounded-xl p-4 mb-6 shadow-lg`}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
-                  Sandy
-                </h2>
-                <p className={`text-sm ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
-                  Chief of Staff
-                </p>
-                {sandyMessage && (
-                  <p className={`mt-3 text-sm ${darkMode ? 'text-purple-200' : 'text-purple-800'}`}>
-                    "{sandyMessage}"
-                  </p>
-                )}
+            <div className="flex items-start gap-4">
+              {/* Avatar */}
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                  darkMode
+                    ? 'bg-purple-800 text-purple-100'
+                    : 'bg-purple-300 text-purple-900'
+                }`}
+              >
+                S
               </div>
-              <div className="flex gap-4 text-center">
+
+              {/* Content */}
+              <div className="flex-1">
                 <div>
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
-                    {stats.totalTasks}
-                  </div>
-                  <div className={`text-xs ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>Tasks</div>
+                  <h2 className={`font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
+                    Sandy
+                  </h2>
+                  <p className={`text-xs ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                    Chief of Staff
+                  </p>
                 </div>
-                <div>
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
-                    {stats.totalApprovals}
+
+                {/* Summary */}
+                <p className={`text-xs mt-2 leading-relaxed ${darkMode ? 'text-purple-200' : 'text-purple-800'}`}>
+                  {stats.working === employees.length
+                    ? `All ${employees.length} team members available.`
+                    : `${employees.length - stats.working} of ${employees.length} team members available.`}{' '}
+                  {stats.totalTasks === 0
+                    ? 'No tasks currently assigned.'
+                    : `${stats.totalTasks} ${stats.totalTasks === 1 ? 'task' : 'tasks'} in progress.`}
+                </p>
+
+                {/* Three Metrics */}
+                <div className="flex gap-3 mt-3">
+                  <div className="text-center">
+                    <div className={`text-lg font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
+                      {stats.totalTasks}
+                    </div>
+                    <div className={`text-xs ${darkMode ? 'text-purple-300' : 'text-purple-600'}`}>
+                      Assigned
+                    </div>
                   </div>
-                  <div className={`text-xs ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>Approvals</div>
+                  <div className="text-center">
+                    <div className={`text-lg font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
+                      {stats.totalApprovals}
+                    </div>
+                    <div className={`text-xs ${darkMode ? 'text-purple-300' : 'text-purple-600'}`}>
+                      Waiting
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-lg font-bold ${darkMode ? 'text-purple-100' : 'text-purple-900'}`}>
+                      {stats.completedToday}
+                    </div>
+                    <div className={`text-xs ${darkMode ? 'text-purple-300' : 'text-purple-600'}`}>
+                      Completed
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Message Button */}
+            <button
+              onClick={onAskSandy}
+              className={`w-full mt-3 py-2 px-3 rounded-lg font-medium text-sm transition-colors ${
+                darkMode
+                  ? 'bg-purple-700 hover:bg-purple-600 text-purple-100'
+                  : 'bg-purple-300 hover:bg-purple-400 text-purple-900'
+              }`}
+            >
+              Message Sandy
+            </button>
           </div>
 
           {/* Employee Grid */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 auto-rows-max">
               {employees.map((employee) => {
                 const statusColor = EMPLOYEE_STATUS_COLORS[employee.status];
                 const statusLabel = EMPLOYEE_STATUS_LABELS[employee.status];
@@ -143,21 +199,16 @@ export function TeamDashboardView({
 
                 return (
                   <div
-                    key={employee.id}
-                    onClick={() => {
-                      selectEmployee(employee.id);
-                      onSelectRoom(employee.id);
-                    }}
                     className={`${
                       darkMode
-                        ? `${isSelected(employee.id) ? 'bg-slate-800 border-orange-500' : 'bg-slate-800 border-slate-700'} hover:bg-slate-700`
-                        : `${isSelected(employee.id) ? 'bg-slate-100 border-orange-500' : 'bg-white border-slate-200'} hover:bg-slate-50`
-                    } border rounded-lg p-4 cursor-pointer transition-all`}
+                        ? `${isSelected(employee.id) ? 'bg-slate-700 border-orange-500 shadow-md' : 'bg-slate-800 border-slate-700'} hover:bg-slate-700`
+                        : `${isSelected(employee.id) ? 'bg-slate-50 border-orange-500 shadow-md' : 'bg-white border-slate-200'} hover:bg-slate-50`
+                    } border rounded-xl p-4 cursor-pointer transition-all`}
                   >
                     {/* Avatar & Title */}
                     <div className="flex items-center gap-3 mb-3">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                           darkMode
                             ? 'bg-slate-700 text-slate-100'
                             : 'bg-slate-200 text-slate-900'
@@ -167,15 +218,15 @@ export function TeamDashboardView({
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3
-                          className={`font-semibold text-sm truncate ${
+                          className={`font-semibold text-xs truncate ${
                             darkMode ? 'text-slate-100' : 'text-slate-900'
                           }`}
                         >
                           {ROLE_DISPLAY_NAMES[employee.id] || employee.role}
                         </h3>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1 mt-0.5">
                           <span
-                            className="w-2 h-2 rounded-full"
+                            className="w-1.5 h-1.5 rounded-full"
                             style={{ backgroundColor: statusColor }}
                           />
                           <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -190,17 +241,17 @@ export function TeamDashboardView({
                       <div>
                         <p
                           className={`text-xs font-medium mb-1 ${
-                            darkMode ? 'text-slate-300' : 'text-slate-700'
+                            darkMode ? 'text-slate-400' : 'text-slate-600'
                           }`}
                         >
-                          Current Task
+                          Current
                         </p>
                         <p
-                          className={`text-xs truncate ${
+                          className={`text-xs line-clamp-2 ${
                             currentTask
                               ? darkMode
-                                ? 'text-slate-400'
-                                : 'text-slate-600'
+                                ? 'text-slate-300'
+                                : 'text-slate-700'
                               : darkMode
                               ? 'text-slate-500 italic'
                               : 'text-slate-500 italic'
@@ -215,21 +266,25 @@ export function TeamDashboardView({
                         <div className="flex items-center justify-between mb-1">
                           <span
                             className={`text-xs font-medium ${
-                              darkMode ? 'text-slate-300' : 'text-slate-700'
+                              darkMode ? 'text-slate-400' : 'text-slate-600'
                             }`}
                           >
                             Workload
                           </span>
                           <span
-                            className={`text-xs ${
-                              darkMode ? 'text-slate-400' : 'text-slate-600'
+                            className={`text-xs font-semibold ${
+                              workload > 80
+                                ? 'text-red-400'
+                                : workload > 60
+                                ? 'text-amber-400'
+                                : 'text-green-400'
                             }`}
                           >
-                            {taskCount}
+                            {Math.round(workload)}%
                           </span>
                         </div>
                         <div
-                          className={`w-full h-2 rounded-full ${
+                          className={`w-full h-1.5 rounded-full ${
                             darkMode ? 'bg-slate-700' : 'bg-slate-300'
                           } overflow-hidden`}
                         >
@@ -238,7 +293,7 @@ export function TeamDashboardView({
                               workload > 80
                                 ? 'bg-red-500'
                                 : workload > 60
-                                ? 'bg-orange-500'
+                                ? 'bg-amber-500'
                                 : 'bg-green-500'
                             }`}
                             style={{ width: `${workload}%` }}
@@ -248,21 +303,42 @@ export function TeamDashboardView({
 
                       {/* Task Count Badge */}
                       {taskCount > 0 && (
-                        <div className="flex gap-2 pt-1">
+                        <div className="pt-1">
                           <span
-                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                               taskCount > 3
-                                ? 'bg-red-900 text-red-200'
+                                ? darkMode
+                                  ? 'bg-red-900 text-red-200'
+                                  : 'bg-red-100 text-red-700'
                                 : taskCount > 1
-                                ? 'bg-orange-900 text-orange-200'
-                                : 'bg-green-900 text-green-200'
+                                ? darkMode
+                                  ? 'bg-amber-900 text-amber-200'
+                                  : 'bg-amber-100 text-amber-700'
+                                : darkMode
+                                ? 'bg-green-900 text-green-200'
+                                : 'bg-green-100 text-green-700'
                             }`}
                           >
-                            {taskCount} task{taskCount !== 1 ? 's' : ''}
+                            {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
                           </span>
                         </div>
                       )}
                     </div>
+
+                    {/* Open Button */}
+                    <button
+                      onClick={() => {
+                        selectEmployee(employee.id);
+                        onSelectRoom(employee.id);
+                      }}
+                      className={`w-full mt-3 py-1.5 px-3 rounded-lg font-medium text-xs transition-colors ${
+                        darkMode
+                          ? 'bg-orange-600 hover:bg-orange-700 text-white'
+                          : 'bg-orange-100 hover:bg-orange-200 text-orange-900'
+                      }`}
+                    >
+                      Open
+                    </button>
                   </div>
                 );
               })}
@@ -271,19 +347,19 @@ export function TeamDashboardView({
         </div>
 
         {/* Right Sidebar */}
-        <aside className="w-80 flex flex-col gap-6 overflow-y-auto">
+        <aside className="w-full lg:w-80 flex flex-col gap-6 overflow-y-auto">
           {/* Today's To-Do */}
           <div
             className={`${
               darkMode
                 ? 'bg-slate-800 border-slate-700'
                 : 'bg-slate-50 border-slate-200'
-            } border rounded-lg p-4`}
+            } border rounded-xl p-4`}
           >
             <h3 className={`font-semibold text-sm mb-3 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
               Today's To-Do
             </h3>
-            <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               No tasks assigned to you yet
             </div>
           </div>
@@ -294,54 +370,13 @@ export function TeamDashboardView({
               darkMode
                 ? 'bg-slate-800 border-slate-700'
                 : 'bg-slate-50 border-slate-200'
-            } border rounded-lg p-4`}
+            } border rounded-xl p-4`}
           >
             <h3 className={`font-semibold text-sm mb-3 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
               Upcoming Deadlines
             </h3>
-            <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               No deadlines this week
-            </div>
-          </div>
-
-          {/* Team Workload */}
-          <div
-            className={`${
-              darkMode
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-slate-50 border-slate-200'
-            } border rounded-lg p-4`}
-          >
-            <h3 className={`font-semibold text-sm mb-4 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-              Team Workload
-            </h3>
-            <div className="space-y-3">
-              {employees.slice(0, 4).map((emp) => (
-                <div key={emp.id}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span
-                      className={`text-xs font-medium ${
-                        darkMode ? 'text-slate-300' : 'text-slate-700'
-                      }`}
-                    >
-                      {(ROLE_DISPLAY_NAMES[emp.id] || emp.role).split(' ')[0]}
-                    </span>
-                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {emp.tasks?.length || 0}
-                    </span>
-                  </div>
-                  <div
-                    className={`w-full h-1.5 rounded-full ${
-                      darkMode ? 'bg-slate-700' : 'bg-slate-300'
-                    }`}
-                  >
-                    <div
-                      className="h-full rounded-full bg-green-500"
-                      style={{ width: `${Math.min(100, ((emp.tasks?.length || 0) / 5) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -351,13 +386,42 @@ export function TeamDashboardView({
               darkMode
                 ? 'bg-slate-800 border-slate-700'
                 : 'bg-slate-50 border-slate-200'
-            } border rounded-lg p-4`}
+            } border rounded-xl p-4`}
           >
             <h3 className={`font-semibold text-sm mb-3 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
               Waiting for Approval
             </h3>
-            <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              {stats.totalApprovals > 0 ? `${stats.totalApprovals} items pending` : 'All caught up'}
+            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {stats.totalApprovals > 0
+                ? `${stats.totalApprovals} ${stats.totalApprovals === 1 ? 'item' : 'items'} pending`
+                : 'All caught up'}
+            </div>
+          </div>
+
+          {/* Waiting for John */}
+          <div
+            className={`${
+              darkMode
+                ? 'bg-slate-800 border-slate-700'
+                : 'bg-slate-50 border-slate-200'
+            } border rounded-xl p-4`}
+          >
+            <h3 className={`font-semibold text-sm mb-3 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              Waiting for John
+            </h3>
+            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {(() => {
+                const waitingForJohn = employees.reduce(
+                  (sum, e) =>
+                    sum +
+                    (e.tasks?.filter((t) => t.status === 'waiting_john_approval')
+                      .length || 0),
+                  0
+                );
+                return waitingForJohn > 0
+                  ? `${waitingForJohn} ${waitingForJohn === 1 ? 'item' : 'items'} pending`
+                  : 'All reviewed';
+              })()}
             </div>
           </div>
 
@@ -367,13 +431,13 @@ export function TeamDashboardView({
               darkMode
                 ? 'bg-blue-950 border-blue-900'
                 : 'bg-blue-50 border-blue-200'
-            } border rounded-lg p-4`}
+            } border rounded-xl p-4`}
           >
             <h3 className={`font-semibold text-sm mb-2 ${darkMode ? 'text-blue-100' : 'text-blue-900'}`}>
               ✨ AI Insights
             </h3>
             <p className={`text-xs ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-              8 team members have capacity for new work
+              {stats.avgWorkload} tasks per person on average. {stats.blocked} blocked.
             </p>
           </div>
         </aside>
@@ -383,7 +447,7 @@ export function TeamDashboardView({
       <footer
         className={`${
           darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'
-        } border-t px-8 py-4`}
+        } border-t px-8 py-4 flex flex-col`}
       >
         <div className="flex gap-6 max-w-7xl mx-auto">
           {[
@@ -395,25 +459,35 @@ export function TeamDashboardView({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
                 activeTab === tab.id
-                  ? 'bg-orange-600 text-white'
+                  ? 'bg-orange-600 text-white border-orange-600'
                   : darkMode
-                  ? 'text-slate-400 hover:text-slate-300'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'text-slate-400 hover:text-slate-300 border-transparent hover:border-slate-700'
+                  : 'text-slate-600 hover:text-slate-900 border-transparent hover:border-slate-200'
               }`}
             >
               {tab.icon} {tab.label}
             </button>
           ))}
         </div>
-        <div className={`mt-4 p-4 rounded-lg ${
-          darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
-        } text-sm`}>
-          {activeTab === 'active' && `${stats.totalTasks} active tasks across the team`}
-          {activeTab === 'todo' && 'No tasks assigned to you yet'}
-          {activeTab === 'activity' && 'Recent activity will appear here'}
-          {activeTab === 'campaigns' && 'Campaign tracking will appear here'}
+        <div
+          className={`mt-4 p-4 rounded-xl border ${
+            darkMode
+              ? 'bg-slate-800 border-slate-700 text-slate-400'
+              : 'bg-slate-100 border-slate-200 text-slate-600'
+          } text-sm`}
+        >
+          {activeTab === 'active' &&
+            (stats.totalTasks > 0
+              ? `${stats.totalTasks} ${stats.totalTasks === 1 ? 'task' : 'tasks'} in progress across the team`
+              : 'Nothing is in progress. Ask Sandy to assign work.')}
+          {activeTab === 'todo' &&
+            'No tasks assigned to you yet'}
+          {activeTab === 'activity' &&
+            'Recent activity will appear here'}
+          {activeTab === 'campaigns' &&
+            'Campaign tracking will appear here'}
         </div>
       </footer>
     </div>
