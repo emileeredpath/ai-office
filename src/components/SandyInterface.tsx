@@ -6,6 +6,7 @@ import { RightPanel } from '@/components/RightPanel';
 import { BottomPanel } from '@/components/BottomPanel';
 import { AskSandyBar } from '@/components/AskSandyBar';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { CampaignsView } from '@/components/CampaignsView';
 import { LeftSidebar, type NavKey } from '@/components/layout/LeftSidebar';
 import { TopBar, type TopTab } from '@/components/layout/TopBar';
 import { PlaceholderModal } from '@/components/PlaceholderModal';
@@ -245,6 +246,7 @@ export function SandyInterface() {
               )}
               {topTab === 'board-room' && <BoardRoomPanel />}
               {topTab === 'tasks' && <TasksBoard />}
+              {topTab === 'campaigns' && <CampaignsView />}
               {topTab === 'reports' && <PlaceholderPanel title="Reports" />}
               {topTab === 'analytics' && <PlaceholderPanel title="Analytics" />}
               {topTab === 'settings' && <SettingsPanel />}
