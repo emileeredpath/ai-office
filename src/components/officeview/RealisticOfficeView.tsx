@@ -1,7 +1,4 @@
-import { useOfficeStore } from '@/store/officeStore';
-import { LivingOffice } from './LivingOffice';
-import { OfficeRightSidebar } from './OfficeRightSidebar';
-import { OfficeBottomBar } from './OfficeBottomBar';
+import { TeamDashboardView } from './TeamDashboardView';
 
 interface RealisticOfficeViewProps {
   activeRoomIds: string[];
@@ -21,36 +18,12 @@ export function RealisticOfficeView({
   onAskSandy,
 }: RealisticOfficeViewProps) {
   return (
-    <div
-      className="w-full h-full flex flex-col overflow-hidden transition-colors duration-300"
-      style={{
-        backgroundColor: 'var(--bg-primary)',
-        color: 'var(--text-primary)',
-      }}
-    >
-      {/* Main office area: floor + right sidebar */}
-      <div className="flex-1 flex gap-4 p-6 overflow-hidden">
-        {/* Living Office - premium office scene */}
-        <div className="flex-1 overflow-hidden rounded-lg">
-          <LivingOffice
-            sandyThinking={sandyThinking}
-            sandyMessage={sandyMessage}
-            selectedRoomId={selectedRoomId}
-            onSelectRoom={onSelectRoom}
-            onAskSandy={onAskSandy}
-          />
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="w-72 flex flex-col gap-4 overflow-y-auto">
-          <OfficeRightSidebar selectedRoomId={selectedRoomId} />
-        </div>
-      </div>
-
-      {/* Bottom Bar - Activity Feed + Collaboration + Ask Sandy */}
-      <div style={{ borderTop: '1px solid var(--border-color)' }}>
-        <OfficeBottomBar />
-      </div>
-    </div>
+    <TeamDashboardView
+      sandyThinking={sandyThinking}
+      sandyMessage={sandyMessage}
+      selectedRoomId={selectedRoomId}
+      onSelectRoom={onSelectRoom}
+      onAskSandy={onAskSandy}
+    />
   );
 }
