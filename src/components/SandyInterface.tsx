@@ -16,6 +16,7 @@ import { useOfficeStore } from '@/store/officeStore';
 import { RoutingEngine } from '@/systems/RoutingEngine';
 import { WorkflowEngine } from '@/systems/WorkflowEngine';
 import { ClaudeWorkflowGenerator } from '@/systems/ClaudeWorkflowGenerator';
+import { SandyCommandParser } from '@/systems/SandyCommandParser';
 import type { RoutingResult } from '@/systems/RoutingEngine';
 import { rooms, roomForEmployee } from '@/data/rooms';
 
@@ -73,43 +74,81 @@ export function SandyInterface() {
     setIsProcessing(true);
     setShowResponse(false);
     setCurrentRequest(taskInput);
-    setSandyMessage(`Processing: "${taskInput.trim()}"`);
     logActivity(`Sandy received: "${taskInput.trim()}"`);
 
     try {
-      // Try Claude API first if API key is available
+      // Parse the command
+      const parser = new SandyCommandParser();
+      const command = parser.parseCommand(taskInput);
+
+      // Handle recognized commands
+      if (command.type !== 'unknown') {
+        const response = parser.executeCommand(command, employees);
+        setTaskInput('');
+        setSandyMessage(response);
+        setShowResponse(true);
+        logActivity(`Sandy: ${response}`);
+
+        setTimeout(() => {
+          setShowResponse(false);
+          setSandyMessage(undefined);
+        }, 8000);
+
+        setIsProcessing(false);
+        return;
+      }
+
+      // Unknown command - check API key
       const apiKey = localStorage.getItem('anthropic_api_key');
+
+      if (!apiKey?.trim()) {
+        // No API key - show fallback message
+        const fallback =
+          "I don't have an API key configured yet — add it in Settings so I can process new briefs. For task queries, try asking: what are my tasks, what's outstanding on [campaign], or what's waiting.";
+        setSandyMessage(fallback);
+        setShowResponse(true);
+        setTaskInput('');
+        logActivity(`Sandy: ${fallback}`);
+
+        setTimeout(() => {
+          setShowResponse(false);
+          setSandyMessage(undefined);
+        }, 6000);
+
+        setIsProcessing(false);
+        return;
+      }
+
+      // API key exists - treat as new brief
       let totalTasks = 0;
 
-      if (apiKey?.trim()) {
-        try {
-          setSandyMessage('Generating campaign with Claude...');
-          const generator = new ClaudeWorkflowGenerator(apiKey);
-          const workflow = await generator.generateWorkflow(taskInput);
-          const workflowTasks = generator.createTasksFromWorkflow(workflow, employees);
+      try {
+        setSandyMessage('Generating campaign with Claude...');
+        const generator = new ClaudeWorkflowGenerator(apiKey);
+        const workflow = await generator.generateWorkflow(taskInput);
+        const workflowTasks = generator.createTasksFromWorkflow(workflow, employees);
 
-          for (const { employeeId, task } of workflowTasks) {
-            assignTask(employeeId, task);
-            totalTasks++;
-          }
-
-          setTaskCount(totalTasks);
-          setShowResponse(true);
-          setTaskInput('');
-          setSandyMessage(`Campaign created: ${workflow.campaignName}`);
-          logActivity(`Sandy created campaign: "${workflow.campaignName}" with ${totalTasks} tasks using Claude API`);
-
-          setTimeout(() => {
-            setShowResponse(false);
-            setSandyMessage(undefined);
-          }, 6000);
-
-          setIsProcessing(false);
-          return;
-        } catch (claudeError) {
-          console.error('Claude API error, falling back to routing engine:', claudeError);
-          // Fall through to routing engine
+        for (const { employeeId, task } of workflowTasks) {
+          assignTask(employeeId, task);
+          totalTasks++;
         }
+
+        setTaskCount(totalTasks);
+        setShowResponse(true);
+        setTaskInput('');
+        setSandyMessage(`Campaign created: ${workflow.campaignName}`);
+        logActivity(`Sandy created campaign: "${workflow.campaignName}" with ${totalTasks} tasks using Claude API`);
+
+        setTimeout(() => {
+          setShowResponse(false);
+          setSandyMessage(undefined);
+        }, 6000);
+
+        setIsProcessing(false);
+        return;
+      } catch (claudeError) {
+        console.error('Claude API error, falling back to routing engine:', claudeError);
+        // Fall through to routing engine
       }
 
       // Fallback: Use routing engine
