@@ -37,6 +37,7 @@ export interface Task {
   completedAt?: string;
   notes: TaskNote[];
   assignedBy?: 'sandy' | 'user';
+  campaign?: string;
 }
 
 export interface Employee {

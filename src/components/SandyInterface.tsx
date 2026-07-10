@@ -5,6 +5,7 @@ import { BoardRoomPanel } from '@/components/BoardRoomPanel';
 import { RightPanel } from '@/components/RightPanel';
 import { BottomPanel } from '@/components/BottomPanel';
 import { AskSandyBar } from '@/components/AskSandyBar';
+import { SettingsPanel } from '@/components/SettingsPanel';
 import { LeftSidebar, type NavKey } from '@/components/layout/LeftSidebar';
 import { TopBar, type TopTab } from '@/components/layout/TopBar';
 import { PlaceholderModal } from '@/components/PlaceholderModal';
@@ -14,6 +15,7 @@ import { SandyResponse } from '@/components/SandyResponse';
 import { useOfficeStore } from '@/store/officeStore';
 import { RoutingEngine } from '@/systems/RoutingEngine';
 import { WorkflowEngine } from '@/systems/WorkflowEngine';
+import { ClaudeWorkflowGenerator } from '@/systems/ClaudeWorkflowGenerator';
 import type { RoutingResult } from '@/systems/RoutingEngine';
 import { rooms, roomForEmployee } from '@/data/rooms';
 
@@ -71,10 +73,47 @@ export function SandyInterface() {
     setIsProcessing(true);
     setShowResponse(false);
     setCurrentRequest(taskInput);
-    setSandyMessage(`Routing: "${taskInput.trim()}"`);
+    setSandyMessage(`Processing: "${taskInput.trim()}"`);
     logActivity(`Sandy received: "${taskInput.trim()}"`);
 
     try {
+      // Try Claude API first if API key is available
+      const apiKey = localStorage.getItem('anthropic_api_key');
+      let totalTasks = 0;
+
+      if (apiKey?.trim()) {
+        try {
+          setSandyMessage('Generating campaign with Claude...');
+          const generator = new ClaudeWorkflowGenerator(apiKey);
+          const workflow = await generator.generateWorkflow(taskInput);
+          const workflowTasks = generator.createTasksFromWorkflow(workflow, employees);
+
+          for (const { employeeId, task } of workflowTasks) {
+            assignTask(employeeId, task);
+            totalTasks++;
+          }
+
+          setTaskCount(totalTasks);
+          setShowResponse(true);
+          setTaskInput('');
+          setSandyMessage(`Campaign created: ${workflow.campaignName}`);
+          logActivity(`Sandy created campaign: "${workflow.campaignName}" with ${totalTasks} tasks using Claude API`);
+
+          setTimeout(() => {
+            setShowResponse(false);
+            setSandyMessage(undefined);
+          }, 6000);
+
+          setIsProcessing(false);
+          return;
+        } catch (claudeError) {
+          console.error('Claude API error, falling back to routing engine:', claudeError);
+          // Fall through to routing engine
+        }
+      }
+
+      // Fallback: Use routing engine
+      setSandyMessage('Routing request...');
       const routingEngine = new RoutingEngine(employees);
       const routing = routingEngine.route(taskInput, employees);
       setCurrentRouting(routing);
@@ -90,7 +129,6 @@ export function SandyInterface() {
 
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      let totalTasks = 0;
       routing.taskBreakdown.forEach((item) => {
         item.subtasks.forEach((subtask, idx) => {
           assignTask(item.assignee.id, {
@@ -126,7 +164,15 @@ export function SandyInterface() {
 
       setIsProcessing(false);
     } catch (error) {
-      console.error('Error creating workflow:', error);
+      console.error('Error processing Sandy request:', error);
+      setSandyMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowResponse(true);
+
+      setTimeout(() => {
+        setShowResponse(false);
+        setSandyMessage(undefined);
+      }, 4000);
+
       setIsProcessing(false);
     }
   };
@@ -162,7 +208,7 @@ export function SandyInterface() {
               {topTab === 'tasks' && <TasksBoard />}
               {topTab === 'reports' && <PlaceholderPanel title="Reports" />}
               {topTab === 'analytics' && <PlaceholderPanel title="Analytics" />}
-              {topTab === 'settings' && <PlaceholderPanel title="Settings" />}
+              {topTab === 'settings' && <SettingsPanel />}
 
               {topTab === 'office' && selectedRoomId && (
                 <RoomDetailDrawer
