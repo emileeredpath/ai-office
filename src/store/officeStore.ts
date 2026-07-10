@@ -79,6 +79,9 @@ interface OfficeStore {
   addTaskNote: (employeeId: string, taskId: string, text: string) => void;
   removeTask: (employeeId: string, taskId: string) => void;
   logActivity: (message: string) => void;
+
+  getAllOpenTasks: () => Array<Task & { employeeId: string; employeeName: string }>;
+  getTasksByCampaign: (campaignName: string) => Array<Task & { employeeId: string; employeeName: string }>;
 }
 
 export const useOfficeStore = create<OfficeStore>()(
@@ -191,6 +194,38 @@ export const useOfficeStore = create<OfficeStore>()(
             return { ...e, tasks, status: deriveEmployeeStatus(tasks) };
           }),
         })),
+
+      getAllOpenTasks: () => {
+        const result: Array<Task & { employeeId: string; employeeName: string }> = [];
+        get().employees.forEach((emp) => {
+          emp.tasks
+            .filter((t) => t.status !== 'complete')
+            .forEach((task) => {
+              result.push({
+                ...task,
+                employeeId: emp.id,
+                employeeName: emp.name,
+              });
+            });
+        });
+        return result;
+      },
+
+      getTasksByCampaign: (campaignName: string) => {
+        const result: Array<Task & { employeeId: string; employeeName: string }> = [];
+        get().employees.forEach((emp) => {
+          emp.tasks
+            .filter((t) => t.campaign === campaignName)
+            .forEach((task) => {
+              result.push({
+                ...task,
+                employeeId: emp.id,
+                employeeName: emp.name,
+              });
+            });
+        });
+        return result;
+      },
     }),
     {
       name: 'mtech-office-employees',
