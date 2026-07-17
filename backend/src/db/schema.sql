@@ -311,6 +311,57 @@ CREATE TABLE IF NOT EXISTS unsubscribe_events (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- AI Decision Outcomes (for learning and optimization)
+CREATE TABLE IF NOT EXISTS task_outcomes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  ai_employee_id UUID NOT NULL REFERENCES ai_employees(id),
+  ai_name VARCHAR(255),
+  decision VARCHAR(50), -- approved, rejected, pending_review
+  actual_outcome VARCHAR(50), -- success, failure, partial, unknown
+  confidence INTEGER, -- 0-100
+  time_to_resolution INTEGER, -- minutes
+  feedback TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- AI Learning Events
+CREATE TABLE IF NOT EXISTS ai_learnings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ai_employee_id UUID NOT NULL REFERENCES ai_employees(id),
+  ai_name VARCHAR(255),
+  learning_type VARCHAR(100), -- false_positive, false_negative, confidence_mismatch, etc.
+  description TEXT,
+  task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  confidence_improvement INTEGER, -- positive or negative adjustment
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Decision Feedback (human feedback on AI decisions)
+CREATE TABLE IF NOT EXISTS decision_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  ai_employee_id UUID NOT NULL REFERENCES ai_employees(id),
+  feedback TEXT,
+  score INTEGER, -- 1-5 rating
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- AI Performance History (snapshot of performance metrics over time)
+CREATE TABLE IF NOT EXISTS ai_performance_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ai_employee_id UUID NOT NULL REFERENCES ai_employees(id),
+  ai_name VARCHAR(255),
+  success_rate DECIMAL(5, 2),
+  average_confidence DECIMAL(5, 2),
+  average_time_to_resolution INTEGER,
+  total_decisions INTEGER,
+  snapshot_date DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(ai_employee_id, snapshot_date)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_ai_employees_company_id ON ai_employees(company_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_company_id ON tasks(company_id);
@@ -336,3 +387,12 @@ CREATE INDEX IF NOT EXISTS idx_email_lists_company_id ON email_lists(company_id)
 CREATE INDEX IF NOT EXISTS idx_traffic_sources_company_id ON traffic_sources(company_id);
 CREATE INDEX IF NOT EXISTS idx_daily_metrics_company_id ON daily_metrics(company_id);
 CREATE INDEX IF NOT EXISTS idx_anomalies_company_id ON anomalies(company_id);
+CREATE INDEX IF NOT EXISTS idx_task_outcomes_task_id ON task_outcomes(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_outcomes_ai_employee_id ON task_outcomes(ai_employee_id);
+CREATE INDEX IF NOT EXISTS idx_task_outcomes_actual_outcome ON task_outcomes(actual_outcome);
+CREATE INDEX IF NOT EXISTS idx_ai_learnings_ai_employee_id ON ai_learnings(ai_employee_id);
+CREATE INDEX IF NOT EXISTS idx_ai_learnings_learning_type ON ai_learnings(learning_type);
+CREATE INDEX IF NOT EXISTS idx_decision_feedback_task_id ON decision_feedback(task_id);
+CREATE INDEX IF NOT EXISTS idx_decision_feedback_ai_employee_id ON decision_feedback(ai_employee_id);
+CREATE INDEX IF NOT EXISTS idx_ai_performance_history_ai_employee_id ON ai_performance_history(ai_employee_id);
+CREATE INDEX IF NOT EXISTS idx_ai_performance_history_snapshot_date ON ai_performance_history(snapshot_date);

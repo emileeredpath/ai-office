@@ -8,6 +8,7 @@ import companiesRouter from './routes/companies.js';
 import knowledgeRouter from './routes/knowledge.js';
 import specialistAIRouter from './routes/specialistAI.js';
 import integrationsRouter from './routes/integrations.js';
+import outcomesRouter from './routes/outcomes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +40,7 @@ app.use('/api/conversations', conversationsRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/specialist-ai', specialistAIRouter);
 app.use('/api/integrations', integrationsRouter);
+app.use('/api/outcomes', outcomesRouter);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
