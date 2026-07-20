@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RealisticOfficeView } from '@/components/officeview/RealisticOfficeView';
 import { RoomDetailDrawer } from '@/components/office3d/RoomDetailDrawer';
 import { BoardRoomPanel } from '@/components/BoardRoomPanel';
@@ -7,6 +7,7 @@ import { BottomPanel } from '@/components/BottomPanel';
 import { AskSandyBar } from '@/components/AskSandyBar';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { CampaignsView } from '@/components/CampaignsView';
+import { MyTasks } from '@/components/MyTasks';
 import { LeftSidebar, type NavKey } from '@/components/layout/LeftSidebar';
 import { TopBar, type TopTab } from '@/components/layout/TopBar';
 import { PlaceholderModal } from '@/components/PlaceholderModal';
@@ -35,6 +36,21 @@ export function SandyInterface() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [activeRoomIds, setActiveRoomIds] = useState<string[]>([]);
   const [sandyMessage, setSandyMessage] = useState<string | undefined>();
+  const [companyId, setCompanyId] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+
+  // Initialize company and user
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const company = await import('@/services/api').then((api) => api.getDefaultCompany());
+        setCompanyId(company.id);
+      } catch (error) {
+        console.error('Failed to initialize company:', error);
+      }
+    };
+    initializeApp();
+  }, []);
 
   const NAV_LABELS: Record<NavKey, string> = {
     home: 'Home',
@@ -99,108 +115,24 @@ export function SandyInterface() {
         return;
       }
 
-      // Unknown command - check API key
-      const apiKey = localStorage.getItem('anthropic_api_key');
+      // For new requests, guide user to create tasks manually
+      // Sandy now recommends but doesn't auto-create
+      const suggestion = `I understand you need: "${taskInput.trim()}"
 
-      if (!apiKey?.trim()) {
-        // No API key - show fallback message
-        const fallback =
-          "I don't have an API key configured yet — add it in Settings so I can process new briefs. For task queries, try asking: what are my tasks, what's outstanding on [campaign], or what's waiting.";
-        setSandyMessage(fallback);
-        setShowResponse(true);
-        setTaskInput('');
-        logActivity(`Sandy: ${fallback}`);
+This sounds like a task! Go to the **Tasks** tab and create it there. That way you can:
+- Add full details
+- Delegate to a specialist
+- Track progress in one place`;
 
-        setTimeout(() => {
-          setShowResponse(false);
-          setSandyMessage(undefined);
-        }, 6000);
-
-        setIsProcessing(false);
-        return;
-      }
-
-      // API key exists - treat as new brief
-      let totalTasks = 0;
-
-      try {
-        setSandyMessage('Generating campaign with Claude...');
-        const generator = new ClaudeWorkflowGenerator(apiKey);
-        const workflow = await generator.generateWorkflow(taskInput);
-        const workflowTasks = generator.createTasksFromWorkflow(workflow, employees);
-
-        for (const { employeeId, task } of workflowTasks) {
-          assignTask(employeeId, task);
-          totalTasks++;
-        }
-
-        setTaskCount(totalTasks);
-        setShowResponse(true);
-        setTaskInput('');
-        setSandyMessage(`Campaign created: ${workflow.campaignName}`);
-        logActivity(`Sandy created campaign: "${workflow.campaignName}" with ${totalTasks} tasks using Claude API`);
-
-        setTimeout(() => {
-          setShowResponse(false);
-          setSandyMessage(undefined);
-        }, 6000);
-
-        setIsProcessing(false);
-        return;
-      } catch (claudeError) {
-        console.error('Claude API error, falling back to routing engine:', claudeError);
-        // Fall through to routing engine
-      }
-
-      // Fallback: Use routing engine
-      setSandyMessage('Routing request...');
-      const routingEngine = new RoutingEngine(employees);
-      const routing = routingEngine.route(taskInput, employees);
-      setCurrentRouting(routing);
-      setAssigningEmployeeId(routing.primaryAssignee.id);
-
-      const involvedRoomIds = [routing.primaryAssignee, ...routing.suggestedCollaborators]
-        .map((emp) => roomForEmployee(emp.id)?.id)
-        .filter((id): id is string => Boolean(id));
-      setActiveRoomIds(involvedRoomIds);
-
-      const workflowEngine = new WorkflowEngine();
-      const campaign = workflowEngine.createCampaign(taskInput, routing, employees);
-
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      routing.taskBreakdown.forEach((item) => {
-        item.subtasks.forEach((subtask, idx) => {
-          assignTask(item.assignee.id, {
-            id: `task-${campaign.id}-${item.assignee.id}-${idx}`,
-            title: subtask,
-            priority: idx === 0 ? ('high' as const) : ('medium' as const),
-            createdAt: new Date().toISOString(),
-            assignedBy: 'sandy',
-          });
-          totalTasks++;
-        });
-      });
-
-      setTaskCount(totalTasks);
+      setSandyMessage(suggestion);
       setShowResponse(true);
       setTaskInput('');
-      setSandyMessage(`Assigned to ${routing.primaryAssignee.name}`);
-      logActivity(
-        `Sandy routed the request to ${routing.primaryAssignee.name}${
-          routing.suggestedCollaborators.length
-            ? ` with support from ${routing.suggestedCollaborators.map((c) => c.name).join(', ')}`
-            : ''
-        }`
-      );
+      logActivity(`Sandy suggested creating a task for: "${taskInput.trim()}"`);
 
       setTimeout(() => {
         setShowResponse(false);
-        setAssigningEmployeeId(undefined);
-        setCurrentRouting(undefined);
-        setActiveRoomIds([]);
         setSandyMessage(undefined);
-      }, 6000);
+      }, 8000);
 
       setIsProcessing(false);
     } catch (error) {
@@ -245,7 +177,9 @@ export function SandyInterface() {
                 />
               )}
               {topTab === 'board-room' && <BoardRoomPanel />}
-              {topTab === 'tasks' && <TasksBoard />}
+              {topTab === 'tasks' && companyId && currentUserId && (
+                <MyTasks companyId={companyId} currentUserId={currentUserId} />
+              )}
               {topTab === 'campaigns' && <CampaignsView />}
               {topTab === 'reports' && <PlaceholderPanel title="Reports" />}
               {topTab === 'analytics' && <PlaceholderPanel title="Analytics" />}
