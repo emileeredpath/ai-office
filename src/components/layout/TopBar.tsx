@@ -58,7 +58,7 @@ export function TopBar({ active, onSelect }: TopBarProps) {
             Emilee
           </p>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Marketing Director
+            Marketing Coordinator
           </p>
         </div>
       </div>

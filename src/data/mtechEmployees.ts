@@ -89,6 +89,12 @@ export const EMPLOYEES: Record<string, Employee> = {
 };
 
 export const BRANDS = {
+  mtech: {
+    id: 'mtech',
+    name: 'MTech',
+    website: '',
+    shortName: 'MTech',
+  },
   brentwood: {
     id: 'brentwood',
     name: 'MTech Brentwood Communications',
@@ -114,6 +120,9 @@ export const BRANDS = {
     shortName: 'IRCL',
   },
 };
+
+// Brand order for filters: All Brands · MTech · Brentwood · Radio Links · Capcom · IRCL
+export const BRAND_ORDER = ['mtech', 'brentwood', 'radio_links', 'capcom', 'ircl'] as const;
 
 export type BrandId = keyof typeof BRANDS;
 export type EmployeeId = keyof typeof EMPLOYEES;

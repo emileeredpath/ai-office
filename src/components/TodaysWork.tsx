@@ -116,47 +116,55 @@ export function TodaysWork({ companyId, currentUserId }: TodaysWorkProps) {
             Morning Emilee. Here's what needs your attention today:
           </p>
 
-          <ul className="space-y-2 mb-6" style={{ color: '#E8ECF1' }}>
+          <ul className="space-y-2 mb-8" style={{ color: '#E8ECF1' }}>
             <li className="text-sm">✓ {briefingStats.approvalsWaiting} approvals waiting</li>
             <li className="text-sm">✓ {briefingStats.deadlinesToday} deadline{briefingStats.deadlinesToday !== 1 ? 's' : ''} today</li>
             <li className="text-sm">✓ {briefingStats.tasksInProgress} tasks in progress across the team</li>
           </ul>
 
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={sandyInput}
-              onChange={(e) => setSandyInput(e.target.value)}
-              placeholder="Ask Sandy anything..."
-              className="flex-1 px-4 py-2 rounded-lg text-sm"
-              style={{
-                backgroundColor: '#0A0E14',
-                borderColor: '#1E2430',
-                border: '1px solid',
-                color: '#E8ECF1',
-              }}
-            />
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={sandyInput}
+                onChange={(e) => setSandyInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    // Handle Sandy message
+                    setSandyInput('');
+                  }
+                }}
+                placeholder="Tell Sandy what you need..."
+                className="flex-1 px-4 py-2 rounded-lg text-sm"
+                style={{
+                  backgroundColor: '#0A0E14',
+                  borderColor: '#1E2430',
+                  border: '1px solid',
+                  color: '#E8ECF1',
+                }}
+              />
+              <button
+                className="px-6 py-2 rounded-lg font-medium transition-all text-sm"
+                style={{
+                  backgroundColor: '#F97031',
+                  color: 'white',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E85E1F')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#F97031')}
+              >
+                Send
+              </button>
+            </div>
+
             <button
-              className="px-6 py-2 rounded-lg font-medium transition-all text-sm"
-              style={{
-                backgroundColor: '#F97031',
-                color: 'white',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#E85E1F')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#F97031')}
+              className="text-sm font-medium transition-all"
+              style={{ color: '#F97031' }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
             >
-              Send
+              Full Briefing →
             </button>
           </div>
-
-          <button
-            className="mt-3 text-sm font-medium transition-all"
-            style={{ color: '#F97031' }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-          >
-            Full Briefing →
-          </button>
         </div>
 
         {/* Main Content Grid */}

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { REAL_TASKS, BRANDS, EMPLOYEES, BrandId } from '@/data/mtechEmployees';
+import { REAL_TASKS, BRANDS, EMPLOYEES, BrandId, BRAND_ORDER } from '@/data/mtechEmployees';
 
 interface TasksListProps {
   companyId: string;
@@ -126,11 +126,14 @@ export function TasksList({ companyId, currentUserId }: TasksListProps) {
               }}
             >
               <option value="all">All Brands</option>
-              {Object.entries(BRANDS).map(([key, brand]) => (
-                <option key={key} value={key}>
-                  {brand.shortName}
-                </option>
-              ))}
+              {BRAND_ORDER.map((brandId) => {
+                const brand = BRANDS[brandId];
+                return (
+                  <option key={brandId} value={brandId}>
+                    {brand.shortName}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
