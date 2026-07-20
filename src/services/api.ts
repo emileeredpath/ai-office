@@ -463,3 +463,132 @@ export async function getSpecialistContextHistory(
   if (!response.ok) throw new Error('Failed to fetch context history');
   return response.json();
 }
+
+// Phase 6: Advanced Features
+
+// Task Templates
+export async function createTaskTemplate(
+  companyId: string,
+  template: {
+    name: string;
+    description?: string;
+    category?: string;
+    defaultPriority?: string;
+    estimatedHours?: number;
+    steps?: any[];
+    requiredSpecialists?: string[];
+  }
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/advanced/company/${companyId}/templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(template),
+  });
+  if (!response.ok) throw new Error('Failed to create template');
+  return response.json();
+}
+
+export async function getTaskTemplates(companyId: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/api/advanced/company/${companyId}/templates`);
+  if (!response.ok) throw new Error('Failed to fetch templates');
+  return response.json();
+}
+
+// Task Collaborations
+export async function addTaskCollaborator(
+  taskId: string,
+  specialistId: string,
+  role: string = 'contributor'
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/advanced/task/${taskId}/collaborators`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ specialistId, role }),
+  });
+  if (!response.ok) throw new Error('Failed to add collaborator');
+  return response.json();
+}
+
+export async function getTaskCollaborators(taskId: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/api/advanced/task/${taskId}/collaborators`);
+  if (!response.ok) throw new Error('Failed to fetch collaborators');
+  return response.json();
+}
+
+// Specialist Performance
+export async function getSpecialistPerformance(
+  specialistId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<any> {
+  const response = await fetch(
+    `${API_URL}/api/advanced/specialist/${specialistId}/performance?periodStart=${periodStart}&periodEnd=${periodEnd}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch performance');
+  return response.json();
+}
+
+export async function getTeamPerformance(
+  companyId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<any[]> {
+  const response = await fetch(
+    `${API_URL}/api/advanced/company/${companyId}/team-performance?periodStart=${periodStart}&periodEnd=${periodEnd}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch team performance');
+  return response.json();
+}
+
+// Task Analytics
+export async function recordTaskAnalytics(
+  taskId: string,
+  analytics: {
+    timeToComplete?: number;
+    revisionCount?: number;
+    approvalRate?: number;
+    userSatisfaction?: number;
+    businessImpact?: string;
+  }
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/advanced/task/${taskId}/analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(analytics),
+  });
+  if (!response.ok) throw new Error('Failed to record analytics');
+  return response.json();
+}
+
+export async function getTaskAnalytics(taskId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/advanced/task/${taskId}/analytics`);
+  if (!response.ok) throw new Error('Failed to fetch analytics');
+  return response.json();
+}
+
+export async function getCompanyAnalytics(companyId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/advanced/company/${companyId}/analytics`);
+  if (!response.ok) throw new Error('Failed to fetch company analytics');
+  return response.json();
+}
+
+// Task Dependencies
+export async function addTaskDependency(
+  taskId: string,
+  prerequisiteTaskId: string,
+  dependencyType: string = 'blocks'
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/advanced/task/${taskId}/dependencies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prerequisiteTaskId, dependencyType }),
+  });
+  if (!response.ok) throw new Error('Failed to add dependency');
+  return response.json();
+}
+
+export async function getTaskDependencies(taskId: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/api/advanced/task/${taskId}/dependencies`);
+  if (!response.ok) throw new Error('Failed to fetch dependencies');
+  return response.json();
+}

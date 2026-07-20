@@ -11,6 +11,7 @@ import integrationsRouter from './routes/integrations.js';
 import outcomesRouter from './routes/outcomes.js';
 import adminRouter from './routes/admin.js';
 import taskWorkspaceRouter from './routes/taskWorkspace.js';
+import advancedFeaturesRouter from './routes/advancedFeatures.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -45,6 +46,7 @@ app.use('/api/integrations', integrationsRouter);
 app.use('/api/outcomes', outcomesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/task-workspace', taskWorkspaceRouter);
+app.use('/api/advanced', advancedFeaturesRouter);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

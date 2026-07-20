@@ -557,3 +557,143 @@ CREATE INDEX IF NOT EXISTS idx_campaign_outputs_output_id ON campaign_outputs(ou
 CREATE INDEX IF NOT EXISTS idx_specialist_context_history_task_id ON specialist_context_history(task_id);
 CREATE INDEX IF NOT EXISTS idx_specialist_context_history_specialist_id ON specialist_context_history(specialist_id);
 CREATE INDEX IF NOT EXISTS idx_specialist_context_history_context_type ON specialist_context_history(context_type);
+
+-- Phase 6: Advanced Features
+
+-- Task Templates (for recurring workflows)
+CREATE TABLE IF NOT EXISTS task_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  category VARCHAR(100), -- 'marketing', 'sales', 'operations', etc.
+  default_priority VARCHAR(50) DEFAULT 'medium',
+  estimated_hours INTEGER, -- rough estimate
+  steps JSONB, -- array of template steps
+  required_specialists TEXT[], -- array of specialist roles needed
+  created_by_id UUID REFERENCES ai_employees(id),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(company_id, name)
+);
+
+-- Task Dependencies (for sequencing and workflows)
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dependent_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  prerequisite_task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  dependency_type VARCHAR(50), -- 'blocks', 'requires_completion', 'informs'
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(dependent_task_id, prerequisite_task_id)
+);
+
+-- Task Collaborations (multiple specialists on one task)
+CREATE TABLE IF NOT EXISTS task_collaborations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  specialist_id UUID NOT NULL REFERENCES ai_employees(id),
+  role VARCHAR(100), -- 'primary', 'reviewer', 'contributor', 'approver'
+  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP,
+  notes TEXT,
+  UNIQUE(task_id, specialist_id)
+);
+
+-- Workflow Instances (tracks execution of workflows)
+CREATE TABLE IF NOT EXISTS workflow_instances (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  template_id UUID REFERENCES task_templates(id),
+  status VARCHAR(50) DEFAULT 'active', -- active, paused, completed, failed
+  created_by_id UUID REFERENCES ai_employees(id),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Workflow Steps (execution history of workflow steps)
+CREATE TABLE IF NOT EXISTS workflow_steps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_instance_id UUID NOT NULL REFERENCES workflow_instances(id) ON DELETE CASCADE,
+  task_id UUID REFERENCES tasks(id),
+  step_order INTEGER,
+  status VARCHAR(50) DEFAULT 'pending', -- pending, running, completed, failed, skipped
+  assigned_to_id UUID REFERENCES ai_employees(id),
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  result JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Specialist Performance Metrics (aggregated stats)
+CREATE TABLE IF NOT EXISTS specialist_performance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  specialist_id UUID NOT NULL REFERENCES ai_employees(id),
+  period_start DATE,
+  period_end DATE,
+  tasks_completed INTEGER DEFAULT 0,
+  tasks_approved INTEGER DEFAULT 0,
+  avg_rating DECIMAL(3, 2),
+  total_feedback_count INTEGER DEFAULT 0,
+  quality_score DECIMAL(3, 2), -- aggregate from ratings and feedback
+  efficiency_score DECIMAL(3, 2), -- time-based score
+  consistency_score DECIMAL(3, 2), -- consistency with guidelines
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(specialist_id, period_start, period_end)
+);
+
+-- Task Analytics (metrics per task)
+CREATE TABLE IF NOT EXISTS task_analytics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  time_to_complete INTEGER, -- minutes
+  revision_count INTEGER DEFAULT 0, -- how many drafts before approval
+  approval_rate DECIMAL(3, 2), -- percentage of outputs approved on first review
+  user_satisfaction DECIMAL(3, 2), -- 1-5 rating
+  business_impact TEXT, -- qualitative impact
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Scheduled Tasks (automation)
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  template_id UUID REFERENCES task_templates(id),
+  cron_expression VARCHAR(100), -- '0 9 * * MON' for recurring tasks
+  next_run_at TIMESTAMP,
+  last_run_at TIMESTAMP,
+  created_by_id UUID REFERENCES ai_employees(id),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Escalation Rules (auto-escalate tasks meeting certain criteria)
+CREATE TABLE IF NOT EXISTS escalation_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  name VARCHAR(255) NOT NULL,
+  trigger_condition JSONB, -- e.g., {\"type\": \"no_progress_days\", \"value\": 3}
+  escalate_to_id UUID REFERENCES ai_employees(id), -- who to escalate to
+  notification_template TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Phase 6 Indexes
+CREATE INDEX IF NOT EXISTS idx_task_templates_company_id ON task_templates(company_id);
+CREATE INDEX IF NOT EXISTS idx_task_templates_category ON task_templates(category);
+CREATE INDEX IF NOT EXISTS idx_task_dependencies_dependent_task_id ON task_dependencies(dependent_task_id);
+CREATE INDEX IF NOT EXISTS idx_task_dependencies_prerequisite_task_id ON task_dependencies(prerequisite_task_id);
+CREATE INDEX IF NOT EXISTS idx_task_collaborations_task_id ON task_collaborations(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_collaborations_specialist_id ON task_collaborations(specialist_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_instances_company_id ON workflow_instances(company_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_instances_template_id ON workflow_instances(template_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow_instance_id ON workflow_steps(workflow_instance_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_status ON workflow_steps(status);
+CREATE INDEX IF NOT EXISTS idx_specialist_performance_specialist_id ON specialist_performance(specialist_id);
+CREATE INDEX IF NOT EXISTS idx_specialist_performance_period ON specialist_performance(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_task_analytics_task_id ON task_analytics(task_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_company_id ON scheduled_tasks(company_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run_at ON scheduled_tasks(next_run_at);
+CREATE INDEX IF NOT EXISTS idx_escalation_rules_company_id ON escalation_rules(company_id);
