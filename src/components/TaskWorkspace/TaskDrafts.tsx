@@ -1,30 +1,17 @@
 import { useState } from 'react';
-import * as api from '@/services/api';
+import { OutputApprovalPanel } from './OutputApprovalPanel';
 
 interface TaskDraftsProps {
   workspace: any;
   taskId: string;
   currentUserId: string;
+  onUpdate: () => void;
 }
 
-export function TaskDrafts({ workspace, taskId, currentUserId }: TaskDraftsProps) {
+export function TaskDrafts({ workspace, taskId, currentUserId, onUpdate }: TaskDraftsProps) {
   const [drafts, setDrafts] = useState(workspace.drafts || []);
   const [selectedDraft, setSelectedDraft] = useState<any>(null);
-  const [approving, setApproving] = useState(false);
-
-  const handleApproveDraft = async (draft: any) => {
-    setApproving(true);
-    try {
-      await api.approveDraft(taskId, draft.id, currentUserId, 'document');
-      alert('Draft approved as output!');
-      setSelectedDraft(null);
-    } catch (err) {
-      console.error('Failed to approve draft:', err);
-      alert('Failed to approve draft');
-    } finally {
-      setApproving(false);
-    }
-  };
+  const [approvingDraftId, setApprovingDraftId] = useState<string | null>(null);
 
   if (drafts.length === 0) {
     return (
@@ -81,25 +68,24 @@ export function TaskDrafts({ workspace, taskId, currentUserId }: TaskDraftsProps
             </div>
 
             <div className="p-6">
-              <div className="prose prose-invert max-w-none">
+              <div className="prose prose-invert max-w-none mb-8">
                 <div className="text-slate-200 whitespace-pre-wrap">{selectedDraft.content}</div>
               </div>
-            </div>
 
-            <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6 flex gap-3">
-              <button
-                onClick={() => setSelectedDraft(null)}
-                className="px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => handleApproveDraft(selectedDraft)}
-                disabled={approving}
-                className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:bg-slate-700 text-white font-medium"
-              >
-                {approving ? 'Approving...' : '✓ Approve as Output'}
-              </button>
+              {approvingDraftId !== selectedDraft.id && (
+                <OutputApprovalPanel
+                  taskId={taskId}
+                  draftId={selectedDraft.id}
+                  draftTitle={selectedDraft.title}
+                  draftContent={selectedDraft.content}
+                  currentUserId={currentUserId}
+                  onApprove={() => {
+                    setSelectedDraft(null);
+                    onUpdate();
+                  }}
+                  onCancel={() => setApprovingDraftId(null)}
+                />
+              )}
             </div>
           </div>
         </div>

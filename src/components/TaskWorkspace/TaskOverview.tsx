@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as api from '@/services/api';
 import { DelegationDialog } from './DelegationDialog';
+import { TaskCompletion } from './TaskCompletion';
 
 interface TaskOverviewProps {
   workspace: any;
@@ -75,16 +76,39 @@ export function TaskOverview({ workspace, currentUserId, onUpdate }: TaskOvervie
         {workspace.conversation?.delegated_to_id && (
           <div className="bg-blue-900/20 rounded-lg p-6 border border-blue-700/50">
             <h2 className="text-xl font-bold text-slate-50 mb-4">Delegated</h2>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-4">
               <div className="text-3xl">{workspace.conversation.delegated_to_emoji || '👤'}</div>
               <div>
                 <p className="text-slate-100 font-medium">{workspace.conversation.delegated_to_name}</p>
                 <p className="text-sm text-slate-400">Assigned on {new Date(workspace.conversation.created_at).toLocaleDateString()}</p>
               </div>
             </div>
-            <p className="text-slate-300 mt-4">
+            <p className="text-slate-300 mb-4">
               Go to the Conversation tab to work with this specialist.
             </p>
+
+            {/* Task Completion */}
+            {workspace.task.status !== 'complete' && (
+              <TaskCompletion
+                taskId={workspace.task.id}
+                taskTitle={workspace.task.title}
+                specialistName={workspace.conversation.delegated_to_name}
+                specialistId={workspace.conversation.delegated_to_id}
+                currentUserId={currentUserId}
+                onComplete={onUpdate}
+              />
+            )}
+
+            {workspace.task.status === 'complete' && (
+              <div className="bg-green-900/20 border border-green-700/50 rounded p-4 mt-4">
+                <p className="text-sm text-green-200 font-medium">✓ Task completed</p>
+                <p className="text-xs text-green-300 mt-1">
+                  {workspace.task.completed_at
+                    ? `Finished on ${new Date(workspace.task.completed_at).toLocaleDateString()}`
+                    : 'Completed'}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
