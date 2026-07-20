@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { EMPLOYEES, REAL_TASKS, BRANDS } from '@/data/mtechEmployees';
 
 interface TodaysWorkProps {
   companyId: string;
@@ -11,6 +12,70 @@ export function TodaysWork({ companyId, currentUserId }: TodaysWorkProps) {
   const todayDate = new Date();
   const dayName = todayDate.toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = todayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  // Calculate Sandy's briefing from real data
+  const briefingStats = useMemo(() => {
+    const waitingForJohn = REAL_TASKS.filter((t) => t.status === 'waiting-john');
+    const inProgress = REAL_TASKS.filter((t) => t.status === 'in-progress');
+    const dueSoon = REAL_TASKS.filter((t) => t.deadline && new Date(t.deadline) <= new Date(Date.now() + 86400000)); // Next 24 hours
+
+    return {
+      approvalsWaiting: waitingForJohn.length,
+      deadlinesToday: dueSoon.length,
+      tasksInProgress: inProgress.length,
+    };
+  }, []);
+
+  // Get today's focus (high priority, waiting for john, or in progress)
+  const todaysFocus = useMemo(() => {
+    return REAL_TASKS.filter((t) =>
+      t.status === 'waiting-john' || (t.status === 'in-progress' && t.priority === 'high')
+    ).slice(0, 3);
+  }, []);
+
+  // Get waiting for john tasks
+  const waitingForJohnTasks = useMemo(() => {
+    return REAL_TASKS.filter((t) => t.status === 'waiting-john');
+  }, []);
+
+  // Get busy team members
+  const busyTeam = useMemo(() => {
+    return Object.values(EMPLOYEES)
+      .filter((e) => e.status === 'busy' && e.id !== 'sandy')
+      .slice(0, 3);
+  }, []);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'waiting-john':
+        return '#F59E0B';
+      case 'in-progress':
+        return '#1D9E75';
+      case 'waiting-approval':
+        return '#F97031';
+      case 'complete':
+        return '#5C6879';
+      default:
+        return '#5C6879';
+    }
+  };
+
+  const getStatusDot = (status: string) => {
+    switch (status) {
+      case 'in-progress':
+        return '🟢';
+      case 'available':
+        return '⚫';
+      case 'busy':
+        return '🟠';
+      case 'waiting':
+        return '🟡';
+      case 'blocked':
+        return '🔴';
+      default:
+        return '⚫';
+    }
+  };
 
   return (
     <div className="flex-1 overflow-y-auto p-8" style={{ backgroundColor: '#070A0F' }}>
@@ -52,9 +117,9 @@ export function TodaysWork({ companyId, currentUserId }: TodaysWorkProps) {
           </p>
 
           <ul className="space-y-2 mb-6" style={{ color: '#E8ECF1' }}>
-            <li className="text-sm">✓ 2 approvals waiting</li>
-            <li className="text-sm">✓ 1 deadline today</li>
-            <li className="text-sm">✓ 3 tasks in progress across the team</li>
+            <li className="text-sm">✓ {briefingStats.approvalsWaiting} approvals waiting</li>
+            <li className="text-sm">✓ {briefingStats.deadlinesToday} deadline{briefingStats.deadlinesToday !== 1 ? 's' : ''} today</li>
+            <li className="text-sm">✓ {briefingStats.tasksInProgress} tasks in progress across the team</li>
           </ul>
 
           <div className="flex gap-3">
@@ -102,73 +167,50 @@ export function TodaysWork({ companyId, currentUserId }: TodaysWorkProps) {
               TODAY'S FOCUS
             </h3>
             <div className="space-y-3">
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#EF4444',
-                borderLeft: '4px solid #EF4444',
-              }}>
-                <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                  🔴 Sateen Email
-                </p>
-                <p className="text-xs mt-1" style={{ color: '#5C6879' }}>
-                  Waiting for John
-                </p>
-              </div>
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#F97031',
-                borderLeft: '4px solid #F97031',
-              }}>
-                <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                  🟠 Website Refresh
-                </p>
-                <p className="text-xs mt-1" style={{ color: '#5C6879' }}>
-                  In Progress
-                </p>
-              </div>
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#F59E0B',
-                borderLeft: '4px solid #F59E0B',
-              }}>
-                <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                  🟡 PPC Campaign
-                </p>
-                <p className="text-xs mt-1" style={{ color: '#5C6879' }}>
-                  Due today
-                </p>
-              </div>
+              {todaysFocus.map((task) => (
+                <div
+                  key={task.id}
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: '#0F1219',
+                    borderColor: getStatusColor(task.status),
+                    borderLeft: `4px solid ${getStatusColor(task.status)}`,
+                  }}
+                >
+                  <p className="text-sm font-medium truncate" style={{ color: '#E8ECF1' }}>
+                    {task.status === 'waiting-john' ? '🔴' : task.status === 'in-progress' ? '🟠' : '🟡'} {task.title}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: '#5C6879' }}>
+                    {BRANDS[task.brand].shortName}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Waiting for Approval */}
+          {/* Waiting for Approval (Waiting for John) */}
           <div>
             <h3 className="text-sm font-bold mb-4" style={{ color: '#E8ECF1' }}>
               WAITING FOR APPROVAL
             </h3>
             <div className="space-y-3">
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#1E2430',
-              }}>
-                <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                  Sateen email
-                </p>
-                <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>
-                  Waiting for John
-                </p>
-              </div>
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#1E2430',
-              }}>
-                <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                  IRCL stickers
-                </p>
-                <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>
-                  Waiting for John
-                </p>
-              </div>
+              {waitingForJohnTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: '#0F1219',
+                    borderColor: '#1E2430',
+                  }}
+                >
+                  <p className="text-sm font-medium truncate" style={{ color: '#E8ECF1' }}>
+                    {task.title}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: '#F59E0B' }}>
+                    Waiting for John
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -178,54 +220,37 @@ export function TodaysWork({ companyId, currentUserId }: TodaysWorkProps) {
               TEAM STATUS
             </h3>
             <div className="space-y-3">
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#1E2430',
-              }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                    📧 Email Manager
+              {busyTeam.map((employee) => (
+                <div
+                  key={employee.id}
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: '#0F1219',
+                    borderColor: '#1E2430',
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
+                      {employee.emoji} {employee.name.split(' ')[0]}
+                    </p>
+                    <span style={{ color: getStatusColor(employee.status) }}>
+                      {getStatusDot(employee.status)}
+                    </span>
+                  </div>
+                  <p className="text-xs" style={{ color: '#5C6879' }}>
+                    {employee.currentTask || 'Available'}
                   </p>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#1D9E75' }}></span>
+                  <div className="mt-2 h-1.5 rounded-full" style={{ backgroundColor: '#1E2430' }}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${employee.workload}%`,
+                        background: 'linear-gradient(90deg, #F97031, #FFB067)',
+                      }}
+                    />
+                  </div>
                 </div>
-                <p className="text-xs" style={{ color: '#5C6879' }}>
-                  In Progress
-                </p>
-                <p className="text-xs mt-1 font-medium" style={{ color: '#E8ECF1' }}>
-                  Account Manager emails
-                </p>
-              </div>
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#1E2430',
-              }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                    🌐 Website Manager
-                  </p>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#1D9E75' }}></span>
-                </div>
-                <p className="text-xs" style={{ color: '#5C6879' }}>
-                  In Progress
-                </p>
-                <p className="text-xs mt-1 font-medium" style={{ color: '#E8ECF1' }}>
-                  Radio Systems page
-                </p>
-              </div>
-              <div className="p-4 rounded-lg" style={{
-                backgroundColor: '#0F1219',
-                borderColor: '#1E2430',
-              }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium" style={{ color: '#E8ECF1' }}>
-                    📊 SEO Manager
-                  </p>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#5C6879' }}></span>
-                </div>
-                <p className="text-xs" style={{ color: '#5C6879' }}>
-                  Available
-                </p>
-              </div>
+              ))}
             </div>
           </div>
         </div>
