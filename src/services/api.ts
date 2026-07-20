@@ -592,3 +592,134 @@ export async function getTaskDependencies(taskId: string): Promise<any[]> {
   if (!response.ok) throw new Error('Failed to fetch dependencies');
   return response.json();
 }
+
+// Phase 7: Integration Layer
+
+// Integration Configuration
+export async function saveIntegration(
+  companyId: string,
+  systemType: string,
+  config: {
+    apiKey?: string;
+    apiUrl?: string;
+    username?: string;
+    password?: string;
+    accessToken?: string;
+  }
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/integrations/${systemType}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!response.ok) throw new Error('Failed to save integration');
+  return response.json();
+}
+
+export async function getIntegrations(companyId: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/integrations`);
+  if (!response.ok) throw new Error('Failed to fetch integrations');
+  return response.json();
+}
+
+export async function getIntegration(companyId: string, systemType: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/integrations/${systemType}`);
+  if (!response.ok) throw new Error('Failed to fetch integration');
+  return response.json();
+}
+
+// Sync History
+export async function getSyncHistory(
+  companyId: string,
+  systemType?: string,
+  limit?: number
+): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (systemType) params.append('systemType', systemType);
+  if (limit) params.append('limit', limit.toString());
+
+  const response = await fetch(
+    `${API_URL}/api/integrations/company/${companyId}/sync-history?${params.toString()}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch sync history');
+  return response.json();
+}
+
+// Data Sync Endpoints
+export async function syncAcumaticaVendors(companyId: string, vendors: any[]): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/sync/acumatica/vendors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vendors }),
+  });
+  if (!response.ok) throw new Error('Failed to sync vendors');
+  return response.json();
+}
+
+export async function syncAcumaticaInvoices(companyId: string, invoices: any[]): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/sync/acumatica/invoices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invoices }),
+  });
+  if (!response.ok) throw new Error('Failed to sync invoices');
+  return response.json();
+}
+
+export async function syncEmailCampaigns(companyId: string, campaigns: any[]): Promise<any> {
+  const response = await fetch(
+    `${API_URL}/api/integrations/company/${companyId}/sync/campaign-monitor/campaigns`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaigns }),
+    }
+  );
+  if (!response.ok) throw new Error('Failed to sync email campaigns');
+  return response.json();
+}
+
+export async function syncGA4Metrics(companyId: string, metrics: any[]): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/sync/ga4/metrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metrics }),
+  });
+  if (!response.ok) throw new Error('Failed to sync GA4 metrics');
+  return response.json();
+}
+
+export async function syncGA4Campaigns(companyId: string, campaigns: any[]): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/sync/ga4/campaigns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ campaigns }),
+  });
+  if (!response.ok) throw new Error('Failed to sync GA4 campaigns');
+  return response.json();
+}
+
+// Integration Context
+export async function getIntegrationContext(companyId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/company/${companyId}/integration-context`);
+  if (!response.ok) throw new Error('Failed to fetch integration context');
+  return response.json();
+}
+
+// Integration Alerts
+export async function getIntegrationAlerts(companyId: string, unresolvedOnly: boolean = true): Promise<any[]> {
+  const response = await fetch(
+    `${API_URL}/api/integrations/company/${companyId}/alerts?unresolvedOnly=${unresolvedOnly}`
+  );
+  if (!response.ok) throw new Error('Failed to fetch alerts');
+  return response.json();
+}
+
+export async function resolveAlert(alertId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/integrations/alerts/${alertId}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Failed to resolve alert');
+  return response.json();
+}

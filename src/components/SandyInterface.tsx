@@ -11,6 +11,7 @@ import { MyTasks } from '@/components/MyTasks';
 import { CompanyKnowledgePanel } from '@/components/TaskWorkspace/CompanyKnowledgePanel';
 import { TaskTemplatesPanel } from '@/components/TaskWorkspace/TaskTemplatesPanel';
 import { AnalyticsDashboard } from '@/components/TaskWorkspace/AnalyticsDashboard';
+import { IntegrationPanel } from '@/components/TaskWorkspace/IntegrationPanel';
 import { LeftSidebar, type NavKey } from '@/components/layout/LeftSidebar';
 import { TopBar, type TopTab } from '@/components/layout/TopBar';
 import { PlaceholderModal } from '@/components/PlaceholderModal';
@@ -189,6 +190,9 @@ This sounds like a task! Go to the **Tasks** tab and create it there. That way y
               )}
               {topTab === 'knowledge' && companyId && currentUserId && (
                 <CompanyKnowledgePanel companyId={companyId} currentUserId={currentUserId} />
+              )}
+              {topTab === 'integrations' && companyId && currentUserId && (
+                <IntegrationPanel companyId={companyId} currentUserId={currentUserId} />
               )}
               {topTab === 'reports' && <PlaceholderPanel title="Reports" />}
               {topTab === 'analytics' && companyId && currentUserId && (

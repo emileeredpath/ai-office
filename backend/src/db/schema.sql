@@ -697,3 +697,84 @@ CREATE INDEX IF NOT EXISTS idx_task_analytics_task_id ON task_analytics(task_id)
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_company_id ON scheduled_tasks(company_id);
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run_at ON scheduled_tasks(next_run_at);
 CREATE INDEX IF NOT EXISTS idx_escalation_rules_company_id ON escalation_rules(company_id);
+
+-- Phase 7: Integration Layer
+
+-- External System Integrations
+CREATE TABLE IF NOT EXISTS integrations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  system_type VARCHAR(50), -- 'acumatica', 'campaign_monitor', 'ga4', etc.
+  config JSONB, -- API keys, endpoints, credentials (encrypted in production)
+  is_active BOOLEAN DEFAULT TRUE,
+  last_sync_at TIMESTAMP,
+  sync_status VARCHAR(50), -- 'idle', 'syncing', 'success', 'failed'
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(company_id, system_type)
+);
+
+-- Sync History and Status
+CREATE TABLE IF NOT EXISTS sync_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  system_type VARCHAR(50), -- which system was synced
+  sync_type VARCHAR(50), -- 'pull', 'push', 'bidirectional'
+  status VARCHAR(50), -- 'success', 'failed', 'partial'
+  records_processed INTEGER DEFAULT 0,
+  records_skipped INTEGER DEFAULT 0,
+  error_message TEXT,
+  details JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Integration Alerts
+CREATE TABLE IF NOT EXISTS integration_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  alert_type VARCHAR(100), -- 'sync_failed', 'data_mismatch', 'api_quota', 'auth_expired'
+  message TEXT NOT NULL,
+  source_system VARCHAR(50),
+  priority VARCHAR(50), -- 'critical', 'high', 'normal', 'low'
+  is_resolved BOOLEAN DEFAULT FALSE,
+  resolved_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Data Mapping Configuration (for custom field mappings)
+CREATE TABLE IF NOT EXISTS data_mappings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  source_system VARCHAR(50), -- e.g., 'acumatica'
+  source_field VARCHAR(255),
+  target_table VARCHAR(100), -- e.g., 'vendors', 'tasks'
+  target_field VARCHAR(255),
+  transformation_rule TEXT, -- JSON rule for transforming data
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Webhook Registrations (for real-time updates from external systems)
+CREATE TABLE IF NOT EXISTS webhooks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id),
+  system_type VARCHAR(50),
+  event_type VARCHAR(100), -- 'invoice_created', 'campaign_sent', etc.
+  webhook_url VARCHAR(500),
+  secret_key VARCHAR(255),
+  is_active BOOLEAN DEFAULT TRUE,
+  last_triggered_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Phase 7 Indexes
+CREATE INDEX IF NOT EXISTS idx_integrations_company_id ON integrations(company_id);
+CREATE INDEX IF NOT EXISTS idx_integrations_system_type ON integrations(system_type);
+CREATE INDEX IF NOT EXISTS idx_sync_history_company_id ON sync_history(company_id);
+CREATE INDEX IF NOT EXISTS idx_sync_history_system_type ON sync_history(system_type);
+CREATE INDEX IF NOT EXISTS idx_sync_history_created_at ON sync_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_integration_alerts_company_id ON integration_alerts(company_id);
+CREATE INDEX IF NOT EXISTS idx_integration_alerts_is_resolved ON integration_alerts(is_resolved);
+CREATE INDEX IF NOT EXISTS idx_data_mappings_company_id ON data_mappings(company_id);
+CREATE INDEX IF NOT EXISTS idx_webhooks_company_id ON webhooks(company_id);
+CREATE INDEX IF NOT EXISTS idx_webhooks_system_type ON webhooks(system_type);
