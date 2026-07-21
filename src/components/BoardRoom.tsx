@@ -14,6 +14,7 @@ export function BoardRoom({ companyId, currentUserId }: BoardRoomProps) {
     const waitingForJohn = REAL_TASKS.filter((t) => t.status === 'waiting-john').length;
     const highPriorityTasks = REAL_TASKS.filter((t) => t.priority === 'high').length;
     const highPriorityComplete = REAL_TASKS.filter((t) => t.priority === 'high' && t.status === 'complete').length;
+    const overdueTasks = REAL_TASKS.filter((t) => t.deadline && new Date(t.deadline) < new Date()).length;
 
     const teamBusyCount = Object.values(EMPLOYEES).filter((e) => e.status === 'busy').length;
     const avgWorkload = Math.round(
@@ -29,6 +30,11 @@ export function BoardRoom({ companyId, currentUserId }: BoardRoomProps) {
       };
     });
 
+    const criticalIssues: string[] = [];
+    if (waitingForJohn > 2) criticalIssues.push(`${waitingForJohn} items awaiting John's review`);
+    if (overdueTasks > 0) criticalIssues.push(`${overdueTasks} overdue task${overdueTasks > 1 ? 's' : ''}`);
+    if (avgWorkload > 75) criticalIssues.push(`Team workload at ${avgWorkload}% - consider load balancing`);
+
     return {
       totalTasks,
       completedTasks,
@@ -37,10 +43,12 @@ export function BoardRoom({ companyId, currentUserId }: BoardRoomProps) {
       waitingForJohn,
       highPriorityTasks,
       highPriorityComplete,
-      highPriorityRate: Math.round((highPriorityComplete / highPriorityTasks) * 100),
+      highPriorityRate: Math.round((highPriorityComplete / highPriorityTasks) * 100) || 0,
       teamBusyCount,
       avgWorkload,
+      overdueTasks,
       brandMetrics,
+      criticalIssues,
     };
   }, []);
 
@@ -85,13 +93,13 @@ export function BoardRoom({ companyId, currentUserId }: BoardRoomProps) {
 
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', border: '1px solid' }}>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Awaiting Review
+              {metrics.overdueTasks > 0 ? 'URGENT: Overdue' : 'Awaiting Review'}
             </p>
-            <p className="text-3xl font-bold mt-2" style={{ color: '#F59E0B' }}>
-              {metrics.waitingForJohn}
+            <p className="text-3xl font-bold mt-2" style={{ color: metrics.overdueTasks > 0 ? '#EF4444' : '#F59E0B' }}>
+              {metrics.overdueTasks > 0 ? metrics.overdueTasks : metrics.waitingForJohn}
             </p>
             <p className="text-xs mt-1" style={{ color: '#7A8997' }}>
-              Waiting for John
+              {metrics.overdueTasks > 0 ? 'Overdue tasks' : 'Waiting for John'}
             </p>
           </div>
 
@@ -99,7 +107,7 @@ export function BoardRoom({ companyId, currentUserId }: BoardRoomProps) {
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
               Team Capacity
             </p>
-            <p className="text-3xl font-bold mt-2" style={{ color: '#3B82F6' }}>
+            <p className="text-3xl font-bold mt-2" style={{ color: metrics.avgWorkload > 75 ? '#EF4444' : '#3B82F6' }}>
               {metrics.avgWorkload}%
             </p>
             <p className="text-xs mt-1" style={{ color: '#7A8997' }}>
@@ -107,6 +115,22 @@ export function BoardRoom({ companyId, currentUserId }: BoardRoomProps) {
             </p>
           </div>
         </div>
+
+        {/* Critical Issues Alert */}
+        {metrics.criticalIssues.length > 0 && (
+          <div className="p-4 mb-8 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: '#EF4444', border: '1px solid' }}>
+            <p style={{ color: '#EF4444', fontWeight: '600', marginBottom: '8px' }}>
+              ⚠️ Critical Issues
+            </p>
+            <div className="space-y-2">
+              {metrics.criticalIssues.map((issue, i) => (
+                <p key={i} style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
+                  • {issue}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Secondary Metrics */}
         <div className="grid grid-cols-2 gap-6 mb-8">
