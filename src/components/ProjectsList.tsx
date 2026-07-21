@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { REAL_TASKS, BRANDS, EMPLOYEES } from '@/data/mtechEmployees';
 
 interface ProjectsListProps {
@@ -19,6 +19,8 @@ interface Project {
 }
 
 export function ProjectsList({ companyId, currentUserId }: ProjectsListProps) {
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
   const projects: Project[] = useMemo(() => {
     const projectsMap: Record<string, Project> = {
       'martyn-law': {
@@ -166,21 +168,45 @@ export function ProjectsList({ companyId, currentUserId }: ProjectsListProps) {
 
         {/* Projects Grid */}
         <div className="space-y-4">
-          {projects.map((project) => (
+          {projects.map((project) => {
+            const projectTasks = REAL_TASKS.filter((t) => {
+              if (project.id === 'martyn-law') return t.title.includes("Martyn's Law");
+              if (project.id === 'account-manager-emails') return t.title.includes('Account Manager Email');
+              if (project.id === 'website-refresh') return t.title.includes('page') || t.title.includes('Page') || t.title.includes('Banner');
+              if (project.id === 'ppc-optimization') return t.title.includes('PPC');
+              return false;
+            });
+            const hasOverdueTasks = projectTasks.some((t) => t.deadline && new Date(t.deadline) < new Date());
+            const blockingTasks = projectTasks.filter((t) => t.status === 'waiting-john').length;
+
+            return (
             <div
               key={project.id}
-              className="p-6 rounded-lg"
+              onClick={() => setSelectedProjectId(project.id)}
+              className="p-6 rounded-lg cursor-pointer transition-all hover:border-orange-500"
               style={{
                 backgroundColor: 'var(--bg-secondary)',
-                borderColor: 'var(--border-color)',
+                borderColor: hasOverdueTasks ? '#EF4444' : 'var(--border-color)',
                 border: '1px solid',
               }}
             >
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                    {project.name}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                      {project.name}
+                    </h3>
+                    {hasOverdueTasks && (
+                      <span style={{ fontSize: '16px' }} title="Has overdue tasks">
+                        ⚠️
+                      </span>
+                    )}
+                    {blockingTasks > 0 && (
+                      <span style={{ fontSize: '16px' }} title={`${blockingTasks} tasks awaiting review`}>
+                        🔴
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                     {project.description}
                   </p>
@@ -263,8 +289,112 @@ export function ProjectsList({ companyId, currentUserId }: ProjectsListProps) {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Project Detail Modal */}
+        {selectedProjectId && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+            onClick={() => setSelectedProjectId(null)}
+          >
+            <div
+              className="bg-slate-900 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+              style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', border: '1px solid' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(() => {
+                const project = projects.find((p) => p.id === selectedProjectId);
+                if (!project) return null;
+
+                const projectTasks = REAL_TASKS.filter((t) => {
+                  if (project.id === 'martyn-law') return t.title.includes("Martyn's Law");
+                  if (project.id === 'account-manager-emails') return t.title.includes('Account Manager Email');
+                  if (project.id === 'website-refresh') return t.title.includes('page') || t.title.includes('Page') || t.title.includes('Banner');
+                  if (project.id === 'ppc-optimization') return t.title.includes('PPC');
+                  return false;
+                });
+
+                return (
+                  <>
+                    <div className="sticky top-0 bg-slate-900 border-b p-6" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                            {project.name}
+                          </h2>
+                          <p style={{ color: 'var(--text-secondary)' }}>{project.description}</p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedProjectId(null)}
+                          className="text-2xl font-bold transition-all"
+                          style={{ color: 'var(--text-secondary)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-6">
+                      {/* Project Stats */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Status</p>
+                          <p className="text-lg font-bold mt-1" style={{ color: getStatusColor(project.status) }}>
+                            {getStatusLabel(project.status)}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Progress</p>
+                          <p className="text-lg font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                            {project.progress}%
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Tasks</p>
+                          <p className="text-lg font-bold mt-1" style={{ color: 'var(--text-primary)' }}>
+                            {project.completedCount}/{project.taskCount}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tasks List */}
+                      <div>
+                        <h3 className="font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+                          Project Tasks ({projectTasks.length})
+                        </h3>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {projectTasks.map((task) => (
+                            <div key={task.id} className="p-2 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                              <p style={{ color: 'var(--text-primary)', fontSize: '14px', fontWeight: '500' }}>{task.title}</p>
+                              <div className="flex gap-2 mt-1 flex-wrap">
+                                <span
+                                  className="text-xs px-2 py-1 rounded"
+                                  style={{
+                                    backgroundColor: task.status === 'complete' ? 'rgba(29, 158, 117, 0.2)' : 'rgba(249, 112, 31, 0.2)',
+                                    color: task.status === 'complete' ? '#1D9E75' : '#F97031',
+                                  }}
+                                >
+                                  {task.status}
+                                </span>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                  {Object.values(EMPLOYEES).find((e) => e.id === task.owner)?.name}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
