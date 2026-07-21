@@ -6,6 +6,10 @@ import { CampaignsList } from '@/components/CampaignsList';
 import { BoardRoom } from '@/components/BoardRoom';
 import { KnowledgeHub } from '@/components/KnowledgeHub';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { ActivityFeed } from '@/components/ActivityFeed';
+import { EmployeeChat } from '@/components/EmployeeChat';
+import { CalendarScheduling } from '@/components/CalendarScheduling';
+import { VisualOutputs } from '@/components/VisualOutputs';
 import { LeftSidebar, type NavKey } from '@/components/layout/LeftSidebar';
 import { TopBar, type TopTab } from '@/components/layout/TopBar';
 import { CompletedTasksProvider } from '@/contexts/CompletedTasksContext';
@@ -24,13 +28,13 @@ export function SandyInterface() {
     // Map left sidebar navigation to top tabs
     const tabMap: Record<NavKey, TopTab> = {
       home: 'home',
-      team: 'home',
-      messages: 'home',
+      team: 'chat',
+      messages: 'chat',
       tasks: 'tasks',
-      calendar: 'home',
-      files: 'home',
+      calendar: 'calendar',
+      files: 'outputs',
       campaigns: 'campaigns',
-      analytics: 'home',
+      analytics: 'activity',
       help: 'home',
     };
     setTopTab(tabMap[key] || 'home');
@@ -63,6 +67,26 @@ export function SandyInterface() {
           {/* Campaigns */}
           {topTab === 'campaigns' && (
             <CampaignsList companyId={companyId} currentUserId={currentUserId} />
+          )}
+
+          {/* Activity Feed */}
+          {topTab === 'activity' && (
+            <ActivityFeed />
+          )}
+
+          {/* Employee Chat */}
+          {topTab === 'chat' && (
+            <EmployeeChat />
+          )}
+
+          {/* Calendar & Scheduling */}
+          {topTab === 'calendar' && (
+            <CalendarScheduling />
+          )}
+
+          {/* Visual Outputs */}
+          {topTab === 'outputs' && (
+            <VisualOutputs />
           )}
 
           {/* Board Room */}
