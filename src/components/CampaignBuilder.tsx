@@ -7,13 +7,21 @@ import { getProposalTemplate, type ProposalResponse } from '@/services/proposalS
 import { getCaseStudyTemplate, type CaseStudyStrategy } from '@/services/caseStudyService';
 import { getFundingOpportunities, type FundingStrategy } from '@/services/fundingService';
 
-type ExpertTab = 'email' | 'social' | 'website' | 'ppc' | 'proposal' | 'case-study' | 'funding';
+type ExpertType = 'email' | 'social' | 'website' | 'ppc' | 'proposal' | 'case-study' | 'funding';
+
+interface Expert {
+  key: ExpertType;
+  name: string;
+  emoji: string;
+  role: string;
+  description: string;
+}
 
 interface Campaign {
   id: string;
   brief: CampaignBrief;
-  emailVariants: EmailVariant[];
-  selectedVariant: string | null;
+  selectedExperts: Set<ExpertType>;
+  emailVariants: EmailVariant[] | null;
   socialStrategy: SocialMediaStrategy | null;
   websiteStrategy: WebsiteStrategy | null;
   ppcStrategy: PPCStrategy | null;
@@ -24,11 +32,62 @@ interface Campaign {
   createdAt: Date;
 }
 
+const EXPERTS: Expert[] = [
+  {
+    key: 'email',
+    name: 'Email Marketing Manager',
+    emoji: '📧',
+    role: 'Campaigns & Newsletters',
+    description: 'Creates compelling email variants with optimized subject lines and CTAs',
+  },
+  {
+    key: 'social',
+    name: 'Social Media Manager',
+    emoji: '📱',
+    role: 'LinkedIn, Facebook, Instagram, TikTok',
+    description: 'Develops platform-specific content strategies and posting calendars',
+  },
+  {
+    key: 'website',
+    name: 'Website Manager',
+    emoji: '🌐',
+    role: 'Page Creation & Updates',
+    description: 'Designs landing pages and optimizes for SEO and conversions',
+  },
+  {
+    key: 'ppc',
+    name: 'SEO & PPC Manager',
+    emoji: '📊',
+    role: 'Search & Google Ads',
+    description: 'Builds paid advertising campaigns with keyword and budget strategy',
+  },
+  {
+    key: 'proposal',
+    name: 'Proposal Writer',
+    emoji: '✍️',
+    role: 'Tenders & RFP Responses',
+    description: 'Writes executive summaries and RFP responses',
+  },
+  {
+    key: 'case-study',
+    name: 'Case Study Writer',
+    emoji: '📖',
+    role: 'Customer Stories & Testimonials',
+    description: 'Creates customer success stories with quantifiable results',
+  },
+  {
+    key: 'funding',
+    name: 'Funding & Rewards Manager',
+    emoji: '💰',
+    role: 'Grants & Supplier Co-op',
+    description: 'Identifies grants, co-op programs, and funding opportunities',
+  },
+];
+
 export function CampaignBuilder() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
-  const [activeExpertTab, setActiveExpertTab] = useState<ExpertTab>('email');
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -38,16 +97,6 @@ export function CampaignBuilder() {
     timeline: '',
     successMetric: '',
     keyMessages: '',
-  });
-
-  const [expertRequests, setExpertRequests] = useState<Record<ExpertTab, string>>({
-    email: '',
-    social: '',
-    website: '',
-    ppc: '',
-    proposal: '',
-    'case-study': '',
-    funding: '',
   });
 
   const selectedCampaign = useMemo(() => campaigns.find((c) => c.id === selectedCampaignId), [campaigns, selectedCampaignId]);
@@ -68,8 +117,8 @@ export function CampaignBuilder() {
           .map((m) => m.trim())
           .filter((m) => m),
       },
-      emailVariants: [],
-      selectedVariant: null,
+      selectedExperts: new Set(),
+      emailVariants: null,
       socialStrategy: null,
       websiteStrategy: null,
       ppcStrategy: null,
@@ -86,119 +135,117 @@ export function CampaignBuilder() {
     setShowNewCampaign(false);
   };
 
-  const handleRequestExpert = async (expert: ExpertTab) => {
-    if (!selectedCampaign || !expertRequests[expert].trim()) return;
+  const handleToggleExpert = (expert: ExpertType) => {
+    if (!selectedCampaign) return;
+
+    setCampaigns((prev) =>
+      prev.map((c) => {
+        if (c.id === selectedCampaignId) {
+          const newExperts = new Set(c.selectedExperts);
+          if (newExperts.has(expert)) {
+            newExperts.delete(expert);
+          } else {
+            newExperts.add(expert);
+          }
+          return { ...c, selectedExperts: newExperts };
+        }
+        return c;
+      })
+    );
+  };
+
+  const handleGetTeamHelp = async () => {
+    if (!selectedCampaign || selectedCampaign.selectedExperts.size === 0) return;
 
     setLoading(true);
     try {
-      let response: any;
+      const updates: Partial<Campaign> = {};
 
-      switch (expert) {
-        case 'email':
-          response = await getEmailManagerHelp(selectedCampaign.brief, expertRequests[expert]);
-          setCampaigns((prev) =>
-            prev.map((c) =>
-              c.id === selectedCampaignId
-                ? {
-                    ...c,
-                    emailVariants: response.variants,
-                    selectedVariant: response.variants[0]?.id || null,
-                  }
-                : c
-            )
-          );
-          break;
-
-        case 'social':
-          response = await getSocialMediaStrategy(
-            selectedCampaign.brief.name,
-            selectedCampaign.brief.targetAudience,
-            selectedCampaign.brief.keyMessages,
-            expertRequests[expert]
-          );
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === selectedCampaignId ? { ...c, socialStrategy: response } : c))
-          );
-          break;
-
-        case 'website':
-          response = await getWebsiteStrategy(
-            selectedCampaign.brief.name,
-            selectedCampaign.brief.objective,
-            selectedCampaign.brief.targetAudience,
-            expertRequests[expert]
-          );
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === selectedCampaignId ? { ...c, websiteStrategy: response } : c))
-          );
-          break;
-
-        case 'ppc':
-          response = await getPPCStrategy(
-            selectedCampaign.brief.name,
-            selectedCampaign.brief.targetAudience,
-            selectedCampaign.brief.successMetric,
-            expertRequests[expert]
-          );
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === selectedCampaignId ? { ...c, ppcStrategy: response } : c))
-          );
-          break;
-
-        case 'proposal':
-          response = await getProposalTemplate(
-            selectedCampaign.brief.name,
-            selectedCampaign.brief.objective,
-            selectedCampaign.brief.targetAudience,
-            expertRequests[expert]
-          );
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === selectedCampaignId ? { ...c, proposalResponse: response } : c))
-          );
-          break;
-
-        case 'case-study':
-          response = await getCaseStudyTemplate(
-            selectedCampaign.brief.name,
-            selectedCampaign.brief.targetAudience,
-            selectedCampaign.brief.keyMessages,
-            expertRequests[expert]
-          );
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === selectedCampaignId ? { ...c, caseStudyStrategy: response } : c))
-          );
-          break;
-
-        case 'funding':
-          response = await getFundingOpportunities(
-            selectedCampaign.brief.name,
-            selectedCampaign.brief.successMetric,
-            selectedCampaign.brief.targetAudience,
-            expertRequests[expert]
-          );
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === selectedCampaignId ? { ...c, fundingStrategy: response } : c))
-          );
-          break;
+      // Email Manager
+      if (selectedCampaign.selectedExperts.has('email')) {
+        const emailResponse = await getEmailManagerHelp(selectedCampaign.brief, 'Create compelling email variants for this campaign');
+        updates.emailVariants = emailResponse.variants;
       }
 
-      setExpertRequests({ ...expertRequests, [expert]: '' });
+      // Social Media Manager
+      if (selectedCampaign.selectedExperts.has('social')) {
+        const socialResponse = await getSocialMediaStrategy(
+          selectedCampaign.brief.name,
+          selectedCampaign.brief.targetAudience,
+          selectedCampaign.brief.keyMessages,
+          'Create a comprehensive social media strategy'
+        );
+        updates.socialStrategy = socialResponse;
+      }
+
+      // Website Manager
+      if (selectedCampaign.selectedExperts.has('website')) {
+        const websiteResponse = await getWebsiteStrategy(
+          selectedCampaign.brief.name,
+          selectedCampaign.brief.objective,
+          selectedCampaign.brief.targetAudience,
+          'Design optimized landing pages for this campaign'
+        );
+        updates.websiteStrategy = websiteResponse;
+      }
+
+      // PPC Manager
+      if (selectedCampaign.selectedExperts.has('ppc')) {
+        const ppcResponse = await getPPCStrategy(
+          selectedCampaign.brief.name,
+          selectedCampaign.brief.targetAudience,
+          selectedCampaign.brief.successMetric,
+          'Create PPC campaigns for this initiative'
+        );
+        updates.ppcStrategy = ppcResponse;
+      }
+
+      // Proposal Writer
+      if (selectedCampaign.selectedExperts.has('proposal')) {
+        const proposalResponse = await getProposalTemplate(
+          selectedCampaign.brief.name,
+          selectedCampaign.brief.objective,
+          selectedCampaign.brief.targetAudience,
+          'Write a proposal for this campaign'
+        );
+        updates.proposalResponse = proposalResponse;
+      }
+
+      // Case Study Writer
+      if (selectedCampaign.selectedExperts.has('case-study')) {
+        const caseStudyResponse = await getCaseStudyTemplate(
+          selectedCampaign.brief.name,
+          selectedCampaign.brief.targetAudience,
+          selectedCampaign.brief.keyMessages,
+          'Create case study templates for this campaign'
+        );
+        updates.caseStudyStrategy = caseStudyResponse;
+      }
+
+      // Funding Manager
+      if (selectedCampaign.selectedExperts.has('funding')) {
+        const fundingResponse = await getFundingOpportunities(
+          selectedCampaign.brief.name,
+          selectedCampaign.brief.successMetric,
+          selectedCampaign.brief.targetAudience,
+          'Identify funding opportunities for this campaign'
+        );
+        updates.fundingStrategy = fundingResponse;
+      }
+
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c.id === selectedCampaignId
+            ? {
+                ...c,
+                ...updates,
+              }
+            : c
+        )
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelectVariant = (variantId: string) => {
-    setCampaigns((prev) =>
-      prev.map((c) =>
-        c.id === selectedCampaignId
-          ? {
-              ...c,
-              selectedVariant: variantId,
-            }
-          : c
-      )
-    );
   };
 
   const handleLaunchCampaign = () => {
@@ -216,16 +263,6 @@ export function CampaignBuilder() {
     );
   };
 
-  const EXPERT_TABS: { key: ExpertTab; label: string; emoji: string }[] = [
-    { key: 'email', label: 'Email', emoji: '📧' },
-    { key: 'social', label: 'Social', emoji: '📱' },
-    { key: 'website', label: 'Website', emoji: '🌐' },
-    { key: 'ppc', label: 'PPC', emoji: '📊' },
-    { key: 'proposal', label: 'Proposal', emoji: '✍️' },
-    { key: 'case-study', label: 'Case Study', emoji: '📖' },
-    { key: 'funding', label: 'Funding', emoji: '💰' },
-  ];
-
   return (
     <div className="flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <div className="p-8">
@@ -235,7 +272,7 @@ export function CampaignBuilder() {
               Campaign Builder
             </h1>
             <p style={{ color: 'var(--text-secondary)' }}>
-              Build full email campaigns with expert team assistance
+              Brief your team once, select who you need, get a complete campaign
             </p>
           </div>
           <button
@@ -367,9 +404,9 @@ export function CampaignBuilder() {
                 >
                   <p className="font-medium text-sm">{campaign.brief.name}</p>
                   <p style={{ fontSize: '11px', opacity: 0.7 }}>
-                    {[campaign.emailVariants.length > 0 && '📧', campaign.socialStrategy && '📱', campaign.websiteStrategy && '🌐', campaign.ppcStrategy && '📊', campaign.proposalResponse && '✍️', campaign.caseStudyStrategy && '📖', campaign.fundingStrategy && '💰']
-                      .filter(Boolean)
-                      .join(' ') || 'No experts yet'}
+                    {campaign.selectedExperts.size > 0
+                      ? `${campaign.selectedExperts.size} expert${campaign.selectedExperts.size !== 1 ? 's' : ''} selected`
+                      : 'No experts selected'}
                   </p>
                   <p
                     style={{
@@ -427,89 +464,75 @@ export function CampaignBuilder() {
                   </div>
                 </div>
 
-                {/* Expert Tabs */}
+                {/* Team Selection */}
                 <div className="p-6 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', border: '1px solid' }}>
-                  <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                    {EXPERT_TABS.map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setActiveExpertTab(tab.key)}
-                        className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all"
+                  <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+                    👥 Select Your Team
+                  </h2>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '4px', fontSize: '14px' }}>
+                    Check which experts you need help from:
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 mt-4">
+                    {EXPERTS.map((expert) => (
+                      <label
+                        key={expert.key}
+                        className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all"
                         style={{
-                          backgroundColor: activeExpertTab === tab.key ? 'var(--accent-orange)' : 'var(--bg-tertiary)',
-                          color: activeExpertTab === tab.key ? 'white' : 'var(--text-primary)',
-                          borderColor: 'var(--border-color)',
+                          backgroundColor: selectedCampaign.selectedExperts.has(expert.key)
+                            ? 'rgba(249, 112, 31, 0.1)'
+                            : 'var(--bg-tertiary)',
+                          borderColor: selectedCampaign.selectedExperts.has(expert.key)
+                            ? 'var(--accent-orange)'
+                            : 'var(--border-color)',
                           border: '1px solid',
                         }}
                       >
-                        {tab.emoji} {tab.label}
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedCampaign.selectedExperts.has(expert.key)}
+                          onChange={() => handleToggleExpert(expert.key)}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            cursor: 'pointer',
+                            accentColor: 'var(--accent-orange)',
+                          }}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span style={{ fontSize: '20px' }}>{expert.emoji}</span>
+                            <div>
+                              <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '14px' }}>
+                                {expert.name}
+                              </p>
+                              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                                {expert.description}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
                     ))}
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-                        What would you like from the{' '}
-                        {EXPERT_TABS.find((t) => t.key === activeExpertTab)?.label.toLowerCase()} expert?
-                      </label>
-                      <textarea
-                        value={expertRequests[activeExpertTab]}
-                        onChange={(e) =>
-                          setExpertRequests({ ...expertRequests, [activeExpertTab]: e.target.value })
-                        }
-                        placeholder="Describe what you need..."
-                        disabled={loading}
-                        className="w-full px-3 py-2 rounded text-sm"
-                        rows={3}
-                        style={{
-                          backgroundColor: 'var(--bg-tertiary)',
-                          borderColor: 'var(--border-color)',
-                          border: '1px solid',
-                          color: 'var(--text-primary)',
-                          opacity: loading ? 0.6 : 1,
-                        }}
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => handleRequestExpert(activeExpertTab)}
-                      disabled={loading || !expertRequests[activeExpertTab].trim()}
-                      className="w-full px-4 py-2 rounded-lg font-medium text-sm"
-                      style={{
-                        backgroundColor: 'var(--accent-orange)',
-                        color: 'white',
-                        opacity: loading || !expertRequests[activeExpertTab].trim() ? 0.6 : 1,
-                        cursor: loading || !expertRequests[activeExpertTab].trim() ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {loading ? '⏳ Expert working...' : '✨ Get Expert Help'}
-                    </button>
-                  </div>
-
-                  {/* Results Display */}
-                  <ExpertResultsDisplay
-                    expert={activeExpertTab}
-                    campaign={selectedCampaign}
-                    onSelectVariant={handleSelectVariant}
-                  />
+                  <button
+                    onClick={handleGetTeamHelp}
+                    disabled={loading || selectedCampaign.selectedExperts.size === 0}
+                    className="w-full mt-6 px-4 py-3 rounded-lg font-medium text-sm"
+                    style={{
+                      backgroundColor: 'var(--accent-orange)',
+                      color: 'white',
+                      opacity: loading || selectedCampaign.selectedExperts.size === 0 ? 0.6 : 1,
+                      cursor: loading || selectedCampaign.selectedExperts.size === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {loading ? '⏳ Team is working...' : `✨ Get Help from ${selectedCampaign.selectedExperts.size} Expert${selectedCampaign.selectedExperts.size !== 1 ? 's' : ''}`}
+                  </button>
                 </div>
 
-                {/* Launch Button */}
-                {selectedCampaign.emailVariants.length > 0 && selectedCampaign.selectedVariant && selectedCampaign.status === 'draft' && (
-                  <button
-                    onClick={handleLaunchCampaign}
-                    className="w-full px-4 py-3 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: '#1D9E75',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-                  >
-                    🚀 Campaign Ready - Mark as Ready
-                  </button>
-                )}
+                {/* Results */}
+                <CampaignResults campaign={selectedCampaign} onLaunch={handleLaunchCampaign} />
               </div>
             ) : (
               <div className="h-full flex items-center justify-center rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)' }}>
@@ -523,202 +546,190 @@ export function CampaignBuilder() {
   );
 }
 
-function ExpertResultsDisplay({
-  expert,
-  campaign,
-  onSelectVariant,
-}: {
-  expert: ExpertTab;
-  campaign: Campaign;
-  onSelectVariant: (variantId: string) => void;
-}) {
-  switch (expert) {
-    case 'email':
-      return campaign.emailVariants.length > 0 ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-            Email Variants ({campaign.emailVariants.length})
-          </h3>
-          <div className="space-y-3">
-            {campaign.emailVariants.map((variant) => (
-              <div
-                key={variant.id}
-                onClick={() => onSelectVariant(variant.id)}
-                className="p-4 rounded-lg cursor-pointer transition-all"
-                style={{
-                  backgroundColor: campaign.selectedVariant === variant.id ? 'rgba(249, 112, 31, 0.1)' : 'var(--bg-tertiary)',
-                  borderColor: campaign.selectedVariant === variant.id ? 'var(--accent-orange)' : 'var(--border-color)',
-                  border: '1px solid',
-                }}
-              >
-                <p style={{ color: 'var(--text-primary)', fontWeight: '500', marginBottom: '4px' }}>
-                  {variant.subjectLine}
-                </p>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
-                  {variant.preview}
-                </p>
-                <div className="p-3 rounded text-xs" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
-                  {variant.bodyContent}
+function CampaignResults({ campaign, onLaunch }: { campaign: Campaign; onLaunch: () => void }) {
+  if (campaign.selectedExperts.size === 0) return null;
+
+  const hasResults =
+    campaign.emailVariants || campaign.socialStrategy || campaign.websiteStrategy || campaign.ppcStrategy || campaign.proposalResponse || campaign.caseStudyStrategy || campaign.fundingStrategy;
+
+  if (!hasResults) return null;
+
+  return (
+    <div className="p-6 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', border: '1px solid' }}>
+      <h2 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
+        📋 Campaign Deliverables
+      </h2>
+
+      <div className="space-y-6">
+        {/* Email */}
+        {campaign.emailVariants && (
+          <div className="border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>📧</span> Email Variants
+            </h3>
+            <div className="space-y-2">
+              {campaign.emailVariants.slice(0, 2).map((variant, i) => (
+                <div key={i} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '13px' }}>
+                    {variant.subjectLine}
+                  </p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                    {variant.cta}
+                  </p>
                 </div>
-                <div className="mt-2 flex gap-2 text-xs">
+              ))}
+              {campaign.emailVariants.length > 2 && (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+                  +{campaign.emailVariants.length - 2} more variants
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Social */}
+        {campaign.socialStrategy && (
+          <div className="border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>📱</span> Social Media Strategy
+            </h3>
+            <div className="space-y-2">
+              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                {campaign.socialStrategy.platforms.length} platforms • {campaign.socialStrategy.platforms.reduce((sum, p) => sum + p.postCount, 0)} posts planned
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {campaign.socialStrategy.platforms.map((p) => (
                   <span
+                    key={p.name}
                     style={{
                       backgroundColor: 'rgba(249, 112, 31, 0.2)',
                       color: 'var(--accent-orange)',
-                      padding: '2px 8px',
+                      padding: '4px 12px',
                       borderRadius: '4px',
+                      fontSize: '12px',
                     }}
                   >
-                    CTA: {variant.cta}
+                    {p.name}
                   </span>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      ) : null;
+        )}
 
-    case 'social':
-      return campaign.socialStrategy ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>Social Media Strategy</h3>
-          {campaign.socialStrategy.platforms.map((platform) => (
-            <div key={platform.name} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '500', marginBottom: '8px' }}>
-                {platform.name}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '4px' }}>
-                Best times: {platform.bestTimes}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                {platform.posts.length} posts planned
-              </p>
+        {/* Website */}
+        {campaign.websiteStrategy && (
+          <div className="border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>🌐</span> Website Pages
+            </h3>
+            <div className="space-y-2">
+              {campaign.websiteStrategy.pages.slice(0, 2).map((page) => (
+                <div key={page.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '13px' }}>
+                    {page.title}
+                  </p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                    {page.headline}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
-          <div className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-            <p style={{ color: 'var(--text-primary)', fontWeight: '500', marginBottom: '4px' }}>
-              Hashtag Strategy
-            </p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-              {campaign.socialStrategy.hashtagStrategy}
-            </p>
           </div>
-        </div>
-      ) : null;
+        )}
 
-    case 'website':
-      return campaign.websiteStrategy ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-            Website Pages ({campaign.websiteStrategy.pages.length})
-          </h3>
-          {campaign.websiteStrategy.pages.map((page) => (
-            <div key={page.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                {page.title}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                {page.headline}
-              </p>
-              <p style={{ color: 'var(--accent-orange)', fontSize: '12px', marginTop: '4px' }}>
-                CTA: {page.cta}
-              </p>
+        {/* PPC */}
+        {campaign.ppcStrategy && (
+          <div className="border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>📊</span> PPC Campaigns
+            </h3>
+            <div className="space-y-2">
+              {campaign.ppcStrategy.campaigns.map((c) => (
+                <div key={c.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '13px' }}>
+                    {c.platform}
+                  </p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                    Budget: {c.budget} • ROI: {c.expectedROI}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : null;
-
-    case 'ppc':
-      return campaign.ppcStrategy ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-            PPC Campaigns ({campaign.ppcStrategy.campaigns.length})
-          </h3>
-          {campaign.ppcStrategy.campaigns.map((c) => (
-            <div key={c.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                {c.name}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                Platform: {c.platform} • Budget: {c.budget}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                Expected ROI: {c.expectedROI}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : null;
-
-    case 'proposal':
-      return campaign.proposalResponse ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-            Proposals ({campaign.proposalResponse.proposals.length})
-          </h3>
-          {campaign.proposalResponse.proposals.map((p) => (
-            <div key={p.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                {p.title}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                {p.summary.substring(0, 100)}...
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : null;
-
-    case 'case-study':
-      return campaign.caseStudyStrategy ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-            Case Studies ({campaign.caseStudyStrategy.caseStudies.length})
-          </h3>
-          {campaign.caseStudyStrategy.caseStudies.map((cs) => (
-            <div key={cs.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                {cs.title}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                Client: {cs.clientName} • Industry: {cs.industry}
-              </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                Results: {cs.results.length} key metrics
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : null;
-
-    case 'funding':
-      return campaign.fundingStrategy ? (
-        <div className="mt-6 space-y-4 border-t pt-6" style={{ borderColor: 'var(--border-color)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
-            Funding Opportunities ({campaign.fundingStrategy.opportunities.length})
-          </h3>
-          <div className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-            <p style={{ color: 'var(--text-primary)', fontWeight: '500', marginBottom: '4px' }}>
-              Total Potential Funding
-            </p>
-            <p style={{ color: 'var(--accent-orange)', fontSize: '16px', fontWeight: 'bold' }}>
-              {campaign.fundingStrategy.totalPotentialFunding}
-            </p>
           </div>
-          {campaign.fundingStrategy.opportunities.slice(0, 3).map((opp) => (
-            <div key={opp.opportunity.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-                {opp.opportunity.name}
+        )}
+
+        {/* Proposal */}
+        {campaign.proposalResponse && (
+          <div className="border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>✍️</span> Proposal
+            </h3>
+            <div className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '13px' }}>
+                {campaign.proposalResponse.proposals[0]?.title}
               </p>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                Amount: {opp.opportunity.amount} • Effort: {opp.effortRequired}
+              <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                {campaign.proposalResponse.proposals[0]?.sections.length} sections
               </p>
             </div>
-          ))}
-        </div>
-      ) : null;
+          </div>
+        )}
 
-    default:
-      return null;
-  }
+        {/* Case Study */}
+        {campaign.caseStudyStrategy && (
+          <div className="border-b pb-6" style={{ borderColor: 'var(--border-color)' }}>
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>📖</span> Case Studies
+            </h3>
+            <div className="space-y-2">
+              {campaign.caseStudyStrategy.caseStudies.map((cs) => (
+                <div key={cs.id} className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                  <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '13px' }}>
+                    {cs.clientName}
+                  </p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                    {cs.results.length} key metrics
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Funding */}
+        {campaign.fundingStrategy && (
+          <div className="pb-6">
+            <h3 className="flex items-center gap-2 font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: '20px' }}>💰</span> Funding Opportunities
+            </h3>
+            <div className="p-3 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: '500', fontSize: '13px' }}>
+                {campaign.fundingStrategy.totalPotentialFunding}
+              </p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                {campaign.fundingStrategy.opportunities.length} opportunities identified
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Launch Button */}
+      {campaign.emailVariants && campaign.status === 'draft' && (
+        <button
+          onClick={onLaunch}
+          className="w-full mt-6 px-4 py-3 rounded-lg font-medium"
+          style={{
+            backgroundColor: '#1D9E75',
+            color: 'white',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        >
+          🚀 Campaign Ready - Mark as Ready
+        </button>
+      )}
+    </div>
+  );
 }
