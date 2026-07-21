@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TodaysWork } from '@/components/TodaysWork';
 import { TasksList } from '@/components/TasksList';
+import { AllTasksList } from '@/components/AllTasksList';
 import { ProjectsList } from '@/components/ProjectsList';
 import { CampaignsList } from '@/components/CampaignsList';
 import { CampaignBuilder } from '@/components/CampaignBuilder';
@@ -63,6 +64,11 @@ export function SandyInterface() {
           {/* Tasks */}
           {topTab === 'tasks' && (
             <TasksList companyId={companyId} currentUserId={currentUserId} />
+          )}
+
+          {/* All Tasks */}
+          {topTab === 'all-tasks' && (
+            <AllTasksList />
           )}
 
           {/* Campaigns */}

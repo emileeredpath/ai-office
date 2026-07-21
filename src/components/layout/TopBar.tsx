@@ -1,6 +1,6 @@
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-export type TopTab = 'home' | 'projects' | 'tasks' | 'campaigns' | 'campaign-builder' | 'board-room' | 'knowledge' | 'activity' | 'chat' | 'calendar' | 'outputs' | 'settings';
+export type TopTab = 'home' | 'projects' | 'tasks' | 'all-tasks' | 'campaigns' | 'campaign-builder' | 'board-room' | 'knowledge' | 'activity' | 'chat' | 'calendar' | 'outputs' | 'settings';
 
 interface TopBarProps {
   active: TopTab;
@@ -11,6 +11,7 @@ const TABS: { key: TopTab; label: string }[] = [
   { key: 'home', label: "Today's Work" },
   { key: 'projects', label: 'Projects' },
   { key: 'tasks', label: 'Tasks' },
+  { key: 'all-tasks', label: 'All Tasks' },
   { key: 'campaigns', label: 'Campaigns' },
   { key: 'campaign-builder', label: 'Build Campaign' },
   { key: 'activity', label: 'Activity' },
