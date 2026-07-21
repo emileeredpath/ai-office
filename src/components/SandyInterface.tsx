@@ -3,6 +3,7 @@ import { TodaysWork } from '@/components/TodaysWork';
 import { TasksList } from '@/components/TasksList';
 import { ProjectsList } from '@/components/ProjectsList';
 import { CampaignsList } from '@/components/CampaignsList';
+import { CampaignBuilder } from '@/components/CampaignBuilder';
 import { BoardRoom } from '@/components/BoardRoom';
 import { KnowledgeHub } from '@/components/KnowledgeHub';
 import { SettingsPanel } from '@/components/SettingsPanel';
@@ -67,6 +68,11 @@ export function SandyInterface() {
           {/* Campaigns */}
           {topTab === 'campaigns' && (
             <CampaignsList companyId={companyId} currentUserId={currentUserId} />
+          )}
+
+          {/* Campaign Builder */}
+          {topTab === 'campaign-builder' && (
+            <CampaignBuilder />
           )}
 
           {/* Activity Feed */}
