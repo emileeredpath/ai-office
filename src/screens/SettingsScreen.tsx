@@ -1,4 +1,49 @@
+import { useAppStore } from '@/store/useAppStore';
+import { formatDate } from '@/utils/dateUtils';
+
 export function SettingsScreen() {
+  const tasks = useAppStore((s) => s.tasks);
+  const campaigns = useAppStore((s) => s.campaigns);
+
+  const exportTasksAsCSV = () => {
+    const csvHeaders = [
+      'Task ID',
+      'Title',
+      'Brand',
+      'Status',
+      'Priority',
+      'Deadline',
+      'Campaign',
+      'Notes',
+      'Created At',
+    ];
+
+    const csvRows = tasks.map((task) => {
+      const campaign = campaigns.find((c) => c.id === task.campaignId);
+      return [
+        task.id,
+        `"${task.title.replace(/"/g, '""')}"`,
+        task.brand,
+        task.status,
+        task.priority,
+        task.deadline ? formatDate(task.deadline) : '',
+        campaign?.name || '',
+        `"${(task.notes || '').replace(/"/g, '""')}"`,
+        formatDate(task.createdAt),
+      ].join(',');
+    });
+
+    const csv = [csvHeaders.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.setAttribute('href', URL.createObjectURL(blob));
+    link.setAttribute('download', `mtech-tasks-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-2xl mx-auto">
@@ -78,7 +123,9 @@ export function SettingsScreen() {
 
         <div className="card">
           <h2 className="text-lg font-semibold text-text-primary mb-4">Data</h2>
-          <button className="btn btn-secondary">Export tasks as CSV</button>
+          <button onClick={exportTasksAsCSV} className="btn btn-secondary">
+            Export tasks as CSV
+          </button>
         </div>
       </div>
     </div>

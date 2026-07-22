@@ -122,7 +122,7 @@ export function TaskDetailPanel() {
           </div>
 
           <div className="task-detail-field">
-            <label>Campaign</label>
+            <label>Campaign {campaign && <span className="text-accent font-semibold">✓</span>}</label>
             <select
               value={task.campaignId || ''}
               onChange={(e) =>
@@ -131,6 +131,7 @@ export function TaskDetailPanel() {
                 })
               }
               className="input"
+              style={campaign ? { borderColor: '#3b82f6', borderWidth: '2px' } : {}}
             >
               <option value="">None</option>
               {campaigns.map((campaign) => (
