@@ -80,6 +80,8 @@ export const useAppStore = create<AppState>((set, get) => {
 
   return {
     ...savedData,
+    selectedTaskId: savedData.selectedTaskId || null,
+    selectedCampaignId: savedData.selectedCampaignId || null,
 
     addTask: (task: Task) => {
       set((state) => {
