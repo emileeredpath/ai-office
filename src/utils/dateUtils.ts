@@ -31,22 +31,26 @@ export function getMonthName(month: number): string {
   return months[month];
 }
 
-export function getDaysInMonth(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+export function getDaysInMonth(date: Date | string): number {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
 }
 
-export function getFirstDayOfMonth(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+export function getFirstDayOfMonth(date: Date | string): number {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Date(d.getFullYear(), d.getMonth(), 1).getDay();
 }
 
-export function isSameDay(d1: Date, d2: Date): boolean {
+export function isSameDay(d1: Date | string, d2: Date | string): boolean {
+  const date1 = typeof d1 === 'string' ? new Date(d1) : d1;
+  const date2 = typeof d2 === 'string' ? new Date(d2) : d2;
   return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
   );
 }
 
-export function isToday(date: Date): boolean {
+export function isToday(date: Date | string): boolean {
   return isSameDay(date, new Date());
 }

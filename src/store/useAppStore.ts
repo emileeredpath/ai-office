@@ -38,20 +38,28 @@ const defaultState = {
 
 const hydrateDates = (data: any) => {
   if (!data.tasks) return data;
+
+  const toDate = (val: any): Date | null => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    if (typeof val === 'string') return new Date(val);
+    return null;
+  };
+
   return {
     ...data,
     tasks: data.tasks.map((task: any) => ({
       ...task,
-      deadline: task.deadline ? new Date(task.deadline) : null,
-      startDate: task.startDate ? new Date(task.startDate) : null,
-      createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
-      completedAt: task.completedAt ? new Date(task.completedAt) : null,
+      deadline: toDate(task.deadline),
+      startDate: toDate(task.startDate),
+      createdAt: toDate(task.createdAt) || new Date(),
+      completedAt: toDate(task.completedAt),
     })),
-    campaigns: data.campaigns?.map((campaign: any) => ({
+    campaigns: (data.campaigns || []).map((campaign: any) => ({
       ...campaign,
-      startDate: campaign.startDate ? new Date(campaign.startDate) : new Date(),
-      endDate: campaign.endDate ? new Date(campaign.endDate) : new Date(),
-    })) || [],
+      startDate: toDate(campaign.startDate) || new Date(),
+      endDate: toDate(campaign.endDate) || new Date(),
+    })),
   };
 };
 

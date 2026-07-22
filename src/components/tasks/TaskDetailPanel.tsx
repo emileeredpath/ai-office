@@ -95,7 +95,7 @@ export function TaskDetailPanel() {
             <label>Due date</label>
             <input
               type="date"
-              value={task.deadline ? task.deadline.toISOString().split('T')[0] : ''}
+              value={task.deadline ? (typeof task.deadline === 'string' ? task.deadline : task.deadline.toISOString().split('T')[0]) : ''}
               onChange={(e) =>
                 updateTask(task.id, {
                   deadline: e.target.value ? new Date(e.target.value) : null,
