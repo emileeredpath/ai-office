@@ -1,6 +1,10 @@
 import { ThemeToggle } from '@/components/ThemeToggle';
 
+<<<<<<< HEAD
 export type TopTab = 'office' | 'board-room' | 'reports' | 'analytics' | 'settings' | 'tasks' | 'campaigns';
+=======
+export type TopTab = 'home' | 'tasks' | 'campaign-builder' | 'chat';
+>>>>>>> claude/new-session-f2d46t
 
 interface TopBarProps {
   active: TopTab;
@@ -8,6 +12,7 @@ interface TopBarProps {
 }
 
 const TABS: { key: TopTab; label: string }[] = [
+<<<<<<< HEAD
   { key: 'office', label: 'Office' },
   { key: 'board-room', label: 'Board Room' },
   { key: 'tasks', label: 'Tasks' },
@@ -15,6 +20,12 @@ const TABS: { key: TopTab; label: string }[] = [
   { key: 'reports', label: 'Reports' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'settings', label: 'Settings' },
+=======
+  { key: 'home', label: "Today's Work" },
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'campaign-builder', label: 'Build Campaign' },
+  { key: 'chat', label: 'Chat' },
+>>>>>>> claude/new-session-f2d46t
 ];
 
 export function TopBar({ active, onSelect }: TopBarProps) {

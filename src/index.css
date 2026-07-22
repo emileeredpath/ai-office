@@ -4,6 +4,7 @@
 
 @layer base {
   :root[data-theme='dark'] {
+<<<<<<< HEAD
     --bg-primary: #05070C;
     --bg-secondary: #0F1419;
     --bg-tertiary: #1a1f2e;
@@ -17,11 +18,27 @@
     --accent-orange: #F97021;
     --accent-cyan: #06B6D4;
     --glow-purple: rgba(139, 92, 246, 0.4);
+=======
+    --bg-primary: #070A0F;
+    --bg-secondary: #0F1219;
+    --bg-tertiary: #1E2430;
+    --bg-card: rgba(15, 18, 25, 0.9);
+    --text-primary: #E8ECF1;
+    --text-secondary: #7A8997;
+    --text-tertiary: #5C6879;
+    --border-color: #1E2430;
+    --accent-primary: #F97031;
+    --accent-secondary: #F97031;
+    --accent-orange: #F97031;
+    --accent-cyan: #F59E0B;
+    --glow-purple: rgba(249, 112, 31, 0.3);
+>>>>>>> claude/new-session-f2d46t
     --glow-orange: rgba(249, 112, 31, 0.3);
   }
 
   :root[data-theme='light'] {
     --bg-primary: #FFFFFF;
+<<<<<<< HEAD
     --bg-secondary: #F5F5F7;
     --bg-tertiary: #ECECF1;
     --bg-card: rgba(255, 255, 255, 0.9);
@@ -35,6 +52,21 @@
     --accent-cyan: #06B6D4;
     --glow-purple: rgba(168, 85, 247, 0.2);
     --glow-orange: rgba(234, 140, 62, 0.2);
+=======
+    --bg-secondary: #F8F9FA;
+    --bg-tertiary: #ECECF1;
+    --bg-card: rgba(255, 255, 255, 0.95);
+    --text-primary: #1A1A1A;
+    --text-secondary: #666666;
+    --text-tertiary: #999999;
+    --border-color: #E5E5E5;
+    --accent-primary: #F97031;
+    --accent-secondary: #FFB067;
+    --accent-orange: #F97031;
+    --accent-cyan: #F59E0B;
+    --glow-purple: rgba(249, 112, 31, 0.15);
+    --glow-orange: rgba(249, 112, 31, 0.15);
+>>>>>>> claude/new-session-f2d46t
   }
 
   * {
