@@ -35,10 +35,23 @@ export function CampaignsScreen() {
               const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
 
               return (
-                <div key={campaign.id} className="card cursor-pointer hover:shadow-lg transition-shadow" onClick={() => {
-                  console.log('Clicked campaign:', campaign.id);
-                  selectCampaign(campaign.id);
-                }}>
+                <div
+                  key={campaign.id}
+                  className="card cursor-pointer hover:shadow-lg transition-shadow"
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => {
+                    console.log('Clicked campaign:', campaign.id);
+                    selectCampaign(campaign.id);
+                    alert(`Selected: ${campaign.name}`);
+                  }}
+                  onMouseEnter={(e) => {
+                    console.log('Mouse enter on:', campaign.id);
+                    e.currentTarget.style.backgroundColor = '#f0f0f0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-text-primary">{campaign.name}</h3>
