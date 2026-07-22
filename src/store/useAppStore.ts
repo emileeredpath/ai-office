@@ -148,7 +148,7 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     getWaitingForJohnTasks: () => {
-      return get().tasks.filter((t) => t.status === 'waiting-john' && t.status !== 'complete');
+      return get().tasks.filter((t) => t.status === 'waiting-john');
     },
 
     getCompletedToday: () => {
