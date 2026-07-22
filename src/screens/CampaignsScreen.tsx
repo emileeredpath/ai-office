@@ -35,10 +35,11 @@ export function CampaignsScreen() {
               const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
 
               return (
-                <div
+                <button
                   key={campaign.id}
-                  className="card cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => alert('test click')}
+                  className="card cursor-pointer hover:shadow-lg transition-shadow text-left"
+                  style={{ background: 'inherit', border: 'inherit', padding: 'inherit', width: '100%', cursor: 'pointer' }}
+                  onClick={() => alert('button clicked')}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -74,7 +75,7 @@ export function CampaignsScreen() {
                     {campaignTasks.filter((t) => t.status === 'complete').length} of{' '}
                     {campaignTasks.length} tasks complete
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
