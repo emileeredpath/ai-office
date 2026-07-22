@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Settings } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
+import { CampaignDetailPanel } from '@/components/campaigns/CampaignDetailPanel';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { MyTasksScreen } from '@/screens/MyTasksScreen';
 import { CampaignsScreen } from '@/screens/CampaignsScreen';
@@ -25,6 +26,7 @@ const NAVIGATION_ITEMS = [
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
+  const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -54,7 +56,8 @@ export default function App() {
       />
       <main className="flex-1 overflow-hidden flex">
         <div className="flex-1 overflow-y-auto">{renderScreen()}</div>
-        {selectedTaskId && <TaskDetailPanel />}
+        {selectedCampaignId && <CampaignDetailPanel />}
+        {selectedTaskId && !selectedCampaignId && <TaskDetailPanel />}
       </main>
     </div>
   );

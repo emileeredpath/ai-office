@@ -6,6 +6,7 @@ import { formatDateShort } from '@/utils/dateUtils';
 export function CampaignsScreen() {
   const campaigns = useAppStore((s) => s.campaigns);
   const tasks = useAppStore((s) => s.tasks);
+  const selectCampaign = useAppStore((s) => s.selectCampaign);
 
   const getCampaignProgress = (campaignId: string) => {
     const campaignTasks = tasks.filter((t) => t.campaignId === campaignId);
@@ -34,7 +35,7 @@ export function CampaignsScreen() {
               const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
 
               return (
-                <div key={campaign.id} className="card cursor-pointer hover:shadow-lg transition-shadow">
+                <div key={campaign.id} className="card cursor-pointer hover:shadow-lg transition-shadow" onClick={() => selectCampaign(campaign.id)}>
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-text-primary">{campaign.name}</h3>

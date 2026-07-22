@@ -61,6 +61,7 @@ export interface Campaign {
   colour: string;
   tasks: string[];
   reactive: boolean;
+  notes: string;
 }
 
 export interface BriefGeneratorState {

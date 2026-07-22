@@ -318,6 +318,7 @@ export const seedCampaigns: Campaign[] = [
     colour: '#3B82F6',
     tasks: ['task-10', 'task-11'],
     reactive: false,
+    notes: '',
   },
   {
     id: 'campaign-2',
@@ -333,6 +334,7 @@ export const seedCampaigns: Campaign[] = [
     colour: '#3B82F6',
     tasks: ['task-2', 'task-3', 'task-4'],
     reactive: false,
+    notes: '',
   },
   {
     id: 'campaign-3',
@@ -348,5 +350,6 @@ export const seedCampaigns: Campaign[] = [
     colour: '#3B82F6',
     tasks: ['task-6', 'task-7', 'task-8'],
     reactive: false,
+    notes: '',
   },
 ];

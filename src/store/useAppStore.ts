@@ -6,6 +6,7 @@ interface AppState {
   tasks: Task[];
   campaigns: Campaign[];
   selectedTaskId: string | null;
+  selectedCampaignId: string | null;
 
   // Task operations
   addTask: (task: Task) => void;
@@ -19,6 +20,7 @@ interface AppState {
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
   deleteCampaign: (id: string) => void;
   getCampaignById: (id: string) => Campaign | undefined;
+  selectCampaign: (id: string | null) => void;
 
   // Derived data
   getTasksForToday: () => Task[];
@@ -34,6 +36,7 @@ const defaultState = {
   tasks: seedTasks,
   campaigns: seedCampaigns,
   selectedTaskId: null,
+  selectedCampaignId: null,
 };
 
 const hydrateDates = (data: any) => {
@@ -149,6 +152,10 @@ export const useAppStore = create<AppState>((set, get) => {
 
     getCampaignById: (id: string) => {
       return get().campaigns.find((c) => c.id === id);
+    },
+
+    selectCampaign: (id: string | null) => {
+      set({ selectedCampaignId: id });
     },
 
     getTasksForToday: () => {
