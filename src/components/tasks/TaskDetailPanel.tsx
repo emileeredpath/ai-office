@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, MoreVertical } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BriefGenerator } from '@/components/tasks/BriefGenerator';
@@ -13,12 +13,19 @@ export function TaskDetailPanel() {
   const updateTask = useAppStore((s) => s.updateTask);
   const selectTask = useAppStore((s) => s.selectTask);
   const getCampaignById = useAppStore((s) => s.getCampaignById);
+  const campaigns = useAppStore((s) => s.campaigns);
 
   const task = selectedTaskId ? getTaskById(selectedTaskId) : null;
   const campaign = task?.campaignId ? getCampaignById(task.campaignId) : null;
 
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(task?.notes || '');
+
+  useEffect(() => {
+    if (task) {
+      setNotes(task.notes || '');
+    }
+  }, [selectedTaskId, task]);
 
   if (!task) return null;
 
@@ -126,7 +133,11 @@ export function TaskDetailPanel() {
               className="input"
             >
               <option value="">None</option>
-              {/* TODO: render available campaigns */}
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>

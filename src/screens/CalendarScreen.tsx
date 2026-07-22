@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { BrandBadge } from '@/components/common/BrandBadge';
 import {
   getDaysInMonth,
   getFirstDayOfMonth,
@@ -40,6 +41,14 @@ export function CalendarScreen() {
       ? today.getDate()
       : null;
 
+  const getActiveCampaigns = () => {
+    const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    return campaigns.filter(
+      (c) => new Date(c.startDate) <= monthEnd && new Date(c.endDate) >= monthStart,
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-4xl mx-auto">
@@ -47,6 +56,21 @@ export function CalendarScreen() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary">Calendar</h1>
         </div>
+
+        {/* Campaign Timeline */}
+        {getActiveCampaigns().length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-text-secondary mb-3 px-1">Active Campaigns</h3>
+            <div className="space-y-2">
+              {getActiveCampaigns().map((campaign) => (
+                <div key={campaign.id} className="flex items-center gap-2 px-2 py-1">
+                  <BrandBadge brand={campaign.brand} />
+                  <span className="text-sm text-text-primary flex-1">{campaign.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Calendar */}
         <div className="card">

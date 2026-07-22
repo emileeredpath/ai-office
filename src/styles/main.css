@@ -377,6 +377,11 @@ body {
   color: #f97031;
 }
 
+.badge-waiting-customer {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #d97706;
+}
+
 .badge-blocked {
   background-color: rgba(239, 68, 68, 0.15);
   color: #ef4444;

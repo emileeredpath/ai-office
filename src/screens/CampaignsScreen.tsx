@@ -27,51 +27,55 @@ export function CampaignsScreen() {
         </div>
 
         {/* Campaign Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {campaigns.map((campaign) => {
-            const progress = getCampaignProgress(campaign.id);
-            const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
+        {campaigns.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {campaigns.map((campaign) => {
+              const progress = getCampaignProgress(campaign.id);
+              const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
 
-            return (
-              <div key={campaign.id} className="card cursor-pointer hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-text-primary">{campaign.name}</h3>
-                    <BrandBadge brand={campaign.brand} />
+              return (
+                <div key={campaign.id} className="card cursor-pointer hover:shadow-lg transition-shadow">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-text-primary">{campaign.name}</h3>
+                      <BrandBadge brand={campaign.brand} />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2 mb-4">
-                  <div>
-                    <p className="text-sm text-text-secondary">{campaign.primaryIndustry}</p>
-                    {campaign.secondaryIndustry && (
-                      <p className="text-sm text-text-secondary">{campaign.secondaryIndustry}</p>
-                    )}
+                  <div className="space-y-2 mb-4">
+                    <div>
+                      <p className="text-sm text-text-secondary">{campaign.primaryIndustry}</p>
+                      {campaign.secondaryIndustry && (
+                        <p className="text-sm text-text-secondary">{campaign.secondaryIndustry}</p>
+                      )}
+                    </div>
+
+                    <div className="text-sm text-text-secondary">
+                      {formatDateShort(campaign.startDate)} - {formatDateShort(campaign.endDate)}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex-1 bg-surface rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-accent h-full transition-all"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-text-primary">{progress}%</span>
                   </div>
 
                   <div className="text-sm text-text-secondary">
-                    {formatDateShort(campaign.startDate)} - {formatDateShort(campaign.endDate)}
+                    {campaignTasks.filter((t) => t.status === 'complete').length} of{' '}
+                    {campaignTasks.length} tasks complete
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 bg-surface rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-accent h-full transition-all"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-sm font-medium text-text-primary">{progress}%</span>
-                </div>
-
-                <div className="text-sm text-text-secondary">
-                  {campaignTasks.filter((t) => t.status === 'complete').length} of{' '}
-                  {campaignTasks.length} tasks complete
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-text-secondary text-center py-12">No campaigns yet. Create one to get started.</p>
+        )}
       </div>
     </div>
   );
