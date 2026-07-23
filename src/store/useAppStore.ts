@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Task, Campaign } from '@/types/index';
+import { Task, Campaign, TaskHistoryEntry } from '@/types/index';
 import { seedTasks, seedCampaigns } from '@/data/seed';
 
 interface AppState {
@@ -12,6 +12,8 @@ interface AppState {
   addTask: (task: Task) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
+  completeTask: (id: string) => void;
+  reopenTask: (id: string) => void;
   selectTask: (id: string | null) => void;
   getTaskById: (id: string) => Task | undefined;
 
@@ -57,6 +59,11 @@ const hydrateDates = (data: any) => {
       startDate: toDate(task.startDate),
       createdAt: toDate(task.createdAt) || new Date(),
       completedAt: toDate(task.completedAt),
+      previousStatus: task.previousStatus ?? null,
+      history: (task.history || []).map((entry: any) => ({
+        ...entry,
+        timestamp: toDate(entry.timestamp) || new Date(),
+      })),
     })),
     campaigns: (data.campaigns || []).map((campaign: any) => ({
       ...campaign,
@@ -113,6 +120,61 @@ export const useAppStore = create<AppState>((set, get) => {
           ...state,
           tasks: state.tasks.filter((t) => t.id !== id),
           selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        return newState;
+      });
+    },
+
+    completeTask: (id: string) => {
+      set((state) => {
+        const newState = {
+          ...state,
+          tasks: state.tasks.map((t) => {
+            if (t.id !== id || t.status === 'complete') return t;
+            const entry: TaskHistoryEntry = {
+              id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              action: 'completed',
+              timestamp: new Date(),
+              previousStatus: t.status,
+              newStatus: 'complete',
+            };
+            return {
+              ...t,
+              previousStatus: t.status,
+              status: 'complete' as const,
+              completedAt: new Date(),
+              history: [...t.history, entry],
+            };
+          }),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        return newState;
+      });
+    },
+
+    reopenTask: (id: string) => {
+      set((state) => {
+        const newState = {
+          ...state,
+          tasks: state.tasks.map((t) => {
+            if (t.id !== id || t.status !== 'complete') return t;
+            const restoredStatus = t.previousStatus || 'not-started';
+            const entry: TaskHistoryEntry = {
+              id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              action: 'reopened',
+              timestamp: new Date(),
+              previousStatus: 'complete',
+              newStatus: restoredStatus,
+            };
+            return {
+              ...t,
+              status: restoredStatus,
+              completedAt: null,
+              previousStatus: null,
+              history: [...t.history, entry],
+            };
+          }),
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
         return newState;

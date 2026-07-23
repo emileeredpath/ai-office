@@ -107,7 +107,7 @@ export function HomeScreen() {
               <table className="table">
                 <tbody>
                   {completedToday.map((task) => (
-                    <TaskRow key={task.id} task={task} completed={true} />
+                    <TaskRow key={task.id} task={task} />
                   ))}
                 </tbody>
               </table>
