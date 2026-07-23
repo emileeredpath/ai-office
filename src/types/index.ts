@@ -58,6 +58,10 @@ export interface Campaign {
   startDate: Date;
   endDate: Date;
   budget: number | null;
+  spend: number; // actual spend to date
+  conversions: number;
+  leads: number;
+  engagement: number; // percentage or count
   colour: string;
   tasks: string[];
   reactive: boolean;

@@ -101,6 +101,72 @@ export function CampaignDetailPanel() {
           </div>
         </div>
 
+        {/* Metrics Row 1 */}
+        <div className="campaign-detail-fields">
+          <div className="campaign-detail-field">
+            <label>Spend (£)</label>
+            <input
+              type="number"
+              value={campaign.spend}
+              onChange={(e) =>
+                updateCampaign(campaign.id, {
+                  spend: e.target.value ? Number(e.target.value) : 0,
+                })
+              }
+              className="input"
+            />
+          </div>
+
+          <div className="campaign-detail-field">
+            <label>Leads</label>
+            <input
+              type="number"
+              value={campaign.leads}
+              onChange={(e) =>
+                updateCampaign(campaign.id, {
+                  leads: e.target.value ? Number(e.target.value) : 0,
+                })
+              }
+              className="input"
+            />
+          </div>
+
+          <div className="campaign-detail-field">
+            <label>Conversions</label>
+            <input
+              type="number"
+              value={campaign.conversions}
+              onChange={(e) =>
+                updateCampaign(campaign.id, {
+                  conversions: e.target.value ? Number(e.target.value) : 0,
+                })
+              }
+              className="input"
+            />
+          </div>
+        </div>
+
+        {/* Metrics Row 2 */}
+        <div className="campaign-detail-fields">
+          <div className="campaign-detail-field">
+            <label>Engagement (%)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={campaign.engagement}
+              onChange={(e) =>
+                updateCampaign(campaign.id, {
+                  engagement: e.target.value ? Number(e.target.value) : 0,
+                })
+              }
+              className="input"
+            />
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="campaign-detail-divider"></div>
+
         {/* Field Row 2 */}
         <div className="campaign-detail-fields">
           <div className="campaign-detail-field">
