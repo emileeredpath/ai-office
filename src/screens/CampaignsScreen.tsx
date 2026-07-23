@@ -18,11 +18,6 @@ export function CampaignsScreen() {
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Test Button */}
-        <button onClick={() => alert('TEST BUTTON WORKS')} style={{ padding: '10px 20px', marginBottom: '20px', backgroundColor: 'red', color: 'white' }}>
-          CLICK ME TO TEST
-        </button>
-
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary">Campaigns</h1>
@@ -44,7 +39,7 @@ export function CampaignsScreen() {
                   key={campaign.id}
                   className="card cursor-pointer hover:shadow-lg transition-shadow text-left"
                   style={{ background: 'inherit', border: 'inherit', padding: 'inherit', width: '100%', cursor: 'pointer' }}
-                  onClick={() => alert('button clicked')}
+                  onClick={() => selectCampaign(campaign.id)}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
