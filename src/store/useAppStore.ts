@@ -62,6 +62,10 @@ const hydrateDates = (data: any) => {
       ...campaign,
       startDate: toDate(campaign.startDate) || new Date(),
       endDate: toDate(campaign.endDate) || new Date(),
+      spend: campaign.spend || 0,
+      conversions: campaign.conversions || 0,
+      leads: campaign.leads || 0,
+      engagement: campaign.engagement || 0,
       notes: campaign.notes || '',
     })),
   };
