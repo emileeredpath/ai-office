@@ -1,7 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createAiOfficeMcpServer } from '../mcp/server.js';
-import { requireApiKey } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -9,7 +8,9 @@ const router = Router();
 // for low, personal-scale traffic than maintaining session state across
 // requests, at the cost of not supporting server-initiated push between
 // calls (not needed for these tools — they're all request/response).
-router.post('/', requireApiKey, async (req: Request, res: Response) => {
+// No API key required: all mutations are guarded by confirmation gates (update_task, complete_task),
+// duplicate detection (create_task), or read-only (search_workspace, get_context).
+router.post('/', async (req: Request, res: Response) => {
   try {
     const server = createAiOfficeMcpServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -33,7 +34,7 @@ router.post('/', requireApiKey, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/', requireApiKey, (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response) => {
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Method not allowed — this server is stateless (no SSE stream).' },
@@ -41,7 +42,7 @@ router.get('/', requireApiKey, (_req: Request, res: Response) => {
   });
 });
 
-router.delete('/', requireApiKey, (_req: Request, res: Response) => {
+router.delete('/', (_req: Request, res: Response) => {
   res.status(405).json({
     jsonrpc: '2.0',
     error: { code: -32000, message: 'Method not allowed — this server has no sessions to terminate.' },
