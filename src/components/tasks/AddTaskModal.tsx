@@ -10,6 +10,7 @@ interface AddTaskModalProps {
 export function AddTaskModal({ onClose }: AddTaskModalProps) {
   const addTask = useAppStore((s) => s.addTask);
   const campaigns = useAppStore((s) => s.campaigns);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -20,7 +21,7 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
     notes: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.title.trim()) {
@@ -48,8 +49,13 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       lastBriefGenerated: null,
     };
 
-    addTask(newTask);
-    onClose();
+    setIsSaving(true);
+    try {
+      await addTask(newTask);
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -150,12 +156,13 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
 
           {/* Buttons */}
           <div className="flex gap-3 pt-4 border-t">
-            <button type="submit" className="btn btn-primary flex-1">
-              Create Task
+            <button type="submit" disabled={isSaving} className="btn btn-primary flex-1 disabled:opacity-60">
+              {isSaving ? 'Creating…' : 'Create Task'}
             </button>
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className="btn btn-secondary flex-1"
             >
               Cancel

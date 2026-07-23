@@ -1,23 +1,36 @@
 import { create } from 'zustand';
 import { Task, Campaign, TaskHistoryEntry } from '@/types/index';
 import { seedTasks, seedCampaigns } from '@/data/seed';
+import {
+  isActionsApiConfigured,
+  fetchTasksFromApi,
+  createTaskAction,
+  updateTaskAction,
+  completeTaskAction,
+  ActionsApiError,
+} from '@/services/actionsApi';
 
 interface AppState {
   tasks: Task[];
   campaigns: Campaign[];
   selectedTaskId: string | null;
   selectedCampaignId: string | null;
+  apiConnected: boolean;
+  apiSyncing: boolean;
 
-  // Task operations
-  addTask: (task: Task) => void;
-  updateTask: (id: string, updates: Partial<Task>) => void;
+  // Task operations — write through to the Actions API when it's configured
+  // (Settings > Claude Actions Integration), otherwise operate on
+  // localStorage exactly as before.
+  addTask: (task: Task) => Promise<void>;
+  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => void;
-  completeTask: (id: string) => void;
-  reopenTask: (id: string) => void;
+  completeTask: (id: string) => Promise<void>;
+  reopenTask: (id: string) => Promise<void>;
   selectTask: (id: string | null) => void;
   getTaskById: (id: string) => Task | undefined;
+  syncTasksFromApi: () => Promise<void>;
 
-  // Campaign operations
+  // Campaign operations (not yet backed by the Actions API — local only)
   addCampaign: (campaign: Campaign) => void;
   updateCampaign: (id: string, updates: Partial<Campaign>) => void;
   deleteCampaign: (id: string) => void;
@@ -41,30 +54,32 @@ const defaultState = {
   selectedCampaignId: null,
 };
 
+const toDate = (val: any): Date | null => {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  if (typeof val === 'string') return new Date(val);
+  return null;
+};
+
+const hydrateTask = (task: any): Task => ({
+  ...task,
+  deadline: toDate(task.deadline),
+  startDate: toDate(task.startDate),
+  createdAt: toDate(task.createdAt) || new Date(),
+  completedAt: toDate(task.completedAt),
+  previousStatus: task.previousStatus ?? null,
+  history: (task.history || []).map((entry: any) => ({
+    ...entry,
+    timestamp: toDate(entry.timestamp) || new Date(),
+  })),
+});
+
 const hydrateDates = (data: any) => {
   if (!data.tasks) return data;
 
-  const toDate = (val: any): Date | null => {
-    if (!val) return null;
-    if (val instanceof Date) return val;
-    if (typeof val === 'string') return new Date(val);
-    return null;
-  };
-
   return {
     ...data,
-    tasks: data.tasks.map((task: any) => ({
-      ...task,
-      deadline: toDate(task.deadline),
-      startDate: toDate(task.startDate),
-      createdAt: toDate(task.createdAt) || new Date(),
-      completedAt: toDate(task.completedAt),
-      previousStatus: task.previousStatus ?? null,
-      history: (task.history || []).map((entry: any) => ({
-        ...entry,
-        timestamp: toDate(entry.timestamp) || new Date(),
-      })),
-    })),
+    tasks: data.tasks.map(hydrateTask),
     campaigns: (data.campaigns || []).map((campaign: any) => ({
       ...campaign,
       startDate: toDate(campaign.startDate) || new Date(),
@@ -78,8 +93,15 @@ const hydrateDates = (data: any) => {
   };
 };
 
+function friendlyErrorMessage(err: unknown): string {
+  if (err instanceof ActionsApiError) return err.message;
+  return 'Something went wrong talking to AI Office. Please try again.';
+}
+
 export const useAppStore = create<AppState>((set, get) => {
-  // Load from localStorage on init
+  // Load from localStorage on init (used as-is when the Actions API isn't
+  // configured, and as an instant first paint while syncTasksFromApi runs
+  // in the background when it is).
   const savedData = (() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -90,26 +112,108 @@ export const useAppStore = create<AppState>((set, get) => {
     }
   })();
 
-  return {
+  const persistLocal = (state: Pick<AppState, 'tasks' | 'campaigns' | 'selectedTaskId' | 'selectedCampaignId'>) => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        tasks: state.tasks,
+        campaigns: state.campaigns,
+        selectedTaskId: state.selectedTaskId,
+        selectedCampaignId: state.selectedCampaignId,
+      })
+    );
+  };
+
+  const store: AppState = {
     ...savedData,
     selectedTaskId: savedData.selectedTaskId || null,
     selectedCampaignId: savedData.selectedCampaignId || null,
+    apiConnected: false,
+    apiSyncing: false,
 
-    addTask: (task: Task) => {
+    addTask: async (task: Task) => {
+      if (isActionsApiConfigured()) {
+        const requestId = `add-${task.id}-${Date.now()}`;
+        let response = await createTaskAction(
+          {
+            title: task.title,
+            notes: task.notes || undefined,
+            brand: task.brand,
+            priority: task.priority,
+            status: task.status,
+            campaign_id: task.campaignId || undefined,
+          },
+          requestId
+        );
+
+        if (!response.success && response.possible_duplicates?.length) {
+          const names = (response.possible_duplicates as any[]).map((d) => `"${d.title}"`).join(', ');
+          const proceed = window.confirm(
+            `This looks similar to an existing task: ${names}. Create it anyway?`
+          );
+          if (!proceed) return;
+          response = await createTaskAction(
+            {
+              title: task.title,
+              notes: task.notes || undefined,
+              brand: task.brand,
+              priority: task.priority,
+              status: task.status,
+              campaign_id: task.campaignId || undefined,
+              confirm_duplicate: true,
+            },
+            requestId
+          );
+        }
+
+        if (!response.success) {
+          alert(response.message || 'Could not create the task.');
+          return;
+        }
+
+        await get().syncTasksFromApi();
+        return;
+      }
+
       set((state) => {
         const newState = { ...state, tasks: [...state.tasks, task] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
 
-    updateTask: (id: string, updates: Partial<Task>) => {
+    updateTask: async (id: string, updates: Partial<Task>) => {
+      if (isActionsApiConfigured()) {
+        try {
+          const payload: Record<string, unknown> = {};
+          if (updates.title !== undefined) payload.title = updates.title;
+          if (updates.notes !== undefined) payload.notes = updates.notes;
+          if (updates.brand !== undefined) payload.brand = updates.brand;
+          if (updates.priority !== undefined) payload.priority = updates.priority;
+          if (updates.status !== undefined) payload.status = updates.status;
+          if (updates.deadline !== undefined) {
+            payload.deadline = updates.deadline ? updates.deadline.toISOString() : null;
+          }
+          if (updates.campaignId !== undefined) payload.campaign_id = updates.campaignId;
+
+          const response = await updateTaskAction(id, payload);
+          if (!response.success) {
+            alert(response.message || 'Could not update the task.');
+            return;
+          }
+          await get().syncTasksFromApi();
+        } catch (err) {
+          alert(friendlyErrorMessage(err));
+        }
+        return;
+      }
+
       set((state) => {
         const newState = {
           ...state,
           tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
@@ -121,12 +225,26 @@ export const useAppStore = create<AppState>((set, get) => {
           tasks: state.tasks.filter((t) => t.id !== id),
           selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
 
-    completeTask: (id: string) => {
+    completeTask: async (id: string) => {
+      if (isActionsApiConfigured()) {
+        try {
+          const response = await completeTaskAction(id);
+          if (!response.success) {
+            alert(response.message || 'Could not complete the task.');
+            return;
+          }
+          await get().syncTasksFromApi();
+        } catch (err) {
+          alert(friendlyErrorMessage(err));
+        }
+        return;
+      }
+
       set((state) => {
         const newState = {
           ...state,
@@ -148,18 +266,35 @@ export const useAppStore = create<AppState>((set, get) => {
             };
           }),
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
 
-    reopenTask: (id: string) => {
+    reopenTask: async (id: string) => {
+      const current = get().tasks.find((t) => t.id === id);
+      if (!current || current.status !== 'complete') return;
+      const restoredStatus = current.previousStatus || 'not-started';
+
+      if (isActionsApiConfigured()) {
+        try {
+          const response = await updateTaskAction(id, { status: restoredStatus });
+          if (!response.success) {
+            alert(response.message || 'Could not reopen the task.');
+            return;
+          }
+          await get().syncTasksFromApi();
+        } catch (err) {
+          alert(friendlyErrorMessage(err));
+        }
+        return;
+      }
+
       set((state) => {
         const newState = {
           ...state,
           tasks: state.tasks.map((t) => {
             if (t.id !== id || t.status !== 'complete') return t;
-            const restoredStatus = t.previousStatus || 'not-started';
             const entry: TaskHistoryEntry = {
               id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               action: 'reopened',
@@ -176,7 +311,7 @@ export const useAppStore = create<AppState>((set, get) => {
             };
           }),
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
@@ -189,10 +324,28 @@ export const useAppStore = create<AppState>((set, get) => {
       return get().tasks.find((t) => t.id === id);
     },
 
+    syncTasksFromApi: async () => {
+      if (!isActionsApiConfigured()) {
+        set({ apiConnected: false });
+        return;
+      }
+      set({ apiSyncing: true });
+      try {
+        const rawTasks = await fetchTasksFromApi();
+        const tasks = rawTasks.map(hydrateTask);
+        set({ tasks, apiConnected: true, apiSyncing: false });
+      } catch {
+        // Keep whatever is currently in state (local cache) and just flag
+        // the connection as down — never wipe the dashboard because a sync
+        // failed.
+        set({ apiConnected: false, apiSyncing: false });
+      }
+    },
+
     addCampaign: (campaign: Campaign) => {
       set((state) => {
         const newState = { ...state, campaigns: [...state.campaigns, campaign] };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
@@ -203,7 +356,7 @@ export const useAppStore = create<AppState>((set, get) => {
           ...state,
           campaigns: state.campaigns.map((c) => (c.id === id ? { ...c, ...updates } : c)),
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
@@ -214,7 +367,7 @@ export const useAppStore = create<AppState>((set, get) => {
           ...state,
           campaigns: state.campaigns.filter((c) => c.id !== id),
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        persistLocal(newState);
         return newState;
       });
     },
@@ -272,4 +425,12 @@ export const useAppStore = create<AppState>((set, get) => {
       return get().campaigns.filter((c) => c.status === 'active');
     },
   };
+
+  if (isActionsApiConfigured()) {
+    // Fire-and-forget: paint instantly from local cache, then reconcile
+    // with the backend once it responds.
+    store.syncTasksFromApi();
+  }
+
+  return store;
 });

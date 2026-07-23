@@ -1,5 +1,135 @@
+import { useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDate } from '@/utils/dateUtils';
+import { getApiUrl, setApiUrl, getApiKey, setApiKey, isActionsApiConfigured, checkHealth } from '@/services/actionsApi';
+
+const LAST_CONNECTED_KEY = 'ai-office-actions-last-connected';
+
+function ClaudeActionsSettings() {
+  const apiConnected = useAppStore((s) => s.apiConnected);
+  const apiSyncing = useAppStore((s) => s.apiSyncing);
+  const syncTasksFromApi = useAppStore((s) => s.syncTasksFromApi);
+
+  const [urlInput, setUrlInput] = useState(getApiUrl());
+  const [keyInput, setKeyInput] = useState(getApiKey());
+  const [testResult, setTestResult] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [testMessage, setTestMessage] = useState('');
+  const [lastConnected, setLastConnected] = useState(localStorage.getItem(LAST_CONNECTED_KEY));
+
+  const configured = isActionsApiConfigured();
+
+  const handleSave = async () => {
+    setApiUrl(urlInput);
+    setApiKey(keyInput);
+    setTestResult('idle');
+    await syncTasksFromApi();
+  };
+
+  const handleTestConnection = async () => {
+    setApiUrl(urlInput);
+    setApiKey(keyInput);
+    setTestResult('testing');
+
+    const healthy = await checkHealth();
+    if (!healthy) {
+      setTestResult('fail');
+      setTestMessage('Could not reach that URL. Check it\'s correct and the backend is running.');
+      return;
+    }
+
+    await syncTasksFromApi();
+    if (useAppStore.getState().apiConnected) {
+      setTestResult('ok');
+      setTestMessage('Connected — your API key works and tasks are syncing.');
+      const now = new Date().toISOString();
+      localStorage.setItem(LAST_CONNECTED_KEY, now);
+      setLastConnected(now);
+    } else {
+      setTestResult('fail');
+      setTestMessage('The server responded, but the API key was rejected. Double-check it.');
+    }
+  };
+
+  const handleRevoke = () => {
+    if (!window.confirm('Remove the stored API key from this browser? You can add it again later.')) return;
+    setApiKey('');
+    setKeyInput('');
+    setTestResult('idle');
+  };
+
+  const statusLabel = !configured ? 'Not connected' : apiConnected ? 'Connected' : 'Connected, but last sync failed';
+  const statusColor = !configured ? '#9ca3af' : apiConnected ? '#16a34a' : '#dc2626';
+
+  return (
+    <div className="card mb-6">
+      <h2 className="text-lg font-semibold text-text-primary mb-1">Claude Actions Integration</h2>
+      <p className="text-xs text-text-secondary mb-4">
+        This is different from the MTech AI link above — when connected, Claude can create, update
+        and complete tasks directly in AI Office (subject to the confirmation rules built into the
+        backend), and the dashboard itself reads and writes through the same connection.
+      </p>
+
+      <div className="flex items-center gap-2 mb-4">
+        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusColor }}></span>
+        <span className="text-sm font-medium text-text-primary">{statusLabel}</span>
+        {apiSyncing && <span className="text-xs text-text-secondary">(syncing…)</span>}
+        {lastConnected && (
+          <span className="text-xs text-text-secondary ml-2">
+            Last successful connection: {formatDate(new Date(lastConnected))}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">Backend URL</label>
+          <input
+            type="text"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            className="input text-xs"
+            placeholder="https://your-backend.up.railway.app"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-2">API Key</label>
+          <input
+            type="password"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            className="input text-xs"
+            placeholder="Paste the API_KEY you set in Railway"
+          />
+          <p className="text-xs text-text-secondary mt-2">
+            Stored only in this browser. It's never included in the app's code, and revoking it here
+            only removes it from this browser — to fully revoke access, change the API_KEY variable in
+            Railway too.
+          </p>
+        </div>
+
+        {testResult !== 'idle' && (
+          <p className={`text-sm ${testResult === 'ok' ? 'text-success' : testResult === 'fail' ? 'text-danger' : 'text-text-secondary'}`}>
+            {testResult === 'testing' ? 'Testing connection…' : testMessage}
+          </p>
+        )}
+
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={handleSave} className="btn btn-primary">
+            Save
+          </button>
+          <button onClick={handleTestConnection} className="btn btn-secondary" disabled={testResult === 'testing'}>
+            Test connection
+          </button>
+          {configured && (
+            <button onClick={handleRevoke} className="btn btn-secondary">
+              Revoke connection
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function SettingsScreen() {
   const tasks = useAppStore((s) => s.tasks);
@@ -80,6 +210,8 @@ export function SettingsScreen() {
             </div>
           </div>
         </div>
+
+        <ClaudeActionsSettings />
 
         <div className="card mb-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">Brand Colours</h2>
