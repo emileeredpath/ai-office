@@ -40,6 +40,8 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       campaignId: formData.campaignId || null,
       createdAt: new Date(),
       completedAt: null,
+      previousStatus: null,
+      history: [],
       approvalRequired: false,
       approver: null,
       blockerReason: null,
