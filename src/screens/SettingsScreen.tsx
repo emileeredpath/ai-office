@@ -73,7 +73,9 @@ export function SettingsScreen() {
                 className="input opacity-60 text-xs"
               />
               <p className="text-xs text-text-secondary mt-2">
-                This link is used when you click "Open MTech AI" in task detail panels.
+                This link is used when you click "Open MTech AI" in task detail panels. It opens a
+                separate Claude conversation — it does not read or write your AI Office data
+                automatically. Anything you discuss there has to be added back into AI Office manually.
               </p>
             </div>
           </div>
