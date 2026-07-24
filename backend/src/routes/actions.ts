@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { executeAction, getAuditLog } from '../services/actionService.js';
-import { requireApiKey } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
@@ -19,7 +18,7 @@ const actionRequestSchema = z.object({
   confirmed: z.boolean().optional(),
 });
 
-router.post('/', requireApiKey, rateLimit, (req, res) => {
+router.post('/', rateLimit, (req, res) => {
   const parsed = actionRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({

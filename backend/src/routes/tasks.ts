@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { getAllTasks } from '../db/taskRepository.js';
-import { requireApiKey } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -8,7 +7,7 @@ const router = Router();
 // tasks. All writes go exclusively through /api/actions so every mutation is
 // validated, audited, and subject to the same confirmation rules regardless
 // of whether it came from the dashboard or from Claude.
-router.get('/', requireApiKey, (_req, res) => {
+router.get('/', (_req, res) => {
   res.json({ success: true, result: getAllTasks() });
 });
 
