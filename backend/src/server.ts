@@ -1,11 +1,14 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -37,6 +40,19 @@ app.use('/api/actions', actionsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/marketingos', marketingosRouter);
 app.use('/mcp', mcpRouter);
+
+// Serve frontend static files in production
+const distPath = path.join(__dirname, '../../dist');
+app.use(express.static(distPath));
+
+// SPA fallback: serve index.html for all non-API routes
+app.get('*', (_req: Request, res: Response) => {
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).json({ success: false, message: 'Not found' });
+    }
+  });
+});
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ success: false, message: 'Not found' });
