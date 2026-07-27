@@ -1,18 +1,75 @@
+import { AlertTriangle, Clock, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { BrandBadge } from '@/components/common/BrandBadge';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate, formatDateShort } from '@/utils/dateUtils';
+import { Campaign, Task } from '@/types/index';
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Cell,
-  Tooltip,
+  LabelList,
   ResponsiveContainer,
   PieChart,
   Pie,
-  Legend,
 } from 'recharts';
+
+const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
+
+const TOKENS = {
+  surface2: '#FFFFFF',
+  surface1: '#F1F5F9',
+  border: '#E2E8F0',
+  textPrimary: '#0F172A',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+  radius: '8px',
+};
+
+const BRAND_COLORS: Record<string, string> = {
+  mtech: '#0D1B2A',
+  brentwood: '#3B82F6',
+  'radio-links': '#0F6E56',
+  capcom: '#534AB7',
+  ircl: '#1D9E75',
+};
+
+const BRAND_LABELS: Record<string, string> = {
+  mtech: 'MTech',
+  brentwood: 'Brentwood',
+  'radio-links': 'Radio Links',
+  capcom: 'Capcom',
+  ircl: 'IRCL',
+};
+
+function exportTasksAsCSV(tasks: Task[], campaigns: Campaign[]) {
+  const csvHeaders = ['Task ID', 'Title', 'Brand', 'Status', 'Priority', 'Deadline', 'Campaign', 'Notes', 'Created At'];
+
+  const csvRows = tasks.map((task) => {
+    const campaign = campaigns.find((c) => c.id === task.campaignId);
+    return [
+      task.id,
+      `"${task.title.replace(/"/g, '""')}"`,
+      task.brand,
+      task.status,
+      task.priority,
+      task.deadline ? formatDate(task.deadline) : '',
+      campaign?.name || '',
+      `"${(task.notes || '').replace(/"/g, '""')}"`,
+      formatDate(task.createdAt),
+    ].join(',');
+  });
+
+  const csv = [csvHeaders.join(','), ...csvRows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.setAttribute('href', URL.createObjectURL(blob));
+  link.setAttribute('download', `mtech-tasks-${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 export function DashboardScreen() {
   const tasks = useAppStore((s) => s.tasks);
@@ -39,223 +96,444 @@ export function DashboardScreen() {
   })();
 
   const getStatusCount = (status: string) => tasks.filter((t) => t.status === status).length;
-  const getBrandColor = (brand: string) => {
-    const colors: Record<string, string> = {
-      mtech: '#0D1B2A',
-      brentwood: '#3B82F6',
-      'radio-links': '#0F6E56',
-      capcom: '#534AB7',
-      ircl: '#1D9E75',
-    };
-    return colors[brand] || '#6B7280';
-  };
 
-  // Data for Tasks by Status chart
   const statusData = [
-    { name: 'In Progress', value: getStatusCount('in-progress'), fill: '#3B82F6' },
-    { name: 'Not Started', value: getStatusCount('not-started'), fill: '#9CA3AF' },
+    { name: 'In progress', value: getStatusCount('in-progress'), fill: '#3B82F6' },
+    { name: 'Not started', value: getStatusCount('not-started'), fill: '#9CA3AF' },
     { name: 'Waiting John', value: getStatusCount('waiting-john'), fill: '#F59E0B' },
-    { name: 'Waiting Approval', value: getStatusCount('waiting-approval'), fill: '#F97031' },
     { name: 'Complete', value: getStatusCount('complete'), fill: '#10B981' },
-    { name: 'Blocked', value: getStatusCount('blocked'), fill: '#EF4444' },
   ];
+  const maxStatusValue = Math.max(...statusData.map((d) => d.value), 1);
 
-  // Data for Tasks by Brand chart
   const brandCounts: Record<string, number> = {};
   tasks.forEach((t) => {
     brandCounts[t.brand] = (brandCounts[t.brand] || 0) + 1;
   });
-
-  const brandData = Object.entries(brandCounts).map(([brand, count]) => ({
-    name: brand.charAt(0).toUpperCase() + brand.slice(1),
-    value: count,
-    fill: getBrandColor(brand),
-  }));
+  const totalBrandTasks = Object.values(brandCounts).reduce((a, b) => a + b, 0) || 1;
+  const brandData = Object.entries(brandCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([brand, count]) => ({
+      name: BRAND_LABELS[brand] || brand,
+      value: count,
+      pct: Math.round((count / totalBrandTasks) * 100),
+      fill: BRAND_COLORS[brand] || '#6B7280',
+    }));
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-white">
-      <div className="max-w-7xl mx-auto">
+    <div style={{ fontFamily: 'inherit', padding: '32px' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-          <div className="text-sm text-slate-600">Week of {new Date().toLocaleDateString()}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <p style={{ fontSize: '22px', fontWeight: 500, color: TOKENS.textPrimary, margin: 0 }}>Dashboard</p>
+            <p style={{ fontSize: '13px', color: TOKENS.textSecondary, margin: '2px 0 0' }}>
+              Week of {formatDateShort(new Date())} {new Date().getFullYear()}
+            </p>
+          </div>
+          <button
+            onClick={() => exportTasksAsCSV(tasks, campaigns)}
+            style={{
+              background: '#F97031',
+              color: '#fff',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: TOKENS.radius,
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Export
+          </button>
         </div>
 
-        {/* Stat Cards - Large Numbers */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-slate-200 border-l-4 border-l-blue-600 p-6">
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-sm font-medium text-slate-600">Active Campaigns</h3>
-              <span className="text-xs text-green-600 font-semibold">↑ 12%</span>
-            </div>
-            <div className="text-5xl font-bold text-slate-900 mb-3">{activeCampaigns.length}</div>
-            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-600" style={{ width: '75%' }}></div>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">Q3 on track</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-slate-200 border-l-4 border-l-orange-600 p-6">
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-sm font-medium text-slate-600">Due This Week</h3>
-              <span className="text-xs text-green-600 font-semibold">↑ 8%</span>
-            </div>
-            <div className="text-5xl font-bold text-slate-900 mb-3">{tasksDueThisWeek.length}</div>
-            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-orange-600" style={{ width: '60%' }}></div>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">{overdueTasks.length} overdue</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-slate-200 border-l-4 border-l-red-600 p-6">
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-sm font-medium text-slate-600">Overdue</h3>
-              <span className="text-xs text-red-600 font-semibold">↑ 2</span>
-            </div>
-            <div className="text-5xl font-bold text-slate-900 mb-3">{overdueTasks.length}</div>
-            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-red-600" style={{ width: '30%' }}></div>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">Needs attention</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-slate-200 border-l-4 border-l-amber-600 p-6">
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-sm font-medium text-slate-600">Waiting for John</h3>
-              <span className="text-xs text-amber-600 font-semibold">→</span>
-            </div>
-            <div className="text-5xl font-bold text-amber-600 mb-3">{waitingForJohn.length}</div>
-            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-600" style={{ width: '100%' }}></div>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">Blocked</p>
-          </div>
+        {/* Stat cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+          <StatCard
+            label="Active campaigns"
+            trend="↑ 12%"
+            trendColor="#10B981"
+            value={activeCampaigns.length}
+            barPct={60}
+            color="#3B82F6"
+            sub="Q3 on track"
+          />
+          <StatCard
+            label="Due this week"
+            trend="↑ 8%"
+            trendColor="#10B981"
+            value={tasksDueThisWeek.length}
+            barPct={45}
+            color="#F97031"
+            sub={`${overdueTasks.length} overdue`}
+          />
+          <StatCard
+            label="Overdue"
+            trend="↓ 4%"
+            trendColor="#EF4444"
+            value={overdueTasks.length}
+            valueColor="#EF4444"
+            barPct={80}
+            color="#EF4444"
+            sub="Needs attention"
+          />
+          <StatCard
+            label="Waiting for John"
+            trend="— 0%"
+            trendColor={TOKENS.textMuted}
+            value={waitingForJohn.length}
+            valueColor="#F59E0B"
+            barPct={20}
+            color="#F59E0B"
+            sub="Blocked"
+          />
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
-          {/* Tasks by Status - Horizontal Bar Chart */}
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-6">Tasks by Status</h2>
-            <ResponsiveContainer width="100%" height={280}>
+        {/* MTech AI card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg,#0D1B2A,#1A3A5C)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <p style={{ fontSize: '14px', fontWeight: 500, color: '#fff', margin: 0 }}>MTech AI Marketing Office</p>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>
+              Open your Claude project to get AI help on any task
+            </p>
+          </div>
+          <button
+            onClick={() => window.open(MTECH_AI_PROJECT_URL, '_blank')}
+            style={{
+              background: '#F97031',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: TOKENS.radius,
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            Open MTech AI <ExternalLink size={14} />
+          </button>
+        </div>
+
+        {/* Charts row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+          <div
+            style={{
+              background: TOKENS.surface2,
+              border: `0.5px solid ${TOKENS.border}`,
+              borderRadius: '12px',
+              padding: '16px 18px',
+            }}
+          >
+            <p style={{ fontSize: '14px', fontWeight: 500, color: TOKENS.textPrimary, margin: '0 0 16px' }}>
+              Tasks by status
+            </p>
+            <ResponsiveContainer width="100%" height={statusData.length * 34}>
               <BarChart
                 data={statusData}
                 layout="vertical"
-                margin={{ top: 0, right: 30, left: 100, bottom: 0 }}
+                barCategoryGap={10}
+                margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
               >
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={95} tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(value) => value} />
-                <Bar dataKey="value" fill="#3B82F6" radius={[0, 6, 6, 0]}>
+                <XAxis type="number" hide domain={[0, maxStatusValue]} />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={90}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: TOKENS.textSecondary }}
+                />
+                <Bar dataKey="value" radius={4} background={{ fill: TOKENS.surface1, radius: 4 }} barSize={24}>
                   {statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
+                  <LabelList
+                    dataKey="value"
+                    position="insideRight"
+                    fill="#fff"
+                    fontSize={11}
+                    fontWeight={500}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Tasks by Brand - Donut Chart */}
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-6">Tasks by Brand</h2>
-            {brandData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={brandData}
-                    cx="45%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={85}
-                    paddingAngle={2}
-                    dataKey="value"
+          <div
+            style={{
+              background: TOKENS.surface2,
+              border: `0.5px solid ${TOKENS.border}`,
+              borderRadius: '12px',
+              padding: '16px 18px',
+            }}
+          >
+            <p style={{ fontSize: '14px', fontWeight: 500, color: TOKENS.textPrimary, margin: '0 0 16px' }}>
+              Tasks by brand
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ flexShrink: 0, width: 110, height: 110 }}>
+                {brandData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={brandData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={50}
+                        startAngle={90}
+                        endAngle={-270}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {brandData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : null}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                {brandData.map((b) => (
+                  <div
+                    key={b.name}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: TOKENS.textSecondary }}
                   >
-                    {brandData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Legend verticalAlign="bottom" height={36} formatter={(value, entry: any) => `${entry.payload.name}: ${entry.payload.value}`} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-slate-500 text-center py-12">No tasks</p>
-            )}
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: b.fill, flexShrink: 0 }} />
+                    {b.name}
+                    <span style={{ fontWeight: 500, color: TOKENS.textPrimary, marginLeft: 'auto' }}>{b.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Active Campaigns with Progress */}
-        <div className="bg-white rounded-lg border border-slate-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-slate-900 mb-6">📌 Active Campaigns</h2>
-          <div className="space-y-4">
-            {activeCampaigns.map((campaign) => {
-              const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
-              const completedTasks = campaignTasks.filter((t) => t.status === 'complete').length;
-              const progress = campaignTasks.length > 0 ? Math.round((completedTasks / campaignTasks.length) * 100) : 0;
+        {/* Active campaigns */}
+        <div
+          style={{
+            background: TOKENS.surface2,
+            border: `0.5px solid ${TOKENS.border}`,
+            borderRadius: '12px',
+            padding: '16px 18px',
+            marginBottom: '20px',
+          }}
+        >
+          <p style={{ fontSize: '14px', fontWeight: 500, color: TOKENS.textPrimary, margin: '0 0 16px' }}>
+            Active campaigns
+          </p>
+          {activeCampaigns.map((campaign, i) => {
+            const campaignTasks = tasks.filter((t) => t.campaignId === campaign.id);
+            const completedTasks = campaignTasks.filter((t) => t.status === 'complete').length;
+            const progress = campaignTasks.length > 0 ? Math.round((completedTasks / campaignTasks.length) * 100) : 0;
 
-              return (
-                <div key={campaign.id} className="flex items-center gap-4 py-3 border-b border-slate-200 last:border-b-0">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900">{campaign.name}</p>
+            return (
+              <div
+                key={campaign.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 0',
+                  borderBottom: i < activeCampaigns.length - 1 ? `0.5px solid ${TOKENS.border}` : 'none',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 500, color: TOKENS.textPrimary, flex: 1 }}>
+                  {campaign.name}
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    background: BRAND_COLORS[campaign.brand] || '#6B7280',
+                  }}
+                >
+                  {BRAND_LABELS[campaign.brand] || campaign.brand}
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    background: '#E8F7F3',
+                    color: '#0F6E56',
+                  }}
+                >
+                  Active
+                </span>
+                <div style={{ width: '120px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1, height: '6px', background: TOKENS.surface1, borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${progress}%`, background: '#3B82F6', borderRadius: '3px' }} />
                   </div>
-                  <BrandBadge brand={campaign.brand} />
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded text-xs font-medium">Active</span>
-                  <div className="w-24 h-1 bg-slate-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600" style={{ width: `${progress}%` }}></div>
-                  </div>
-                  <span className="text-xs text-slate-600 w-12 text-right">{progress}%</span>
+                  <span style={{ fontSize: '11px', color: TOKENS.textSecondary, width: '28px', textAlign: 'right' }}>
+                    {progress}%
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Risk Sections */}
-        <div className="grid grid-cols-2 gap-6">
-          {/* Waiting for John */}
-          <div className="bg-white rounded-lg border border-slate-200 border-l-4 border-l-amber-600 p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              ⚠️ Waiting for John ({waitingForJohn.length})
-            </h2>
+        {/* Bottom row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ background: '#FAEEDA', border: '0.5px solid #FAC775', borderRadius: '12px', padding: '16px 18px' }}>
+            <p
+              style={{
+                fontSize: '13px',
+                fontWeight: 500,
+                margin: '0 0 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#854F0B',
+              }}
+            >
+              <AlertTriangle size={14} /> Waiting for John ({waitingForJohn.length})
+            </p>
             {waitingForJohn.length > 0 ? (
-              <div className="space-y-3">
-                {waitingForJohn.slice(0, 5).map((task) => (
-                  <div key={task.id} className="flex justify-between items-start py-2 border-b border-slate-200 last:border-b-0">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{task.title}</p>
-                      <p className="text-xs text-slate-500 mt-1">Since {task.deadline ? formatDate(task.deadline) : 'N/A'}</p>
-                    </div>
-                    <span className="text-xs font-bold text-red-600">{task.priority?.toUpperCase() || 'MED'}</span>
-                  </div>
-                ))}
-              </div>
+              waitingForJohn.map((task, i) => (
+                <div
+                  key={task.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 0',
+                    borderBottom: i < waitingForJohn.length - 1 ? '0.5px solid rgba(0,0,0,0.08)' : 'none',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span style={{ color: TOKENS.textPrimary, fontWeight: 500 }}>{task.title}</span>
+                  <span style={{ color: TOKENS.textSecondary }}>
+                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} · {BRAND_LABELS[task.brand] || task.brand}
+                  </span>
+                </div>
+              ))
             ) : (
-              <p className="text-slate-500 text-sm">All clear!</p>
+              <p style={{ fontSize: '12px', color: TOKENS.textSecondary, margin: 0 }}>All clear!</p>
             )}
           </div>
 
-          {/* Overdue Tasks */}
-          <div className="bg-white rounded-lg border border-slate-200 border-l-4 border-l-red-600 p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              🔴 Overdue Tasks ({overdueTasks.length})
-            </h2>
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #F7C1C1', borderRadius: '12px', padding: '16px 18px' }}>
+            <p
+              style={{
+                fontSize: '13px',
+                fontWeight: 500,
+                margin: '0 0 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#A32D2D',
+              }}
+            >
+              <Clock size={14} /> Overdue tasks ({overdueTasks.length})
+            </p>
             {overdueTasks.length > 0 ? (
-              <div className="space-y-3">
-                {overdueTasks.slice(0, 5).map((task) => (
-                  <div key={task.id} className="flex justify-between items-start py-2 border-b border-slate-200 last:border-b-0">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{task.title}</p>
-                      <p className="text-xs text-slate-500 mt-1">Due {task.deadline ? formatDate(task.deadline) : 'N/A'}</p>
-                    </div>
-                    <span className="text-xs font-bold text-red-600">{task.priority?.toUpperCase() || 'HIGH'}</span>
-                  </div>
-                ))}
-              </div>
+              overdueTasks.map((task, i) => (
+                <div
+                  key={task.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 0',
+                    borderBottom: i < overdueTasks.length - 1 ? '0.5px solid rgba(0,0,0,0.08)' : 'none',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span style={{ color: TOKENS.textPrimary, fontWeight: 500 }}>{task.title}</span>
+                  <span style={{ color: TOKENS.textSecondary }}>
+                    {task.deadline ? formatDateShort(task.deadline) : '—'}
+                  </span>
+                </div>
+              ))
             ) : (
-              <p className="text-slate-500 text-sm">All caught up!</p>
+              <p style={{ fontSize: '12px', color: TOKENS.textSecondary, margin: 0 }}>All caught up!</p>
             )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  trend,
+  trendColor,
+  value,
+  valueColor,
+  barPct,
+  color,
+  sub,
+}: {
+  label: string;
+  trend: string;
+  trendColor: string;
+  value: number;
+  valueColor?: string;
+  barPct: number;
+  color: string;
+  sub: string;
+}) {
+  return (
+    <div
+      style={{
+        background: TOKENS.surface2,
+        border: `0.5px solid ${TOKENS.border}`,
+        borderRadius: '12px',
+        padding: '16px 18px',
+        borderLeft: `4px solid ${color}`,
+      }}
+    >
+      <p
+        style={{
+          fontSize: '12px',
+          color: TOKENS.textSecondary,
+          margin: '0 0 4px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        {label}
+        <span style={{ fontSize: '11px', fontWeight: 500, color: trendColor }}>{trend}</span>
+      </p>
+      <p
+        style={{
+          fontSize: '40px',
+          fontWeight: 500,
+          color: valueColor || TOKENS.textPrimary,
+          margin: '4px 0 8px',
+          lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </p>
+      <div style={{ height: '3px', background: TOKENS.border, borderRadius: '2px', marginBottom: '8px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${barPct}%`, background: color, borderRadius: '2px' }} />
+      </div>
+      <p style={{ fontSize: '12px', color: TOKENS.textSecondary, margin: 0 }}>{sub}</p>
     </div>
   );
 }
