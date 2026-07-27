@@ -20,12 +20,23 @@ export function DashboardScreen() {
   const getActiveCampaigns = useAppStore((s) => s.getActiveCampaigns);
   const getWaitingForJohnTasks = useAppStore((s) => s.getWaitingForJohnTasks);
   const getOverdueTasks = useAppStore((s) => s.getOverdueTasks);
-  const getTasksForToday = useAppStore((s) => s.getTasksForToday);
 
   const activeCampaigns = getActiveCampaigns();
   const waitingForJohn = getWaitingForJohnTasks();
   const overdueTasks = getOverdueTasks();
-  const tasksDueThisWeek = getTasksForToday();
+
+  const tasksDueThisWeek = (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+    return tasks.filter((t) => {
+      if (!t.deadline) return false;
+      const deadline = new Date(t.deadline);
+      return deadline >= today && deadline < weekFromNow && t.status !== 'complete';
+    });
+  })();
 
   const getStatusCount = (status: string) => tasks.filter((t) => t.status === status).length;
   const getBrandColor = (brand: string) => {
