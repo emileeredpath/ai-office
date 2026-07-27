@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Workflow, Settings, Brain, Target } from 'lucide-react';
+import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Workflow, Settings, Brain, Target, TrendingUp } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { CampaignDetailPanel } from '@/components/campaigns/CampaignDetailPanel';
@@ -26,7 +26,7 @@ const NAVIGATION_ITEMS = [
   { id: 'marketingos' as Screen, icon: Brain, label: 'MarketingOS' },
   { id: 'objectives' as Screen, icon: Target, label: 'Objectives' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Dashboard' },
-  { id: 'metrics' as Screen, icon: Calendar, label: 'Metrics' },
+  { id: 'metrics' as Screen, icon: TrendingUp, label: 'Metrics' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
 ];
