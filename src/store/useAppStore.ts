@@ -89,6 +89,10 @@ const hydrateDates = (data: any) => {
       leads: campaign.leads || 0,
       engagement: campaign.engagement || 0,
       notes: campaign.notes || '',
+      entities: campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand],
+      results: campaign.results
+        ? { ...campaign.results, loggedAt: toDate(campaign.results.loggedAt) || new Date() }
+        : null,
     })),
   };
 };

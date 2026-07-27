@@ -4,7 +4,16 @@ import { useAppStore } from '@/store/useAppStore';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
+import { Brand } from '@/types/index';
 import '@/styles/campaignDetailPanel.css';
+
+const ENTITY_OPTIONS: { value: Brand; label: string }[] = [
+  { value: 'mtech', label: 'MTech Group' },
+  { value: 'brentwood', label: 'Brentwood Communications' },
+  { value: 'radio-links', label: 'Radio Links' },
+  { value: 'capcom', label: 'Capcom' },
+  { value: 'ircl', label: 'IRCL' },
+];
 
 export function CampaignDetailPanel() {
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
@@ -87,27 +96,11 @@ export function CampaignDetailPanel() {
           </div>
 
           <div className="campaign-detail-field">
-            <label>Budget (£)</label>
+            <label>Actual spend (£)</label>
             <input
               type="number"
-              value={campaign.budget || ''}
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  budget: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              className="input"
-            />
-          </div>
-        </div>
-
-        {/* Metrics Row 1 */}
-        <div className="campaign-detail-fields">
-          <div className="campaign-detail-field">
-            <label>Spend (£)</label>
-            <input
-              type="number"
-              value={campaign.spend}
+              value={campaign.spend || ''}
+              placeholder="Not set"
               onChange={(e) =>
                 updateCampaign(campaign.id, {
                   spend: e.target.value ? Number(e.target.value) : 0,
@@ -116,7 +109,36 @@ export function CampaignDetailPanel() {
               className="input"
             />
           </div>
+        </div>
 
+        {/* Sends from — multi-entity */}
+        <div className="campaign-detail-field mb-4">
+          <label>Sends from</label>
+          <div className="flex flex-wrap gap-3 mt-1">
+            {ENTITY_OPTIONS.map((entity) => {
+              const checked = (campaign.entities || [campaign.brand]).includes(entity.value);
+              return (
+                <label key={entity.value} className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      const current = campaign.entities || [campaign.brand];
+                      const next = e.target.checked
+                        ? [...current, entity.value]
+                        : current.filter((b) => b !== entity.value);
+                      updateCampaign(campaign.id, { entities: next.length > 0 ? next : [entity.value] });
+                    }}
+                  />
+                  {entity.label}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Metrics Row 1 */}
+        <div className="campaign-detail-fields">
           <div className="campaign-detail-field">
             <label>Leads</label>
             <input

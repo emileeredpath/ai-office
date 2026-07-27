@@ -57,10 +57,22 @@ export interface Task {
   lastBriefGenerated: string | null;
 }
 
+export interface CampaignResults {
+  emailOpenRate: number | null;
+  emailClickRate: number | null;
+  unsubscribes: number | null;
+  landingPageVisits: number | null;
+  enquiriesReceived: number | null;
+  costToSend: number | null;
+  notes: string;
+  loggedAt: Date;
+}
+
 export interface Campaign {
   id: string;
   name: string;
   brand: Brand;
+  entities: Brand[];
   primaryIndustry: string;
   secondaryIndustry: string;
   theme: string;
@@ -76,6 +88,7 @@ export interface Campaign {
   tasks: string[];
   reactive: boolean;
   notes: string;
+  results: CampaignResults | null;
 }
 
 export interface BriefGeneratorState {

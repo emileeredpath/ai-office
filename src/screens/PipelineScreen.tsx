@@ -61,7 +61,9 @@ export function PipelineScreen() {
                     <p className="text-xs text-slate-500 mt-1">{campaign.brand}</p>
                     <div className="mt-2 flex items-center justify-between text-xs">
                       <span className="text-slate-600">
-                        Budget: ${campaign.budget?.toLocaleString()}
+                        {campaign.spend
+                          ? `Spend: ${campaign.spend.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 })}`
+                          : 'Spend: Not set'}
                       </span>
                       <span className="text-slate-500">
                         {campaign.tasks.length} tasks

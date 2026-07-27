@@ -31,7 +31,7 @@ export function MetricsScreen() {
           <div className="bg-white rounded-lg border border-slate-200 p-6">
             <p className="text-sm font-medium text-slate-600 mb-2">Total Budget</p>
             <p className="text-2xl font-bold text-slate-900">
-              ${totalBudget.toLocaleString()}
+              £{totalBudget.toLocaleString('en-GB')}
             </p>
             <p className="text-xs text-slate-500 mt-2">Across all campaigns</p>
           </div>
@@ -39,7 +39,7 @@ export function MetricsScreen() {
           <div className="bg-white rounded-lg border border-slate-200 p-6">
             <p className="text-sm font-medium text-slate-600 mb-2">Total Spend</p>
             <p className="text-2xl font-bold text-slate-900">
-              ${totalSpend.toLocaleString()}
+              £{totalSpend.toLocaleString('en-GB')}
             </p>
             <p className="text-xs text-slate-500 mt-2">
               {budgetUtilization}% of budget
@@ -48,19 +48,19 @@ export function MetricsScreen() {
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
             <p className="text-sm font-medium text-slate-600 mb-2">Total Leads</p>
-            <p className="text-2xl font-bold text-slate-900">{totalLeads.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-slate-900">{totalLeads.toLocaleString('en-GB')}</p>
             <p className="text-xs text-slate-500 mt-2">
-              ${costPerLead} cost per lead
+              £{costPerLead} cost per lead
             </p>
           </div>
 
           <div className="bg-white rounded-lg border border-slate-200 p-6">
             <p className="text-sm font-medium text-slate-600 mb-2">Conversions</p>
             <p className="text-2xl font-bold text-slate-900">
-              {totalConversions.toLocaleString()}
+              {totalConversions.toLocaleString('en-GB')}
             </p>
             <p className="text-xs text-slate-500 mt-2">
-              ${costPerConversion} cost per conversion
+              £{costPerConversion} cost per conversion
             </p>
           </div>
         </div>
@@ -179,10 +179,10 @@ export function MetricsScreen() {
                   <tr key={campaign.id} className="border-b border-slate-200 hover:bg-slate-50">
                     <td className="px-6 py-4 font-medium text-slate-900">{campaign.name}</td>
                     <td className="px-6 py-4 text-slate-700">
-                      ${campaign.budget?.toLocaleString()}
+                      {campaign.budget ? `£${campaign.budget.toLocaleString('en-GB')}` : 'Not set'}
                     </td>
                     <td className="px-6 py-4 text-slate-700">
-                      ${campaign.spend.toLocaleString()}
+                      {campaign.spend ? `£${campaign.spend.toLocaleString('en-GB')}` : 'Not set'}
                     </td>
                     <td className="px-6 py-4 text-slate-700">{campaign.leads}</td>
                     <td className="px-6 py-4 text-slate-700">{campaign.conversions}</td>

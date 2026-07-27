@@ -393,6 +393,61 @@ export function DashboardScreen() {
           })}
         </div>
 
+        {/* Campaign results — populated once "Log results" is used on ended campaigns */}
+        {(() => {
+          const loggedCampaigns = campaigns.filter((c) => c.results);
+          if (loggedCampaigns.length === 0) return null;
+
+          const totalEnquiries = loggedCampaigns.reduce(
+            (sum, c) => sum + (c.results?.enquiriesReceived || 0),
+            0
+          );
+          const openRates = loggedCampaigns
+            .map((c) => c.results?.emailOpenRate)
+            .filter((v): v is number => v != null);
+          const avgOpenRate = openRates.length > 0
+            ? (openRates.reduce((sum, v) => sum + v, 0) / openRates.length).toFixed(1)
+            : null;
+          const totalCost = loggedCampaigns.reduce(
+            (sum, c) => sum + (c.results?.costToSend || 0),
+            0
+          );
+
+          return (
+            <div
+              style={{
+                background: TOKENS.surface2,
+                border: `0.5px solid ${TOKENS.border}`,
+                borderRadius: '12px',
+                padding: '16px 18px',
+                marginBottom: '20px',
+              }}
+            >
+              <p style={{ fontSize: '14px', fontWeight: 500, color: TOKENS.textPrimary, margin: '0 0 16px' }}>
+                Campaign results
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div>
+                  <p style={{ fontSize: '11px', color: TOKENS.textSecondary, margin: '0 0 4px' }}>Enquiries received</p>
+                  <p style={{ fontSize: '24px', fontWeight: 600, color: TOKENS.textPrimary, margin: 0 }}>{totalEnquiries}</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '11px', color: TOKENS.textSecondary, margin: '0 0 4px' }}>Avg. email open rate</p>
+                  <p style={{ fontSize: '24px', fontWeight: 600, color: TOKENS.textPrimary, margin: 0 }}>
+                    {avgOpenRate != null ? `${avgOpenRate}%` : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '11px', color: TOKENS.textSecondary, margin: '0 0 4px' }}>Total cost to send</p>
+                  <p style={{ fontSize: '24px', fontWeight: 600, color: TOKENS.textPrimary, margin: 0 }}>
+                    £{totalCost.toLocaleString('en-GB')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Bottom row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div style={{ background: '#FAEEDA', border: '0.5px solid #FAC775', borderRadius: '12px', padding: '16px 18px' }}>
