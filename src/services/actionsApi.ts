@@ -6,7 +6,7 @@
 const API_URL_KEY = 'ai-office-actions-api-url';
 const API_KEY_KEY = 'ai-office-actions-api-key';
 
-const DEFAULT_API_URL = 'https://ai-office-production-249c.up.railway.app';
+const DEFAULT_API_URL = 'https://ai-office-production-2f2c.up.railway.app';
 
 export function getApiUrl(): string {
   return localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
