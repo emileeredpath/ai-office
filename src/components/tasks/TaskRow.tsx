@@ -31,8 +31,18 @@ export function TaskRow({ task }: TaskRowProps) {
     }
   };
 
+  const getPriorityBorderColor = () => {
+    if (task.priority === 'high') return '#EF4444';
+    if (task.priority === 'medium') return '#F97031';
+    return '#9CA3AF';
+  };
+
   return (
-    <tr onClick={handleClick} className={completed ? 'opacity-60' : ''}>
+    <tr
+      onClick={handleClick}
+      className={completed ? 'opacity-60' : ''}
+      style={{ borderLeft: `4px solid ${getPriorityBorderColor()}` }}
+    >
       <td className="w-full">
         <div className="flex items-center gap-3">
           <button
