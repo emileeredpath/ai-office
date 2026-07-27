@@ -39,9 +39,9 @@ export function HomeScreen() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-3 gap-6 mb-8">
-          <StatCard title="Due today" value={tasksToday.length} />
-          <StatCard title="Overdue" value={overdueTasks.length} />
-          <StatCard title="Waiting for approval" value={waitingForJohn.length} />
+          <StatCard title="Due today" value={tasksToday.length} accent="#3B82F6" />
+          <StatCard title="Overdue" value={overdueTasks.length} accent="#EF4444" />
+          <StatCard title="Waiting for approval" value={waitingForJohn.length} accent="#F59E0B" />
         </div>
 
         {/* MTech AI Quick Access */}
