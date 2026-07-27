@@ -46,20 +46,19 @@ export function HomeScreen() {
 
         {/* MTech AI Quick Access */}
         <div className="mb-8">
-          <div className="card bg-gradient-to-r from-accent from-50% to-accent to-50% bg-opacity-10 border-2 border-accent border-opacity-20">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-text-primary mb-1">Get AI Help</h3>
-                <p className="text-sm text-text-secondary">Generate prompts for any marketing task using MTech AI</p>
-              </div>
-              <button
-                onClick={() => window.open(MTECH_AI_PROJECT_URL, '_blank')}
-                className="btn btn-primary flex items-center gap-2 whitespace-nowrap"
-              >
-                Open MTech AI
-                <ExternalLink size={16} />
-              </button>
+          <div className="rounded-lg p-6 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #0D1B2A, #1A3A5C)' }}>
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-1">Get AI Help</h3>
+              <p className="text-sm text-white opacity-75">Generate prompts for any marketing task using MTech AI</p>
             </div>
+            <button
+              onClick={() => window.open(MTECH_AI_PROJECT_URL, '_blank')}
+              className="flex items-center gap-2 whitespace-nowrap text-white font-medium px-5 py-3 rounded-lg transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--color-brand-mtech-accent)' }}
+            >
+              Open MTech AI
+              <ExternalLink size={16} />
+            </button>
           </div>
         </div>
 
@@ -85,10 +84,10 @@ export function HomeScreen() {
         {waitingForJohn.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
-              <span className="text-warning">⚠️</span> WAITING FOR JOHN
+              <span>⚠️</span> WAITING FOR JOHN
             </h2>
-            <div className="card bg-orange-50 border-orange-100">
-              <table className="table">
+            <div className="rounded-lg p-6" style={{ backgroundColor: '#FAEEDA', borderColor: '#FAC775', border: '1px solid #FAC775' }}>
+              <table className="w-full">
                 <tbody>
                   {waitingForJohn.map((task) => (
                     <TaskRow key={task.id} task={task} />

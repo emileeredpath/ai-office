@@ -96,58 +96,60 @@ export function MyTasksScreen() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4 mb-8 flex-wrap">
-          <select
-            value={filterBrand}
-            onChange={(e) => setFilterBrand(e.target.value as FilterBrand)}
-            className="input flex-1 min-w-[150px]"
-          >
-            <option value="all">All brands</option>
-            <option value="mtech">MTech</option>
-            <option value="brentwood">Brentwood</option>
-            <option value="radio-links">Radio Links</option>
-            <option value="capcom">Capcom</option>
-            <option value="ircl">IRCL</option>
-          </select>
+        <div className="card mb-8">
+          <div className="flex gap-3 flex-wrap">
+            <select
+              value={filterBrand}
+              onChange={(e) => setFilterBrand(e.target.value as FilterBrand)}
+              className="input flex-1 min-w-[150px]"
+            >
+              <option value="all">All brands</option>
+              <option value="mtech">MTech</option>
+              <option value="brentwood">Brentwood</option>
+              <option value="radio-links">Radio Links</option>
+              <option value="capcom">Capcom</option>
+              <option value="ircl">IRCL</option>
+            </select>
 
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-            className="input flex-1 min-w-[150px]"
-          >
-            <option value="all">All statuses</option>
-            <option value="not-started">Not Started</option>
-            <option value="in-progress">In Progress</option>
-            <option value="waiting-approval">Waiting Approval</option>
-            <option value="waiting-john">Waiting for John</option>
-            <option value="waiting-customer">Waiting Customer</option>
-            <option value="approved-ready">Approved Ready</option>
-            <option value="blocked">Blocked</option>
-            <option value="complete">Complete</option>
-            <option value="backlog">Backlog</option>
-          </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+              className="input flex-1 min-w-[150px]"
+            >
+              <option value="all">All statuses</option>
+              <option value="not-started">Not Started</option>
+              <option value="in-progress">In Progress</option>
+              <option value="waiting-approval">Waiting Approval</option>
+              <option value="waiting-john">Waiting for John</option>
+              <option value="waiting-customer">Waiting Customer</option>
+              <option value="approved-ready">Approved Ready</option>
+              <option value="blocked">Blocked</option>
+              <option value="complete">Complete</option>
+              <option value="backlog">Backlog</option>
+            </select>
 
-          <select
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
-            className="input flex-1 min-w-[150px]"
-          >
-            <option value="all">All priorities</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
+            <select
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value as FilterPriority)}
+              className="input flex-1 min-w-[150px]"
+            >
+              <option value="all">All priorities</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
 
-          <select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as any)}
-            className="input flex-1 min-w-[150px]"
-          >
-            <option value="status">Group by status</option>
-            <option value="brand">Group by brand</option>
-            <option value="campaign">Group by campaign</option>
-            <option value="priority">Group by priority</option>
-          </select>
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as any)}
+              className="input flex-1 min-w-[150px]"
+            >
+              <option value="status">Group by status</option>
+              <option value="brand">Group by brand</option>
+              <option value="campaign">Group by campaign</option>
+              <option value="priority">Group by priority</option>
+            </select>
+          </div>
         </div>
 
         {/* Task Groups */}
