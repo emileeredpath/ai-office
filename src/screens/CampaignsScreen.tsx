@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDateShort } from '@/utils/dateUtils';
 import { CampaignResults } from '@/types/index';
+import { AddCampaignModal } from '@/components/campaigns/AddCampaignModal';
 
 const EMPTY_RESULTS_FORM = {
   emailOpenRate: '',
@@ -23,6 +24,7 @@ export function CampaignsScreen() {
 
   const [loggingCampaignId, setLoggingCampaignId] = useState<string | null>(null);
   const [resultsForm, setResultsForm] = useState(EMPTY_RESULTS_FORM);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const getCampaignProgress = (campaignId: string) => {
     const campaignTasks = tasks.filter((t) => t.campaignId === campaignId);
@@ -96,7 +98,7 @@ export function CampaignsScreen() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary">Campaigns</h1>
-          <button className="btn btn-primary flex items-center gap-2">
+          <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
             <Plus size={18} />
             New campaign
           </button>
@@ -308,6 +310,8 @@ export function CampaignsScreen() {
           <p className="text-text-secondary text-center py-12">No campaigns yet. Create one to get started.</p>
         )}
       </div>
+
+      {showAddModal && <AddCampaignModal onClose={() => setShowAddModal(false)} />}
     </div>
   );
 }

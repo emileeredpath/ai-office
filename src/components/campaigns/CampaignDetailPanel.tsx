@@ -17,32 +17,22 @@ const ENTITY_OPTIONS: { value: Brand; label: string }[] = [
 
 export function CampaignDetailPanel() {
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
-  const getCampaignById = useAppStore((s) => s.getCampaignById);
+  const campaign = useAppStore((s) =>
+    s.selectedCampaignId ? s.campaigns.find((c) => c.id === s.selectedCampaignId) ?? null : null
+  );
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const tasks = useAppStore((s) => s.tasks);
-
-  const campaign = selectedCampaignId ? getCampaignById(selectedCampaignId) : null;
-
-  useEffect(() => {
-    console.log('CampaignDetailPanel - selectedCampaignId:', selectedCampaignId);
-    console.log('CampaignDetailPanel - campaign:', campaign);
-  }, [selectedCampaignId, campaign]);
 
   const campaignTasks = campaign ? tasks.filter((t) => t.campaignId === campaign.id) : [];
 
   const [notes, setNotes] = useState(campaign?.notes || '');
 
   useEffect(() => {
-    if (campaign) {
-      setNotes(campaign.notes || '');
-    }
-  }, [selectedCampaignId, campaign]);
+    setNotes(campaign?.notes || '');
+  }, [selectedCampaignId]);
 
-  if (!campaign) {
-    console.log('CampaignDetailPanel - no campaign found');
-    return null;
-  }
+  if (!campaign) return null;
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newNotes = e.target.value;
