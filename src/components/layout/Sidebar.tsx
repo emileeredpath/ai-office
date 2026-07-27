@@ -14,7 +14,7 @@ interface SidebarProps {
 
 export function Sidebar({ items, currentScreen, onScreenChange }: SidebarProps) {
   return (
-    <div className="w-20 bg-white border-r border-border flex flex-col items-center py-6 gap-8">
+    <div className="w-[100px] bg-white border-r border-border flex flex-col items-center py-6 gap-3">
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = currentScreen === item.id;
@@ -23,14 +23,14 @@ export function Sidebar({ items, currentScreen, onScreenChange }: SidebarProps) 
           <button
             key={item.id}
             onClick={() => onScreenChange(item.id)}
-            className={`p-3 rounded-lg transition-colors ${
+            className={`w-[84px] flex flex-col items-center gap-1 py-2.5 rounded-lg transition-colors ${
               isActive
                 ? 'bg-accent text-white'
                 : 'text-text-secondary hover:bg-surface hover:text-text-primary'
             }`}
-            title={item.label}
           >
-            <Icon size={24} />
+            <Icon size={22} />
+            <span className="text-[11px] font-medium leading-none">{item.label}</span>
           </button>
         );
       })}

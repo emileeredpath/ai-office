@@ -18,6 +18,9 @@ export function TaskRow({ task }: TaskRowProps) {
   const campaign = task.campaignId ? getCampaignById(task.campaignId) : null;
   const completed = task.status === 'complete';
 
+  const priorityColor =
+    task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F97031' : '#9CA3AF';
+
   const handleClick = () => {
     selectTask(task.id);
   };
@@ -33,8 +36,8 @@ export function TaskRow({ task }: TaskRowProps) {
 
   return (
     <tr onClick={handleClick} className={completed ? 'opacity-60' : ''}>
-      <td className="w-full">
-        <div className="flex items-center gap-3">
+      <td className="w-full" style={{ borderLeft: `3px solid ${priorityColor}` }}>
+        <div className="flex items-center gap-3 pl-2">
           <button
             onClick={handleToggleComplete}
             title={completed ? 'Reopen task' : 'Mark complete'}
