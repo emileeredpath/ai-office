@@ -15,6 +15,25 @@ export function CampaignsScreen() {
     return Math.round((completed / campaignTasks.length) * 100);
   };
 
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { backgroundColor: '#E8F7F3', color: '#0F6E56' };
+      case 'planning':
+        return { backgroundColor: '#EFF6FF', color: '#0369A1' };
+      case 'on-hold':
+        return { backgroundColor: '#FEF3C7', color: '#92400E' };
+      case 'completed':
+        return { backgroundColor: '#F0FDF4', color: '#166534' };
+      default:
+        return { backgroundColor: '#F3F4F6', color: '#6B7280' };
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ');
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-7xl mx-auto">
@@ -44,7 +63,19 @@ export function CampaignsScreen() {
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="text-lg font-semibold text-text-primary">{campaign.name}</h3>
-                      <BrandBadge brand={campaign.brand} />
+                      <div className="flex gap-2 mt-2">
+                        <BrandBadge brand={campaign.brand} />
+                        <span
+                          className="badge text-xs font-medium"
+                          style={{
+                            ...getStatusBadgeStyle(campaign.status),
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {getStatusLabel(campaign.status)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -61,14 +92,17 @@ export function CampaignsScreen() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="flex-1 bg-surface rounded-full h-2 overflow-hidden">
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-text-secondary">Progress</span>
+                      <span className="text-sm font-medium text-text-primary">{progress}%</span>
+                    </div>
+                    <div className="flex-1 bg-surface rounded h-2 overflow-hidden">
                       <div
-                        className="bg-accent h-full transition-all"
-                        style={{ width: `${progress}%` }}
+                        className="h-full transition-all"
+                        style={{ width: `${progress}%`, backgroundColor: '#3B82F6' }}
                       ></div>
                     </div>
-                    <span className="text-sm font-medium text-text-primary">{progress}%</span>
                   </div>
 
                   <div className="text-sm text-text-secondary">
