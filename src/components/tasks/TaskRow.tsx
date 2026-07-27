@@ -21,6 +21,10 @@ export function TaskRow({ task }: TaskRowProps) {
   const priorityColor =
     task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F97031' : '#9CA3AF';
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isOverdue = !completed && !!task.deadline && new Date(task.deadline) < today;
+
   const handleClick = () => {
     selectTask(task.id);
   };
@@ -35,7 +39,11 @@ export function TaskRow({ task }: TaskRowProps) {
   };
 
   return (
-    <tr onClick={handleClick} className={completed ? 'opacity-60' : ''}>
+    <tr
+      onClick={handleClick}
+      className={completed ? 'opacity-60' : ''}
+      style={isOverdue ? { backgroundColor: '#FEF2F2' } : undefined}
+    >
       <td className="w-full" style={{ borderLeft: `3px solid ${priorityColor}` }}>
         <div className="flex items-center gap-3 pl-2">
           <button
@@ -64,16 +72,23 @@ export function TaskRow({ task }: TaskRowProps) {
         <BrandBadge brand={task.brand} />
       </td>
       <td>
-        <StatusBadge status={task.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={task.status} />
+          {isOverdue && (
+            <span className="badge" style={{ background: '#EF4444', color: 'white' }}>
+              Overdue
+            </span>
+          )}
+        </div>
       </td>
       <td>
         <div className="text-sm">
-          {task.priority === 'high' && <span className="badge badge-danger">High</span>}
+          {task.priority === 'high' && <span className="badge" style={{ background: '#EF4444', color: 'white' }}>High</span>}
           {task.priority === 'medium' && <span className="badge" style={{ background: '#f97031', color: 'white' }}>Medium</span>}
           {task.priority === 'low' && <span className="badge" style={{ background: '#9ca3af', color: 'white' }}>Low</span>}
         </div>
       </td>
-      <td className="text-sm text-text-secondary">
+      <td className="text-sm" style={{ color: isOverdue ? '#EF4444' : 'var(--color-text-secondary)' }}>
         {task.deadline ? formatDate(task.deadline) : '—'}
       </td>
     </tr>

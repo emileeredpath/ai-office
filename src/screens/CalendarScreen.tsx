@@ -13,6 +13,7 @@ export function CalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const tasks = useAppStore((s) => s.tasks);
   const campaigns = useAppStore((s) => s.campaigns);
+  const selectCampaign = useAppStore((s) => s.selectCampaign);
 
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
@@ -130,17 +131,26 @@ export function CalendarScreen() {
                     {day}
                   </div>
 
-                  {/* Campaign bars */}
+                  {/* Campaign bars — one stacked row per campaign covering this day */}
                   {dayCampaigns.length > 0 && (
-                    <div className="flex gap-1 mb-2 flex-wrap">
-                      {dayCampaigns.map((campaign) => (
-                        <div
+                    <div className="flex flex-col gap-1 mb-2">
+                      {dayCampaigns.slice(0, 3).map((campaign) => (
+                        <button
                           key={campaign.id}
-                          className="h-2 flex-1 rounded-sm"
-                          style={{ backgroundColor: campaign.colour, minWidth: '4px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectCampaign(campaign.id);
+                          }}
+                          className="h-1.5 w-full rounded-sm cursor-pointer"
+                          style={{ backgroundColor: campaign.colour, border: 'none', padding: 0 }}
                           title={campaign.name}
                         />
                       ))}
+                      {dayCampaigns.length > 3 && (
+                        <div className="text-[10px] text-text-secondary">
+                          +{dayCampaigns.length - 3} more
+                        </div>
+                      )}
                     </div>
                   )}
 

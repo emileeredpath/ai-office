@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Workflow, Settings, Brain, Target, TrendingUp } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
@@ -14,6 +14,7 @@ import { SettingsScreen } from '@/screens/SettingsScreen';
 import { MarketingOSScreen } from '@/screens/MarketingOSScreen';
 import { ObjectivesScreen } from '@/screens/ObjectivesScreen';
 import { useAppStore } from '@/store/useAppStore';
+import { getApiUrl } from '@/services/actionsApi';
 import '@/styles/main.css';
 
 type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'pipeline' | 'metrics' | 'marketingos' | 'objectives' | 'settings';
@@ -34,6 +35,13 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
+
+  useEffect(() => {
+    const ping = () => fetch(`${getApiUrl()}/health`, { method: 'GET' }).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 4 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const renderScreen = () => {
     switch (currentScreen) {

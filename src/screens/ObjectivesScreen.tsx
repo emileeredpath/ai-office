@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { Plus, Target, Trash2, Edit2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 
+interface ObjectiveKPI {
+  id: string;
+  name: string;
+  target: string;
+  actual: string;
+}
+
 interface Objective {
   id: string;
   title: string;
@@ -9,7 +16,9 @@ interface Objective {
   deadline?: string;
   brand: string;
   campaignId?: string;
-  status: 'not-started' | 'in-progress' | 'completed';
+  status: 'planning' | 'not-started' | 'in-progress' | 'completed';
+  budget?: number;
+  kpis: ObjectiveKPI[];
   createdAt: string;
 }
 
@@ -17,24 +26,27 @@ export function ObjectivesScreen() {
   const campaigns = useAppStore((s) => s.campaigns);
   const [objectives, setObjectives] = useState<Objective[]>([
     {
-      id: '1',
-      title: 'Q3 Digital Marketing Campaign',
-      goal: 'Increase website traffic by 30% and generate 5000 qualified leads',
-      deadline: '2026-09-30',
+      id: 'obj-1',
+      title: 'Q3 Education Campaign',
+      goal: 'Generate 50 education sector enquiries for MTech Group by end of August 2026',
+      deadline: '2026-08-31',
       brand: 'mtech',
-      status: 'in-progress',
-      createdAt: '2026-07-24',
-    },
-    {
-      id: '2',
-      title: 'Brand Awareness Initiative',
-      goal: 'Achieve 50% brand recognition in target market',
-      deadline: '2026-12-31',
-      brand: 'brentwood',
-      status: 'not-started',
-      createdAt: '2026-07-20',
+      status: 'planning',
+      budget: 8000,
+      campaignId: undefined,
+      kpis: [
+        { id: 'kpi-1', name: 'Email open rate', target: '25%', actual: '' },
+        { id: 'kpi-2', name: 'Email click rate', target: '3%', actual: '' },
+        { id: 'kpi-3', name: 'Landing page visits', target: '500', actual: '' },
+        { id: 'kpi-4', name: 'Enquiries generated', target: '50', actual: '' },
+        { id: 'kpi-5', name: 'Quotes requested', target: '10', actual: '' },
+      ],
+      createdAt: '2026-07-27',
     },
   ]);
+
+  const [loggingId, setLoggingId] = useState<string | null>(null);
+  const [resultsForm, setResultsForm] = useState<Record<string, string>>({});
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -44,7 +56,8 @@ export function ObjectivesScreen() {
     deadline: string;
     brand: string;
     campaignId: string;
-    status: 'not-started' | 'in-progress' | 'completed';
+    status: 'planning' | 'not-started' | 'in-progress' | 'completed';
+    budget: string;
   }>({
     title: '',
     goal: '',
@@ -52,44 +65,59 @@ export function ObjectivesScreen() {
     brand: 'mtech',
     campaignId: '',
     status: 'not-started',
+    budget: '',
   });
+
+  const emptyFormData = {
+    title: '',
+    goal: '',
+    deadline: '',
+    brand: 'mtech',
+    campaignId: '',
+    status: 'not-started' as const,
+    budget: '',
+  };
 
   const handleCreate = () => {
     if (!formData.title.trim() || !formData.goal.trim()) return;
 
     const newObjective: Objective = {
       id: Date.now().toString(),
-      ...formData,
+      title: formData.title,
+      goal: formData.goal,
+      deadline: formData.deadline,
+      brand: formData.brand,
+      campaignId: formData.campaignId,
+      status: formData.status,
+      budget: formData.budget ? Number(formData.budget) : undefined,
+      kpis: [],
       createdAt: new Date().toISOString(),
     };
 
     setObjectives([newObjective, ...objectives]);
-    setFormData({
-      title: '',
-      goal: '',
-      deadline: '',
-      brand: 'mtech',
-      campaignId: '',
-      status: 'not-started',
-    });
+    setFormData(emptyFormData);
     setShowForm(false);
   };
 
   const handleUpdate = (id: string) => {
     setObjectives(
       objectives.map((obj) =>
-        obj.id === id ? { ...obj, ...formData } : obj
+        obj.id === id
+          ? {
+              ...obj,
+              title: formData.title,
+              goal: formData.goal,
+              deadline: formData.deadline,
+              brand: formData.brand,
+              campaignId: formData.campaignId,
+              status: formData.status,
+              budget: formData.budget ? Number(formData.budget) : undefined,
+            }
+          : obj
       )
     );
     setEditingId(null);
-    setFormData({
-      title: '',
-      goal: '',
-      deadline: '',
-      brand: 'mtech',
-      campaignId: '',
-      status: 'not-started',
-    });
+    setFormData(emptyFormData);
   };
 
   const handleDelete = (id: string) => {
@@ -106,6 +134,7 @@ export function ObjectivesScreen() {
       brand: objective.brand as any,
       campaignId: objective.campaignId || '',
       status: objective.status,
+      budget: objective.budget != null ? String(objective.budget) : '',
     });
     setShowForm(true);
   };
@@ -116,9 +145,45 @@ export function ObjectivesScreen() {
         return 'bg-green-100 text-green-800';
       case 'in-progress':
         return 'bg-blue-100 text-blue-800';
+      case 'planning':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const isDeadlinePassed = (obj: Objective) => {
+    if (!obj.deadline) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(obj.deadline) < today;
+  };
+
+  const startLogging = (obj: Objective) => {
+    const initial: Record<string, string> = {};
+    obj.kpis.forEach((kpi) => {
+      initial[kpi.id] = kpi.actual;
+    });
+    setResultsForm(initial);
+    setLoggingId(obj.id);
+  };
+
+  const saveResults = (id: string) => {
+    setObjectives(
+      objectives.map((obj) =>
+        obj.id === id
+          ? {
+              ...obj,
+              kpis: obj.kpis.map((kpi) => ({
+                ...kpi,
+                actual: resultsForm[kpi.id] ?? kpi.actual,
+              })),
+            }
+          : obj
+      )
+    );
+    setLoggingId(null);
+    setResultsForm({});
   };
 
   const getBrandColor = (brand: string) => {
@@ -146,14 +211,7 @@ export function ObjectivesScreen() {
           <button
             onClick={() => {
               setEditingId(null);
-              setFormData({
-                title: '',
-                goal: '',
-                deadline: '',
-                brand: 'mtech',
-                campaignId: '',
-                status: 'not-started',
-              });
+              setFormData(emptyFormData);
               setShowForm(!showForm);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -242,11 +300,23 @@ export function ObjectivesScreen() {
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   >
+                    <option value="planning">Planning</option>
                     <option value="not-started">Not Started</option>
                     <option value="in-progress">In Progress</option>
                     <option value="completed">Completed</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Budget (£, optional)</label>
+                <input
+                  type="number"
+                  value={formData.budget}
+                  onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="e.g., 8000"
+                />
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -322,8 +392,8 @@ export function ObjectivesScreen() {
                     </span>
 
                     {obj.deadline && (
-                      <span className="text-sm text-slate-600">
-                        📅 Due: {new Date(obj.deadline).toLocaleDateString()}
+                      <span className={`text-sm ${isDeadlinePassed(obj) && obj.status !== 'completed' ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
+                        📅 Due: {new Date(obj.deadline).toLocaleDateString('en-GB')}
                       </span>
                     )}
 
@@ -333,10 +403,80 @@ export function ObjectivesScreen() {
                       </span>
                     )}
 
+                    {obj.budget != null && (
+                      <span className="text-sm font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded">
+                        Budget: {obj.budget.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+
                     <span className="text-xs text-slate-500">
-                      Created {new Date(obj.createdAt).toLocaleDateString()}
+                      Created {new Date(obj.createdAt).toLocaleDateString('en-GB')}
                     </span>
                   </div>
+
+                  {obj.kpis.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
+                      {obj.kpis.map((kpi) => (
+                        <div key={kpi.id} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                          <p className="text-xs text-slate-500 mb-1">{kpi.name}</p>
+                          <p className="text-sm font-semibold text-slate-900">
+                            Target: {kpi.target}
+                          </p>
+                          <p className="text-sm text-slate-600">
+                            Actual: {kpi.actual || '—'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {isDeadlinePassed(obj) && obj.kpis.length > 0 && loggingId !== obj.id && (
+                    <button
+                      onClick={() => startLogging(obj)}
+                      className="mt-4 px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-900 transition"
+                    >
+                      Log actual results
+                    </button>
+                  )}
+
+                  {loggingId === obj.id && (
+                    <div className="mt-4 border-t border-slate-200 pt-4">
+                      <h4 className="text-sm font-semibold text-slate-900 mb-3">Log actual results</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
+                        {obj.kpis.map((kpi) => (
+                          <div key={kpi.id}>
+                            <label className="block text-xs text-slate-500 mb-1">{kpi.name}</label>
+                            <input
+                              type="text"
+                              value={resultsForm[kpi.id] ?? ''}
+                              onChange={(e) =>
+                                setResultsForm({ ...resultsForm, [kpi.id]: e.target.value })
+                              }
+                              className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                              placeholder={kpi.target}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveResults(obj.id)}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+                        >
+                          Save results
+                        </button>
+                        <button
+                          onClick={() => {
+                            setLoggingId(null);
+                            setResultsForm({});
+                          }}
+                          className="px-4 py-2 bg-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-400 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })

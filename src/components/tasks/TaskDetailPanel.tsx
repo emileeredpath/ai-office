@@ -25,12 +25,17 @@ export function TaskDetailPanel() {
   const [notes, setNotes] = useState(task?.notes || '');
 
   useEffect(() => {
-    if (task) {
-      setNotes(task.notes || '');
-    }
-  }, [selectedTaskId, task]);
+    setNotes(task?.notes || '');
+  }, [task?.id]);
 
   if (!task) return null;
+
+  const isOverdue = (() => {
+    if (task.status === 'complete' || !task.deadline) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(task.deadline) < today;
+  })();
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newNotes = e.target.value;
@@ -93,6 +98,14 @@ export function TaskDetailPanel() {
         {task.status === 'complete' && task.completedAt && (
           <p className="text-sm text-success mb-2">Completed {formatDate(task.completedAt)}</p>
         )}
+        {isOverdue && (
+          <span
+            className="badge inline-block mb-2"
+            style={{ background: '#EF4444', color: 'white' }}
+          >
+            Overdue
+          </span>
+        )}
 
         {/* Field Row 1 */}
         <div className="task-detail-fields">
@@ -141,6 +154,7 @@ export function TaskDetailPanel() {
                 })
               }
               className="input"
+              style={isOverdue ? { color: '#EF4444', borderColor: '#EF4444' } : undefined}
             />
           </div>
         </div>
