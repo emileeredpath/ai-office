@@ -26,7 +26,6 @@ const NAVIGATION_ITEMS = [
   { id: 'marketingos' as Screen, icon: Brain, label: 'MarketingOS' },
   { id: 'objectives' as Screen, icon: Target, label: 'Objectives' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Dashboard' },
-  { id: 'metrics' as Screen, icon: TrendingUp, label: 'Metrics' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
 ];
