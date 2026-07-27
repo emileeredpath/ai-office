@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Workflow, Settings, Brain } from 'lucide-react';
+import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Workflow, Settings, Brain, Target } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { CampaignDetailPanel } from '@/components/campaigns/CampaignDetailPanel';
@@ -12,18 +12,20 @@ import { PipelineScreen } from '@/screens/PipelineScreen';
 import { MetricsScreen } from '@/screens/MetricsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { MarketingOSScreen } from '@/screens/MarketingOSScreen';
+import { ObjectivesScreen } from '@/screens/ObjectivesScreen';
 import { useAppStore } from '@/store/useAppStore';
 import '@/styles/main.css';
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'pipeline' | 'metrics' | 'marketingos' | 'settings';
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'pipeline' | 'metrics' | 'marketingos' | 'objectives' | 'settings';
 
 const NAVIGATION_ITEMS = [
   { id: 'home' as Screen, icon: Home, label: 'Home' },
   { id: 'tasks' as Screen, icon: CheckSquare, label: 'My Tasks' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
   { id: 'pipeline' as Screen, icon: Workflow, label: 'Pipeline' },
-  { id: 'metrics' as Screen, icon: BarChart3, label: 'Metrics' },
   { id: 'marketingos' as Screen, icon: Brain, label: 'MarketingOS' },
+  { id: 'objectives' as Screen, icon: Target, label: 'Objectives' },
+  { id: 'metrics' as Screen, icon: BarChart3, label: 'Metrics' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
 ];
@@ -43,14 +45,16 @@ export default function App() {
         return <CampaignsScreen />;
       case 'pipeline':
         return <PipelineScreen />;
+      case 'marketingos':
+        return <MarketingOSScreen />;
+      case 'objectives':
+        return <ObjectivesScreen />;
       case 'metrics':
         return <MetricsScreen />;
       case 'calendar':
         return <CalendarScreen />;
       case 'dashboard':
         return <DashboardScreen />;
-      case 'marketingos':
-        return <MarketingOSScreen />;
       case 'settings':
         return <SettingsScreen />;
       default:

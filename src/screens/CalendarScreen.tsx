@@ -49,6 +49,13 @@ export function CalendarScreen() {
     );
   };
 
+  const getCampaignsForDay = (day: number) => {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    return campaigns.filter(
+      (c) => new Date(c.startDate) <= date && new Date(c.endDate) >= date,
+    );
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-4xl mx-auto">
@@ -109,6 +116,7 @@ export function CalendarScreen() {
             {/* Days with tasks */}
             {daysArray.map((day) => {
               const dayTasks = getTasksForDate(day);
+              const dayCampaigns = getCampaignsForDay(day);
               const isToday = todayInThisMonth === day;
 
               return (
@@ -121,6 +129,21 @@ export function CalendarScreen() {
                   <div className={`font-semibold mb-2 ${isToday ? 'text-accent' : 'text-text-primary'}`}>
                     {day}
                   </div>
+
+                  {/* Campaign bars */}
+                  {dayCampaigns.length > 0 && (
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      {dayCampaigns.map((campaign) => (
+                        <div
+                          key={campaign.id}
+                          className="h-2 flex-1 rounded-sm"
+                          style={{ backgroundColor: campaign.colour, minWidth: '4px' }}
+                          title={campaign.name}
+                        />
+                      ))}
+                    </div>
+                  )}
+
                   <div className="space-y-1">
                     {dayTasks.slice(0, 3).map((task) => (
                       <div

@@ -7,9 +7,10 @@ import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
+import { initMarketingTables } from './db/marketingRepository.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+initMarketingTables();
 const PORT = process.env.PORT || 3001;
 
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
@@ -41,15 +42,12 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/marketingos', marketingosRouter);
 app.use('/mcp', mcpRouter);
 
-// Serve frontend static files in production
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, '../../dist');
-console.log(`Serving static files from: ${distPath}`);
 app.use('/ai-office', express.static(distPath));
 
-// SPA fallback: serve index.html for non-API routes under /ai-office/
 app.get('/ai-office/*', (_req: Request, res: Response) => {
   const indexPath = path.join(distPath, 'index.html');
-  console.log(`SPA fallback: attempting to serve ${indexPath} for path ${_req.path}`);
   res.sendFile(indexPath, (err) => {
     if (err) {
       console.error(`Error serving index.html: ${err.message}`);
@@ -78,5 +76,4 @@ app.use((err: Error & { type?: string; status?: number }, _req: Request, res: Re
 
 app.listen(PORT, () => {
   console.log(`AI Office Actions API listening on port ${PORT}`);
-  console.log(`API Key configured: ${process.env.API_KEY ? 'yes' : 'no'}`);
 });
