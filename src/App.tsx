@@ -25,7 +25,8 @@ const NAVIGATION_ITEMS = [
   { id: 'pipeline' as Screen, icon: Workflow, label: 'Pipeline' },
   { id: 'marketingos' as Screen, icon: Brain, label: 'MarketingOS' },
   { id: 'objectives' as Screen, icon: Target, label: 'Objectives' },
-  { id: 'metrics' as Screen, icon: BarChart3, label: 'Metrics' },
+  { id: 'dashboard' as Screen, icon: BarChart3, label: 'Dashboard' },
+  { id: 'metrics' as Screen, icon: Calendar, label: 'Metrics' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
 ];
@@ -49,12 +50,12 @@ export default function App() {
         return <MarketingOSScreen />;
       case 'objectives':
         return <ObjectivesScreen />;
+      case 'dashboard':
+        return <DashboardScreen />;
       case 'metrics':
         return <MetricsScreen />;
       case 'calendar':
         return <CalendarScreen />;
-      case 'dashboard':
-        return <DashboardScreen />;
       case 'settings':
         return <SettingsScreen />;
       default:
