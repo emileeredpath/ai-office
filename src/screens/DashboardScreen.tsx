@@ -472,8 +472,11 @@ export function DashboardScreen() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '8px 0',
+                    padding: '8px 0 8px 10px',
                     borderBottom: i < waitingForJohn.length - 1 ? '0.5px solid rgba(0,0,0,0.08)' : 'none',
+                    borderLeft: `3px solid ${
+                      task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F97031' : '#9CA3AF'
+                    }`,
                     fontSize: '12px',
                   }}
                 >
@@ -510,8 +513,11 @@ export function DashboardScreen() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '8px 0',
+                    padding: '8px 0 8px 10px',
                     borderBottom: i < overdueTasks.length - 1 ? '0.5px solid rgba(0,0,0,0.08)' : 'none',
+                    borderLeft: `3px solid ${
+                      task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F97031' : '#9CA3AF'
+                    }`,
                     fontSize: '12px',
                   }}
                 >
@@ -575,8 +581,8 @@ function StatCard({
       </p>
       <p
         style={{
-          fontSize: '40px',
-          fontWeight: 500,
+          fontSize: '48px',
+          fontWeight: 600,
           color: valueColor || TOKENS.textPrimary,
           margin: '4px 0 8px',
           lineHeight: 1,
