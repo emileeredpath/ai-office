@@ -1,2 +1,6 @@
 /* Import the main design system CSS */
 @import './styles/main.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
