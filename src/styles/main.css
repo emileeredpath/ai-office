@@ -559,19 +559,6 @@ body {
   transition-duration: 150ms;
 }
 
-/* Background opacity utilities */
-.bg-opacity-10 {
-  opacity: 0.1;
-}
-
-.bg-opacity-15 {
-  opacity: 0.15;
-}
-
-.bg-opacity-50 {
-  opacity: 0.5;
-}
-
 .bg-blue-50 {
   background-color: #eff6ff;
 }

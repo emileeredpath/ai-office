@@ -158,7 +158,8 @@ export function CalendarScreen() {
                     {dayTasks.slice(0, 3).map((task) => (
                       <div
                         key={task.id}
-                        className="text-xs p-1 rounded bg-accent bg-opacity-10 text-accent truncate"
+                        className="text-xs p-1 rounded text-accent truncate"
+                        style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}
                       >
                         {task.title}
                       </div>
