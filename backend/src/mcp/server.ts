@@ -7,6 +7,7 @@ import {
   getDailyDashboardSnapshot,
   saveDailyDashboardSnapshot,
 } from '../db/marketingOsRepository.js';
+import { getAllCampaigns, insertCampaign, getCampaignProgress } from '../db/campaignRepository.js';
 import type { ActionResult } from '../types.js';
 import { nanoid } from 'nanoid';
 
@@ -156,6 +157,86 @@ export function createAiOfficeMcpServer(): McpServer {
         payload: {},
       });
       return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_list_campaigns',
+    {
+      title: 'List AI Office campaigns',
+      description:
+        'List all campaigns with their id, name, brand(s), status, and task progress. Read-only — use this to find a campaign_id before creating or tagging a task against it, or before creating a new campaign (to check one doesn\'t already exist).',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const campaigns = getAllCampaigns().map((c) => ({
+          id: c.id,
+          name: c.name,
+          brand: c.brand,
+          entities: c.entities,
+          status: c.status,
+          startDate: c.startDate,
+          endDate: c.endDate,
+          ...getCampaignProgress(c.id),
+        }));
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ success: true, result: campaigns }, null, 2) }],
+          isError: false,
+        };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: String(err) }) }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'ai_office_create_campaign',
+    {
+      title: 'Create a campaign in AI Office',
+      description:
+        'Create a new campaign in AI Office. Campaigns and tasks share the same database as the dashboard, so this appears immediately on the Campaigns page. Check ai_office_list_campaigns first to avoid creating a duplicate.',
+      inputSchema: {
+        name: z.string().min(1).describe('Campaign name'),
+        brand: z.enum(BRANDS).describe('Primary brand'),
+        entities: z.array(z.enum(BRANDS)).optional().describe('All brands this campaign spans — defaults to just the primary brand'),
+        primaryIndustry: z.string().optional(),
+        secondaryIndustry: z.string().optional(),
+        theme: z.string().optional(),
+        status: z.enum(['planning', 'active', 'on-hold', 'completed']).optional(),
+        startDate: z.string().describe('ISO date, e.g. 2026-08-01'),
+        endDate: z.string().describe('ISO date, e.g. 2026-09-30'),
+        budget: z.number().optional(),
+        colour: z.string().optional().describe('Hex colour for the campaign, e.g. #3B82F6'),
+        reactive: z.boolean().optional(),
+        notes: z.string().optional(),
+      },
+    },
+    async (input) => {
+      try {
+        const campaign = insertCampaign(input);
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                { success: true, result: { id: campaign.id, name: campaign.name }, message: `Campaign "${campaign.name}" created.` },
+                null,
+                2
+              ),
+            },
+          ],
+          isError: false,
+        };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: String(err) }) }],
+          isError: true,
+        };
+      }
     }
   );
 
