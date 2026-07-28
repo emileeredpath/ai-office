@@ -41,6 +41,9 @@ export interface TaskRecord {
   lastBriefGenerated: string | null;
   source: string | null;
   sourceConversationId: string | null;
+  // Nullable and unused today — reserved for the per-person to-do list phase
+  // so adding real user accounts later doesn't require a schema change.
+  assignedTo: string | null;
 }
 
 export interface ActionSource {

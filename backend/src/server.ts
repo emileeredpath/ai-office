@@ -5,9 +5,13 @@ import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
+import campaignsRouter from './routes/campaigns.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
+import authRouter from './routes/auth.js';
+import { requireSession } from './middleware/session.js';
 import { initMarketingTables } from './db/marketingRepository.js';
+import './scripts/seed.js';
 
 const app = express();
 initMarketingTables();
@@ -20,7 +24,7 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
 app.use(
   cors({
     origin: allowedOrigins,
-    credentials: false,
+    credentials: true,
   })
 );
 
@@ -37,22 +41,35 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/actions', actionsRouter);
-app.use('/api/tasks', tasksRouter);
-app.use('/api/marketingos', marketingosRouter);
+// Login, logout, and session check are unauthenticated by definition.
+app.use('/api/auth', authRouter);
+
+// Everything else under /api/ requires a signed-in session (Emilee = edit,
+// John = view) — no session, no data, even if you hit the API directly.
+app.use('/api/tasks', requireSession, tasksRouter);
+app.use('/api/campaigns', requireSession, campaignsRouter);
+app.use('/api/actions', requireSession, actionsRouter);
+app.use('/api/marketingos', requireSession, marketingosRouter);
+
+// Claude's MCP connection is a separate, already-scoped access path (per the
+// build brief, not part of the dashboard's shared-password wall).
 app.use('/mcp', mcpRouter);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, '../../dist');
-app.use('/ai-office', express.static(distPath));
 
-app.get('/ai-office/*', (_req: Request, res: Response) => {
-  const indexPath = path.join(distPath, 'index.html');
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error(`Error serving index.html: ${err.message}`);
-      res.status(404).json({ success: false, message: 'Not found' });
-    }
+// Frontend is served from this same Railway service at the root — the SPA
+// shell itself is public (it has to be, to show the login screen); every
+// byte of real data behind it still requires the session above.
+app.use(express.static(distPath));
+
+app.get('*', (req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/mcp')) {
+    next();
+    return;
+  }
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) next(err);
   });
 });
 

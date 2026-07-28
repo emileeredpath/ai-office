@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --loader ts-node/esm --no-warnings=ExperimentalWarning src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "seed": "node dist/scripts/seed.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

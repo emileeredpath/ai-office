@@ -185,6 +185,7 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     lastBriefGenerated: null,
     source: input.source ?? source?.type ?? 'claude',
     sourceConversationId: input.source_conversation_id ?? source?.conversationId ?? null,
+    assignedTo: null,
   };
 
   insertTask(task);
