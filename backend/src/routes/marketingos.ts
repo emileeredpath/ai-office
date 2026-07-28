@@ -1,11 +1,12 @@
 import express, { Request, Response } from 'express';
 import * as marketingRepo from '../db/marketingRepository.js';
 import * as dashboardService from '../services/dashboardService.js';
+import { requireEdit } from '../middleware/session.js';
 
 const router = express.Router();
 
 // Create marketing objective
-router.post('/objectives', (req: Request, res: Response) => {
+router.post('/objectives', requireEdit, (req: Request, res: Response) => {
   try {
     const { brand, title, description, targetAudience, kpis, timeframe, budget } = req.body;
 
@@ -69,7 +70,7 @@ router.get('/objectives', (req: Request, res: Response) => {
 });
 
 // Update objective
-router.put('/objectives/:id', (req: Request, res: Response) => {
+router.put('/objectives/:id', requireEdit, (req: Request, res: Response) => {
   try {
     const updated = marketingRepo.updateObjective(req.params.id, req.body);
     if (!updated) {
@@ -84,7 +85,7 @@ router.put('/objectives/:id', (req: Request, res: Response) => {
 });
 
 // Generate dashboard
-router.post('/generate-dashboard', async (req: Request, res: Response) => {
+router.post('/generate-dashboard', requireEdit, async (req: Request, res: Response) => {
   try {
     const { objectiveId, marketAnalysis, competitors, assumptions } = req.body;
 

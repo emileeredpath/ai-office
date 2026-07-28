@@ -13,7 +13,7 @@ import { MetricsScreen } from '@/screens/MetricsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { ObjectivesScreen } from '@/screens/ObjectivesScreen';
 import { useAppStore } from '@/store/useAppStore';
-import { getApiUrl } from '@/services/actionsApi';
+import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
 
 type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'pipeline' | 'metrics' | 'objectives' | 'settings';
@@ -35,7 +35,7 @@ export default function App() {
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
 
   useEffect(() => {
-    const ping = () => fetch(`${getApiUrl()}/health`, { method: 'GET' }).catch(() => {});
+    const ping = () => fetch(`${API_URL}/health`, { method: 'GET' }).catch(() => {});
     ping();
     const interval = setInterval(ping, 4 * 60 * 1000);
     return () => clearInterval(interval);

@@ -21,6 +21,7 @@ interface TaskRow {
   last_brief_generated: string | null;
   source: string | null;
   source_conversation_id: string | null;
+  assigned_to: string | null;
 }
 
 function rowToRecord(row: TaskRow): TaskRecord {
@@ -44,6 +45,7 @@ function rowToRecord(row: TaskRow): TaskRecord {
     lastBriefGenerated: row.last_brief_generated,
     source: row.source,
     sourceConversationId: row.source_conversation_id,
+    assignedTo: row.assigned_to,
   };
 }
 
@@ -69,15 +71,44 @@ export function insertTask(task: TaskRecord): void {
     `INSERT INTO tasks (
       id, title, notes, brand, status, priority, deadline, start_date, campaign_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
-      blocker_reason, last_brief_generated, source, source_conversation_id
+      blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
-      @blockerReason, @lastBriefGenerated, @source, @sourceConversationId)`
+      @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo)`
   ).run({
-    ...task,
+    id: task.id,
+    title: task.title,
+    notes: task.notes,
+    brand: task.brand,
+    status: task.status,
+    priority: task.priority,
+    deadline: task.deadline,
+    startDate: task.startDate,
+    campaignId: task.campaignId,
+    createdAt: task.createdAt,
+    completedAt: task.completedAt,
+    previousStatus: task.previousStatus,
     history: JSON.stringify(task.history),
     approvalRequired: task.approvalRequired ? 1 : 0,
+    approver: task.approver,
+    blockerReason: task.blockerReason,
+    lastBriefGenerated: task.lastBriefGenerated,
+    source: task.source,
+    sourceConversationId: task.sourceConversationId,
+    assignedTo: task.assignedTo ?? null,
   });
+}
+
+export function deleteTaskRow(id: string): boolean {
+  const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
+export function getTasksFiltered(filters: { campaignId?: string; brand?: string }): TaskRecord[] {
+  let tasks = getAllTasks();
+  if (filters.campaignId) tasks = tasks.filter((t) => t.campaignId === filters.campaignId);
+  if (filters.brand) tasks = tasks.filter((t) => t.brand === filters.brand);
+  return tasks;
 }
 
 export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRecord | undefined {
