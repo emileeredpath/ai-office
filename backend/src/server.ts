@@ -1,16 +1,19 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
+import cron from 'node-cron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import campaignsRouter from './routes/campaigns.js';
+import campaignMonitorRouter from './routes/campaignMonitor.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
 import authRouter from './routes/auth.js';
 import { requireSession } from './middleware/session.js';
 import { initMarketingTables } from './db/marketingRepository.js';
+import { syncCampaignMonitor } from './services/campaignMonitor.js';
 import './scripts/seed.js';
 
 const app = express();
@@ -48,6 +51,7 @@ app.use('/api/auth', authRouter);
 // John = view) — no session, no data, even if you hit the API directly.
 app.use('/api/tasks', requireSession, tasksRouter);
 app.use('/api/campaigns', requireSession, campaignsRouter);
+app.use('/api/campaign-monitor', requireSession, campaignMonitorRouter);
 app.use('/api/actions', requireSession, actionsRouter);
 app.use('/api/marketingos', requireSession, marketingosRouter);
 
@@ -94,3 +98,22 @@ app.use((err: Error & { type?: string; status?: number }, _req: Request, res: Re
 app.listen(PORT, () => {
   console.log(`AI Office Actions API listening on port ${PORT}`);
 });
+
+// Campaign Monitor weekly sync — see the Campaign Monitor API Integration
+// brief. Opt-in via env var so a missing/invalid API key never blocks a
+// deploy; failures are logged and retried on the next scheduled run, never
+// thrown from here.
+if (process.env.CAMPAIGN_MONITOR_SYNC_ENABLED === 'true') {
+  const schedule = process.env.CAMPAIGN_MONITOR_SYNC_SCHEDULE || '0 18 * * 0';
+  if (cron.validate(schedule)) {
+    cron.schedule(schedule, () => {
+      console.log('[campaign-monitor] scheduled sync starting...');
+      syncCampaignMonitor()
+        .then((result) => console.log('[campaign-monitor] scheduled sync finished:', JSON.stringify(result)))
+        .catch((err) => console.error('[campaign-monitor] scheduled sync threw:', err));
+    });
+    console.log(`[campaign-monitor] weekly sync scheduled: "${schedule}"`);
+  } else {
+    console.error(`[campaign-monitor] CAMPAIGN_MONITOR_SYNC_SCHEDULE "${schedule}" is not a valid cron expression — sync not scheduled.`);
+  }
+}

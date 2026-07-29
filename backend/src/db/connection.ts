@@ -39,7 +39,8 @@ db.exec(`
     subject TEXT,
     assigned_to TEXT,
     cost REAL,
-    currency TEXT
+    currency TEXT,
+    external_id TEXT
   );
 
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -174,5 +175,9 @@ addColumnIfMissing('tasks', 'subject', 'TEXT');
 // Cost tracking — see the Calendar Improvements + Cost Tracking brief.
 addColumnIfMissing('tasks', 'cost', 'REAL');
 addColumnIfMissing('tasks', 'currency', 'TEXT');
+// Dedup key for automated external syncs (e.g. Campaign Monitor) — see the
+// Campaign Monitor API Integration brief.
+addColumnIfMissing('tasks', 'external_id', 'TEXT');
+db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_source_external ON tasks(source, external_id)');
 
 export default db;

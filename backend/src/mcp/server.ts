@@ -8,6 +8,7 @@ import {
   saveDailyDashboardSnapshot,
 } from '../db/marketingOsRepository.js';
 import { getAllCampaigns, insertCampaign, getCampaignProgress } from '../db/campaignRepository.js';
+import { syncCampaignMonitor } from '../services/campaignMonitor.js';
 import type { ActionResult } from '../types.js';
 import { nanoid } from 'nanoid';
 
@@ -403,6 +404,25 @@ export function createAiOfficeMcpServer(): McpServer {
           isError: true,
         };
       }
+    }
+  );
+
+  server.registerTool(
+    'ai_office_sync_campaign_monitor',
+    {
+      title: 'Sync Campaign Monitor sends into AI Office',
+      description:
+        'Pull sent campaigns from the last N days (default 7) out of Campaign Monitor, map each to an MTech brand entity by its naming convention, and upsert them as email-send tasks — same effect as the weekly scheduled sync, run on demand. Safe to re-run: existing sends are updated in place rather than duplicated. Requires CAMPAIGN_MONITOR_API_KEY to be set on the server.',
+      inputSchema: {
+        since_days: z.number().int().min(1).max(90).optional().describe('How many days back to pull sends from — defaults to 7'),
+      },
+    },
+    async ({ since_days }) => {
+      const result = await syncCampaignMonitor({ sinceDays: since_days });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        isError: !result.success,
+      };
     }
   );
 

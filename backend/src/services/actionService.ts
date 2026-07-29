@@ -224,6 +224,7 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     assignedTo: null,
     cost: input.cost ?? null,
     currency: input.currency ?? (input.cost != null ? 'GBP' : null),
+    externalId: null,
   };
 
   insertTask(task);

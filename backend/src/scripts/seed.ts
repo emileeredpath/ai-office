@@ -32,6 +32,7 @@ function task(overrides: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' |
     subject: null,
     cost: null,
     currency: null,
+    externalId: null,
     ...overrides,
   };
 }

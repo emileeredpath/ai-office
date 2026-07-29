@@ -55,6 +55,10 @@ export interface TaskRecord {
   // records what the original invoice was in, for audit purposes.
   cost: number | null;
   currency: string | null;
+  // Dedup key for tasks created by an automated external sync (paired with
+  // `source`, e.g. source='campaign-monitor' + externalId=CM's campaign ID)
+  // so re-running a sync updates the existing row instead of duplicating it.
+  externalId: string | null;
 }
 
 export interface ActionSource {
