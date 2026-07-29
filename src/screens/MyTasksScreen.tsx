@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { TaskRow } from '@/components/tasks/TaskRow';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { Brand, TaskStatus } from '@/types/index';
+import { useAuth } from '@/contexts/AuthContext';
 
 type FilterBrand = Brand | 'all';
 type FilterStatus = TaskStatus | 'all';
@@ -11,6 +12,7 @@ type FilterPriority = 'all' | 'high' | 'medium' | 'low';
 
 export function MyTasksScreen() {
   const tasks = useAppStore((s) => s.tasks);
+  const { isEditor } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
 
   const [filterBrand, setFilterBrand] = useState<FilterBrand>('all');
@@ -90,10 +92,12 @@ export function MyTasksScreen() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary">My Tasks</h1>
-          <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
-            <Plus size={18} />
-            Add task
-          </button>
+          {isEditor && (
+            <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
+              <Plus size={18} />
+              Add task
+            </button>
+          )}
         </div>
 
         {/* Filters */}

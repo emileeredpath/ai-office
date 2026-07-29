@@ -36,13 +36,15 @@ db.exec(`
     source_conversation_id TEXT,
     type TEXT NOT NULL DEFAULT 'task',
     recipients INTEGER,
-    subject TEXT
+    subject TEXT,
+    assigned_to TEXT
   );
 
   CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     brand TEXT NOT NULL DEFAULT 'mtech',
+    entities TEXT NOT NULL DEFAULT '[]',
     primary_industry TEXT NOT NULL DEFAULT '',
     secondary_industry TEXT NOT NULL DEFAULT '',
     theme TEXT NOT NULL DEFAULT '',
@@ -56,7 +58,10 @@ db.exec(`
     engagement REAL NOT NULL DEFAULT 0,
     colour TEXT NOT NULL DEFAULT '#3B82F6',
     reactive INTEGER NOT NULL DEFAULT 0,
-    notes TEXT NOT NULL DEFAULT ''
+    notes TEXT NOT NULL DEFAULT '',
+    results TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS audit_log (
@@ -140,20 +145,29 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_quick_capture_created ON quick_capture_items(created_at);
 `);
 
-// CREATE TABLE IF NOT EXISTS above only defines the shape for a brand-new
-// database — a tasks table that already existed on disk (e.g. a live Railway
-// volume from before these columns existed) needs them added explicitly.
-const existingTaskColumns = new Set(
-  (db.prepare('PRAGMA table_info(tasks)').all() as unknown as { name: string }[]).map((c) => c.name)
-);
-if (!existingTaskColumns.has('type')) {
-  db.exec(`ALTER TABLE tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'task'`);
+// Additive migrations for databases created before a column existed. SQLite
+// has no "ADD COLUMN IF NOT EXISTS", so probe pragma_table_info and add only
+// what's missing — safe to run on every boot.
+function columnExists(table: string, column: string): boolean {
+  const rows = db.prepare(`SELECT 1 FROM pragma_table_info(?) WHERE name = ?`).all(table, column);
+  return rows.length > 0;
 }
-if (!existingTaskColumns.has('recipients')) {
-  db.exec('ALTER TABLE tasks ADD COLUMN recipients INTEGER');
+
+function addColumnIfMissing(table: string, column: string, definition: string) {
+  if (!columnExists(table, column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
-if (!existingTaskColumns.has('subject')) {
-  db.exec('ALTER TABLE tasks ADD COLUMN subject TEXT');
-}
+
+addColumnIfMissing('campaigns', 'entities', "TEXT NOT NULL DEFAULT '[]'");
+addColumnIfMissing('campaigns', 'results', 'TEXT');
+addColumnIfMissing('campaigns', 'created_at', "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'");
+addColumnIfMissing('campaigns', 'updated_at', "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'");
+// Nullable now so a later per-person to-do phase doesn't need a schema change.
+addColumnIfMissing('tasks', 'assigned_to', 'TEXT');
+// Calendar/send-log fields — see the Calendar Improvements brief.
+addColumnIfMissing('tasks', 'type', "TEXT NOT NULL DEFAULT 'task'");
+addColumnIfMissing('tasks', 'recipients', 'INTEGER');
+addColumnIfMissing('tasks', 'subject', 'TEXT');
 
 export default db;

@@ -1,32 +1,11 @@
-// Client for the AI Office Actions API (backend/). This is the ONLY place in
-// the frontend that talks to the backend — the dashboard and Claude both go
-// through the same validated, audited action service, just via different
-// callers (source.type: 'dashboard' vs 'claude').
+// Client for the AI Office backend (backend/). This is the ONLY place in the
+// frontend that talks to the backend for task writes — the dashboard and
+// Claude both go through the same validated, audited action service, just
+// via different callers (source.type: 'dashboard' vs 'claude').
+import { apiFetch, ApiError } from './apiConfig';
 
-const API_URL_KEY = 'ai-office-actions-api-url';
-const API_KEY_KEY = 'ai-office-actions-api-key';
-
-const DEFAULT_API_URL = 'https://ai-office-production-2f2c.up.railway.app';
-
-export function getApiUrl(): string {
-  return localStorage.getItem(API_URL_KEY) || DEFAULT_API_URL;
-}
-
-export function setApiUrl(url: string) {
-  localStorage.setItem(API_URL_KEY, url.trim().replace(/\/+$/, ''));
-}
-
-export function getApiKey(): string {
-  return localStorage.getItem(API_KEY_KEY) || '';
-}
-
-export function setApiKey(key: string) {
-  localStorage.setItem(API_KEY_KEY, key.trim());
-}
-
-export function isActionsApiConfigured(): boolean {
-  return Boolean(getApiUrl() && getApiKey());
-}
+export { checkHealth } from './apiConfig';
+export { ApiError as ActionsApiError };
 
 interface ActionRequestOptions {
   requestId?: string;
@@ -44,96 +23,61 @@ export interface ActionResponse<T = unknown> {
   error?: string;
 }
 
-export class ActionsApiError extends Error {
-  constructor(message: string, public status?: number) {
-    super(message);
-    this.name = 'ActionsApiError';
-  }
-}
-
 async function callAction<T = unknown>(
   action: string,
   payload: Record<string, unknown>,
   options: ActionRequestOptions = {}
 ): Promise<ActionResponse<T>> {
-  const apiUrl = getApiUrl();
-  const apiKey = getApiKey();
-  if (!apiUrl || !apiKey) {
-    throw new ActionsApiError('Claude Actions integration is not connected. Set it up in Settings.');
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl}/api/actions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        action,
-        payload,
-        source: { type: 'dashboard' },
-        request_id: options.requestId,
-        confirmed: options.confirmed,
-      }),
-    });
-  } catch {
-    throw new ActionsApiError('Could not reach the AI Office backend. Check your connection.');
-  }
+  const response = await apiFetch('/api/actions', {
+    method: 'POST',
+    body: JSON.stringify({
+      action,
+      payload,
+      source: { type: 'dashboard' },
+      request_id: options.requestId,
+      confirmed: options.confirmed,
+    }),
+  });
 
   let body: ActionResponse<T>;
   try {
     body = await response.json();
   } catch {
-    throw new ActionsApiError('Unexpected response from the backend.', response.status);
+    throw new ApiError('Unexpected response from the backend.', response.status);
   }
 
   if (response.status === 401) {
-    throw new ActionsApiError('The stored API key was rejected. Check it in Settings.', 401);
+    throw new ApiError('Your session has expired. Please sign in again.', 401);
   }
   if (response.status === 429) {
-    throw new ActionsApiError('Too many requests — try again in a moment.', 429);
+    throw new ApiError('Too many requests — try again in a moment.', 429);
   }
 
   return body;
 }
 
-export async function fetchTasksFromApi(): Promise<any[]> {
-  const apiUrl = getApiUrl();
-  const apiKey = getApiKey();
-  if (!apiUrl || !apiKey) {
-    throw new ActionsApiError('Claude Actions integration is not connected.');
-  }
+export async function fetchTasksFromApi(filters?: { campaignId?: string; brand?: string }): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (filters?.campaignId) params.set('campaign_id', filters.campaignId);
+  if (filters?.brand) params.set('brand', filters.brand);
+  const qs = params.toString();
 
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl}/api/tasks`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-  } catch {
-    throw new ActionsApiError('Could not reach the AI Office backend. Check your connection.');
-  }
-
+  const response = await apiFetch(`/api/tasks${qs ? `?${qs}` : ''}`);
   if (response.status === 401) {
-    throw new ActionsApiError('The stored API key was rejected. Check it in Settings.', 401);
+    throw new ApiError('Your session has expired. Please sign in again.', 401);
   }
   if (!response.ok) {
-    throw new ActionsApiError('Failed to load tasks from the backend.', response.status);
+    throw new ApiError('Failed to load tasks from the backend.', response.status);
   }
 
   const body = await response.json();
   return body.result ?? [];
 }
 
-export async function checkHealth(): Promise<boolean> {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return false;
-  try {
-    const response = await fetch(`${apiUrl}/health`);
-    return response.ok;
-  } catch {
-    return false;
+export async function deleteTaskFromApi(taskId: string): Promise<void> {
+  const response = await apiFetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+  if (!response.ok) {
+    throw new ApiError('Failed to delete the task.', response.status);
   }
 }
 

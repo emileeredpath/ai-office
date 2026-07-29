@@ -1,6 +1,5 @@
 import db from './connection.js';
 import type { TaskRecord, TaskHistoryEntry } from '../types.js';
-import { SEED_TASKS } from './seedData.js';
 
 interface TaskRow {
   id: string;
@@ -22,6 +21,7 @@ interface TaskRow {
   last_brief_generated: string | null;
   source: string | null;
   source_conversation_id: string | null;
+  assigned_to: string | null;
   type: string;
   recipients: number | null;
   subject: string | null;
@@ -48,6 +48,7 @@ function rowToRecord(row: TaskRow): TaskRecord {
     lastBriefGenerated: row.last_brief_generated,
     source: row.source,
     sourceConversationId: row.source_conversation_id,
+    assignedTo: row.assigned_to,
     type: (row.type as TaskRecord['type']) || 'task',
     recipients: row.recipients,
     subject: row.subject,
@@ -76,17 +77,49 @@ export function insertTask(task: TaskRecord): void {
     `INSERT INTO tasks (
       id, title, notes, brand, status, priority, deadline, start_date, campaign_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
-      blocker_reason, last_brief_generated, source, source_conversation_id,
+      blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to,
       type, recipients, subject
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
-      @blockerReason, @lastBriefGenerated, @source, @sourceConversationId,
+      @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo,
       @type, @recipients, @subject)`
   ).run({
-    ...task,
+    id: task.id,
+    title: task.title,
+    notes: task.notes,
+    brand: task.brand,
+    status: task.status,
+    priority: task.priority,
+    deadline: task.deadline,
+    startDate: task.startDate,
+    campaignId: task.campaignId,
+    createdAt: task.createdAt,
+    completedAt: task.completedAt,
+    previousStatus: task.previousStatus,
     history: JSON.stringify(task.history),
     approvalRequired: task.approvalRequired ? 1 : 0,
+    approver: task.approver,
+    blockerReason: task.blockerReason,
+    lastBriefGenerated: task.lastBriefGenerated,
+    source: task.source,
+    sourceConversationId: task.sourceConversationId,
+    assignedTo: task.assignedTo ?? null,
+    type: task.type,
+    recipients: task.recipients,
+    subject: task.subject,
   });
+}
+
+export function deleteTaskRow(id: string): boolean {
+  const result = db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
+export function getTasksFiltered(filters: { campaignId?: string; brand?: string }): TaskRecord[] {
+  let tasks = getAllTasks();
+  if (filters.campaignId) tasks = tasks.filter((t) => t.campaignId === filters.campaignId);
+  if (filters.brand) tasks = tasks.filter((t) => t.brand === filters.brand);
+  return tasks;
 }
 
 export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRecord | undefined {
@@ -135,18 +168,4 @@ export function taskCountByStatus(status: string): number {
     count: number;
   };
   return row.count;
-}
-
-// A brand-new (or freshly-provisioned) database has no tasks in it — the
-// frontend's own seed data only ever lands in localStorage, never here. Load
-// the same real task list once so a newly connected Claude Actions
-// Integration has something other than an empty workspace to sync against.
-// No-ops once the table has any rows, so it never overwrites real data.
-export function seedTasksIfEmpty(): void {
-  const row = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as unknown as { count: number };
-  if (row.count > 0) return;
-  for (const task of SEED_TASKS) {
-    insertTask(task);
-  }
-  console.log(`Seeded ${SEED_TASKS.length} tasks into an empty database.`);
 }

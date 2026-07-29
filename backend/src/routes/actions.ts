@@ -5,6 +5,8 @@ import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
 
+const WRITE_ACTIONS = new Set(['create_task', 'update_task', 'complete_task']);
+
 const actionRequestSchema = z.object({
   action: z.string().min(1),
   payload: z.record(z.unknown()).default({}),
@@ -30,6 +32,11 @@ router.post('/', rateLimit, (req, res) => {
   }
 
   const { action, payload, source, request_id, confirmed } = parsed.data;
+
+  if (WRITE_ACTIONS.has(action) && req.sessionRole !== 'edit') {
+    res.status(403).json({ success: false, action, message: 'View-only access — this action requires edit access.' });
+    return;
+  }
 
   try {
     const result = executeAction({

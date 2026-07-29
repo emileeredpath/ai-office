@@ -5,6 +5,7 @@ import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDateShort } from '@/utils/dateUtils';
 import { CampaignResults } from '@/types/index';
 import { AddCampaignModal } from '@/components/campaigns/AddCampaignModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const EMPTY_RESULTS_FORM = {
   emailOpenRate: '',
@@ -21,6 +22,7 @@ export function CampaignsScreen() {
   const tasks = useAppStore((s) => s.tasks);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const updateCampaign = useAppStore((s) => s.updateCampaign);
+  const { isEditor } = useAuth();
 
   const [loggingCampaignId, setLoggingCampaignId] = useState<string | null>(null);
   const [resultsForm, setResultsForm] = useState(EMPTY_RESULTS_FORM);
@@ -98,10 +100,12 @@ export function CampaignsScreen() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary">Campaigns</h1>
-          <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
-            <Plus size={18} />
-            New campaign
-          </button>
+          {isEditor && (
+            <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
+              <Plus size={18} />
+              New campaign
+            </button>
+          )}
         </div>
 
         {/* Campaign Grid */}

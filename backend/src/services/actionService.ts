@@ -196,6 +196,7 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     type: input.type ?? 'task',
     recipients: input.recipients ?? null,
     subject: input.subject ?? null,
+    assignedTo: null,
   };
 
   insertTask(task);

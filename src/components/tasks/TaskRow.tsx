@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDate } from '@/utils/dateUtils';
 import { CheckCircle2, Circle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TaskRowProps {
   task: Task;
@@ -14,6 +15,7 @@ export function TaskRow({ task }: TaskRowProps) {
   const getCampaignById = useAppStore((s) => s.getCampaignById);
   const completeTask = useAppStore((s) => s.completeTask);
   const reopenTask = useAppStore((s) => s.reopenTask);
+  const { isEditor } = useAuth();
 
   const campaign = task.campaignId ? getCampaignById(task.campaignId) : null;
   const completed = task.status === 'complete';
@@ -47,9 +49,10 @@ export function TaskRow({ task }: TaskRowProps) {
       <td className="w-full" style={{ borderLeft: `3px solid ${priorityColor}` }}>
         <div className="flex items-center gap-3 pl-2">
           <button
-            onClick={handleToggleComplete}
-            title={completed ? 'Reopen task' : 'Mark complete'}
-            className="flex-shrink-0 text-text-secondary hover:text-success transition-colors"
+            onClick={isEditor ? handleToggleComplete : (e) => e.stopPropagation()}
+            title={isEditor ? (completed ? 'Reopen task' : 'Mark complete') : 'View only'}
+            disabled={!isEditor}
+            className={`flex-shrink-0 text-text-secondary transition-colors ${isEditor ? 'hover:text-success' : 'cursor-default'}`}
           >
             {completed ? (
               <CheckCircle2 size={20} className="text-success" />
