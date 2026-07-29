@@ -1,5 +1,6 @@
 import db from './connection.js';
 import type { TaskRecord, TaskHistoryEntry } from '../types.js';
+import { SEED_TASKS } from './seedData.js';
 
 interface TaskRow {
   id: string;
@@ -21,6 +22,9 @@ interface TaskRow {
   last_brief_generated: string | null;
   source: string | null;
   source_conversation_id: string | null;
+  type: string;
+  recipients: number | null;
+  subject: string | null;
 }
 
 function rowToRecord(row: TaskRow): TaskRecord {
@@ -44,6 +48,9 @@ function rowToRecord(row: TaskRow): TaskRecord {
     lastBriefGenerated: row.last_brief_generated,
     source: row.source,
     sourceConversationId: row.source_conversation_id,
+    type: (row.type as TaskRecord['type']) || 'task',
+    recipients: row.recipients,
+    subject: row.subject,
   };
 }
 
@@ -69,10 +76,12 @@ export function insertTask(task: TaskRecord): void {
     `INSERT INTO tasks (
       id, title, notes, brand, status, priority, deadline, start_date, campaign_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
-      blocker_reason, last_brief_generated, source, source_conversation_id
+      blocker_reason, last_brief_generated, source, source_conversation_id,
+      type, recipients, subject
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
-      @blockerReason, @lastBriefGenerated, @source, @sourceConversationId)`
+      @blockerReason, @lastBriefGenerated, @source, @sourceConversationId,
+      @type, @recipients, @subject)`
   ).run({
     ...task,
     history: JSON.stringify(task.history),
@@ -94,7 +103,7 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
       deadline = @deadline, start_date = @startDate, campaign_id = @campaignId,
       completed_at = @completedAt, previous_status = @previousStatus, history = @history,
       approval_required = @approvalRequired, approver = @approver, blocker_reason = @blockerReason,
-      last_brief_generated = @lastBriefGenerated
+      last_brief_generated = @lastBriefGenerated, type = @type, recipients = @recipients, subject = @subject
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -113,6 +122,9 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     approver: merged.approver,
     blockerReason: merged.blockerReason,
     lastBriefGenerated: merged.lastBriefGenerated,
+    type: merged.type,
+    recipients: merged.recipients,
+    subject: merged.subject,
   });
 
   return getTaskById(id);
@@ -123,4 +135,18 @@ export function taskCountByStatus(status: string): number {
     count: number;
   };
   return row.count;
+}
+
+// A brand-new (or freshly-provisioned) database has no tasks in it — the
+// frontend's own seed data only ever lands in localStorage, never here. Load
+// the same real task list once so a newly connected Claude Actions
+// Integration has something other than an empty workspace to sync against.
+// No-ops once the table has any rows, so it never overwrites real data.
+export function seedTasksIfEmpty(): void {
+  const row = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as unknown as { count: number };
+  if (row.count > 0) return;
+  for (const task of SEED_TASKS) {
+    insertTask(task);
+  }
+  console.log(`Seeded ${SEED_TASKS.length} tasks into an empty database.`);
 }

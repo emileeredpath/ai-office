@@ -22,7 +22,7 @@ function toToolResult(result: ActionResult) {
   };
 }
 
-const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl'] as const;
+const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
 const STATUSES = [
   'backlog',
   'not-started',
@@ -35,6 +35,7 @@ const STATUSES = [
   'complete',
 ] as const;
 const PRIORITIES = ['high', 'medium', 'low'] as const;
+const TASK_TYPES = ['task', 'email-send'] as const;
 
 export function createAiOfficeMcpServer(): McpServer {
   const server = new McpServer({
@@ -58,6 +59,9 @@ export function createAiOfficeMcpServer(): McpServer {
         campaign_id: z.string().optional(),
         confirm_duplicate: z.boolean().optional().describe('Set true to create even if a similar task already exists'),
         source_conversation_id: z.string().optional(),
+        type: z.enum(TASK_TYPES).optional().describe('Set to "email-send" to log a sent email rather than a general task — use with recipients so it shows on the send calendar'),
+        recipients: z.number().int().min(0).optional().describe('Recipient count, for an email-send'),
+        subject: z.string().optional().describe('Email subject line, for an email-send'),
       },
     },
     async (input) => {
@@ -85,6 +89,9 @@ export function createAiOfficeMcpServer(): McpServer {
         status: z.enum(STATUSES).optional(),
         deadline: z.string().optional(),
         campaign_id: z.string().nullable().optional(),
+        type: z.enum(TASK_TYPES).optional(),
+        recipients: z.number().int().min(0).nullable().optional(),
+        subject: z.string().nullable().optional(),
         confirmed: z.boolean().optional().describe('Set true only after the user has approved the previewed change'),
       },
     },
@@ -130,6 +137,7 @@ export function createAiOfficeMcpServer(): McpServer {
         query: z.string().optional().describe('Free-text search across title and notes'),
         status: z.enum(STATUSES).optional(),
         brand: z.enum(BRANDS).optional(),
+        type: z.enum(TASK_TYPES).optional().describe('Filter to "email-send" to list logged sends only'),
         limit: z.number().int().min(1).max(50).optional(),
       },
     },

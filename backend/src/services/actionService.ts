@@ -26,7 +26,7 @@ const ALLOWED_ACTIONS = new Set([
 // without the caller (Claude, on the user's behalf) explicitly confirming.
 const HIGH_RISK_ACTIONS = new Set(['complete_task', 'update_task']);
 
-const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl'] as const;
+const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
 const STATUSES = [
   'backlog',
   'not-started',
@@ -39,6 +39,7 @@ const STATUSES = [
   'complete',
 ] as const;
 const PRIORITIES = ['high', 'medium', 'low'] as const;
+const TASK_TYPES = ['task', 'email-send'] as const;
 
 const createTaskSchema = z.object({
   title: z.string().trim().min(1, 'title is required').max(300),
@@ -50,6 +51,9 @@ const createTaskSchema = z.object({
   campaign_id: z.string().optional(),
   source: z.string().max(100).optional(),
   source_conversation_id: z.string().max(200).optional(),
+  type: z.enum(TASK_TYPES).optional().describe('"email-send" marks this as a logged send rather than a general task'),
+  recipients: z.number().int().min(0).optional().describe('Recipient count for an email-send'),
+  subject: z.string().max(300).optional().describe('Email subject line for an email-send'),
 });
 
 const updateTaskSchema = z.object({
@@ -61,6 +65,9 @@ const updateTaskSchema = z.object({
   status: z.enum(STATUSES).optional(),
   deadline: z.string().optional(),
   campaign_id: z.string().nullable().optional(),
+  type: z.enum(TASK_TYPES).optional(),
+  recipients: z.number().int().min(0).nullable().optional(),
+  subject: z.string().max(300).nullable().optional(),
 });
 
 const completeTaskSchema = z.object({
@@ -71,6 +78,7 @@ const searchWorkspaceSchema = z.object({
   query: z.string().max(300).optional(),
   status: z.enum(STATUSES).optional(),
   brand: z.enum(BRANDS).optional(),
+  type: z.enum(TASK_TYPES).optional(),
   limit: z.number().int().min(1).max(50).optional(),
 });
 
@@ -185,6 +193,9 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     lastBriefGenerated: null,
     source: input.source ?? source?.type ?? 'claude',
     sourceConversationId: input.source_conversation_id ?? source?.conversationId ?? null,
+    type: input.type ?? 'task',
+    recipients: input.recipients ?? null,
+    subject: input.subject ?? null,
   };
 
   insertTask(task);
@@ -236,6 +247,9 @@ function doUpdateTask(payload: unknown, source: ActionSource | undefined, reques
   if (input.priority !== undefined) updates.priority = input.priority;
   if (input.deadline !== undefined) updates.deadline = input.deadline;
   if (input.campaign_id !== undefined) updates.campaignId = input.campaign_id;
+  if (input.type !== undefined) updates.type = input.type;
+  if (input.recipients !== undefined) updates.recipients = input.recipients;
+  if (input.subject !== undefined) updates.subject = input.subject;
   if (input.status !== undefined) {
     updates.status = input.status;
     if (input.status !== 'complete' && existing.status === 'complete') {
@@ -338,11 +352,12 @@ function doSearchWorkspace(payload: unknown): ActionResult {
   if (!parsed.success) {
     return { success: false, action: 'search_workspace', message: 'Invalid search parameters.', error: parsed.error.issues.map((i) => i.message).join('; ') };
   }
-  const { query, status, brand, limit = 20 } = parsed.data;
+  const { query, status, brand, type, limit = 20 } = parsed.data;
 
   let tasks = getAllTasks();
   if (status) tasks = tasks.filter((t) => t.status === status);
   if (brand) tasks = tasks.filter((t) => t.brand === brand);
+  if (type) tasks = tasks.filter((t) => t.type === type);
   if (query) {
     const q = query.toLowerCase();
     tasks = tasks.filter(
@@ -353,7 +368,18 @@ function doSearchWorkspace(payload: unknown): ActionResult {
   return {
     success: true,
     action: 'search_workspace',
-    result: { tasks: tasks.slice(0, limit).map((t) => ({ id: t.id, title: t.title, status: t.status, brand: t.brand, priority: t.priority, deadline: t.deadline })) },
+    result: {
+      tasks: tasks.slice(0, limit).map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        brand: t.brand,
+        priority: t.priority,
+        deadline: t.deadline,
+        type: t.type,
+        recipients: t.recipients,
+      })),
+    },
     message: `Found ${tasks.length} matching task(s).`,
   };
 }

@@ -13,6 +13,7 @@ const ENTITY_OPTIONS: { value: Brand; label: string }[] = [
   { value: 'radio-links', label: 'Radio Links' },
   { value: 'capcom', label: 'Capcom' },
   { value: 'ircl', label: 'IRCL' },
+  { value: 'idaro', label: 'IDARO' },
 ];
 
 export function CampaignDetailPanel() {

@@ -252,6 +252,12 @@ export function SettingsScreen() {
                 <span className="text-sm text-text-primary">IRCL Green</span>
               </div>
             </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded" style={{ backgroundColor: '#DB2777' }}></div>
+                <span className="text-sm text-text-primary">IDARO Pink</span>
+              </div>
+            </div>
           </div>
         </div>
 

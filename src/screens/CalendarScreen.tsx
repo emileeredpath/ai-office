@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Mail, Check } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
+import { Brand, Task } from '@/types/index';
 import {
   getDaysInMonth,
   getFirstDayOfMonth,
@@ -9,11 +10,30 @@ import {
   isSameDay,
 } from '@/utils/dateUtils';
 
+const BRAND_COLOR: Record<Brand, string> = {
+  mtech: '#0D1B2A',
+  brentwood: '#3B82F6',
+  'radio-links': '#0F6E56',
+  capcom: '#534AB7',
+  ircl: '#1D9E75',
+  idaro: '#DB2777',
+};
+
+const BRAND_LABEL: Record<Brand, string> = {
+  mtech: 'MTech',
+  brentwood: 'Brentwood',
+  'radio-links': 'Radio Links',
+  capcom: 'Capcom',
+  ircl: 'IRCL',
+  idaro: 'IDARO',
+};
+
 export function CalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const tasks = useAppStore((s) => s.tasks);
   const campaigns = useAppStore((s) => s.campaigns);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
+  const selectTask = useAppStore((s) => s.selectTask);
 
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
@@ -28,11 +48,11 @@ export function CalendarScreen() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
-  const getTasksForDate = (day: number) => {
+  // Show every task/send with a deadline on this day, whether complete or not —
+  // a completed send is the whole point of a send calendar, so it must stay visible.
+  const getTasksForDate = (day: number): Task[] => {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    return tasks.filter(
-      (t) => t.deadline && isSameDay(new Date(t.deadline), date) && t.status !== 'complete',
-    );
+    return tasks.filter((t) => t.deadline && isSameDay(new Date(t.deadline), date));
   };
 
   const today = new Date();
@@ -50,20 +70,39 @@ export function CalendarScreen() {
     );
   };
 
-  const getCampaignsForDay = (day: number) => {
+  // Toned down per the brief: campaigns no longer paint every day they span —
+  // the name only appears on the day the campaign actually starts.
+  const getCampaignsStartingOnDay = (day: number) => {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    return campaigns.filter(
-      (c) => new Date(c.startDate) <= date && new Date(c.endDate) >= date,
-    );
+    return campaigns.filter((c) => isSameDay(new Date(c.startDate), date));
   };
+
+  // Monthly sends summary — completed email-sends with a deadline in the visible month.
+  const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  const sendsThisMonth = tasks.filter(
+    (t) =>
+      t.type === 'email-send' &&
+      t.status === 'complete' &&
+      t.deadline &&
+      new Date(t.deadline) >= monthStart &&
+      new Date(t.deadline) <= monthEnd,
+  );
+  const totalRecipients = sendsThisMonth.reduce((sum, t) => sum + (t.recipients || 0), 0);
 
   return (
     <div className="flex-1 overflow-y-auto p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-2">
           <h1 className="text-3xl font-bold text-text-primary">Calendar</h1>
         </div>
+        {sendsThisMonth.length > 0 && (
+          <p className="text-sm text-text-secondary mb-6">
+            {getMonthName(currentDate.getMonth())}: {sendsThisMonth.length} send
+            {sendsThisMonth.length === 1 ? '' : 's'} · {totalRecipients.toLocaleString()} recipients
+          </p>
+        )}
 
         {/* Campaign Timeline */}
         {getActiveCampaigns().length > 0 && (
@@ -71,10 +110,14 @@ export function CalendarScreen() {
             <h3 className="text-sm font-semibold text-text-secondary mb-3 px-1">Active Campaigns</h3>
             <div className="space-y-2">
               {getActiveCampaigns().map((campaign) => (
-                <div key={campaign.id} className="flex items-center gap-2 px-2 py-1">
+                <button
+                  key={campaign.id}
+                  onClick={() => selectCampaign(campaign.id)}
+                  className="flex items-center gap-2 px-2 py-1 w-full text-left"
+                >
                   <BrandBadge brand={campaign.brand} />
                   <span className="text-sm text-text-primary flex-1">{campaign.name}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -110,62 +153,90 @@ export function CalendarScreen() {
             {emptyDays.map((i) => (
               <div
                 key={`empty-${i}`}
-                className="p-4 min-h-[100px] bg-surface border border-border"
+                className="p-3 min-h-[112px] bg-surface border border-border"
               ></div>
             ))}
 
             {/* Days with tasks */}
             {daysArray.map((day) => {
               const dayTasks = getTasksForDate(day);
-              const dayCampaigns = getCampaignsForDay(day);
+              const startingCampaigns = getCampaignsStartingOnDay(day);
               const isToday = todayInThisMonth === day;
 
               return (
                 <div
                   key={day}
-                  className={`p-4 min-h-[100px] border border-border ${
+                  className={`p-3 min-h-[112px] border border-border ${
                     isToday ? 'bg-blue-50' : ''
                   }`}
                 >
-                  <div className={`font-semibold mb-2 ${isToday ? 'text-accent' : 'text-text-primary'}`}>
+                  <div className={`font-semibold mb-1.5 ${isToday ? 'text-accent' : 'text-text-primary'}`}>
                     {day}
                   </div>
 
-                  {/* Campaign bars — one stacked row per campaign covering this day */}
-                  {dayCampaigns.length > 0 && (
-                    <div className="flex flex-col gap-1 mb-2">
-                      {dayCampaigns.slice(0, 3).map((campaign) => (
+                  {/* Campaign start markers — name only appears on the day it kicks off */}
+                  {startingCampaigns.length > 0 && (
+                    <div className="flex flex-col gap-1 mb-1.5">
+                      {startingCampaigns.map((campaign) => (
                         <button
                           key={campaign.id}
                           onClick={(e) => {
                             e.stopPropagation();
                             selectCampaign(campaign.id);
                           }}
-                          className="h-1.5 w-full rounded-sm cursor-pointer"
-                          style={{ backgroundColor: campaign.colour, border: 'none', padding: 0 }}
-                          title={campaign.name}
-                        />
+                          className="text-[10px] font-medium px-1.5 py-0.5 rounded truncate text-left"
+                          style={{
+                            backgroundColor: `${campaign.colour}1A`,
+                            color: campaign.colour,
+                            border: `1px solid ${campaign.colour}40`,
+                          }}
+                          title={`${campaign.name} starts today`}
+                        >
+                          ▶ {campaign.name}
+                        </button>
                       ))}
-                      {dayCampaigns.length > 3 && (
-                        <div className="text-[10px] text-text-secondary">
-                          +{dayCampaigns.length - 3} more
-                        </div>
-                      )}
                     </div>
                   )}
 
                   <div className="space-y-1">
-                    {dayTasks.slice(0, 3).map((task) => (
-                      <div
-                        key={task.id}
-                        className="text-xs p-1 rounded text-accent truncate"
-                        style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}
-                      >
-                        {task.title}
-                      </div>
-                    ))}
-                    {dayTasks.length > 3 && (
-                      <div className="text-xs text-text-secondary">+{dayTasks.length - 3} more</div>
+                    {dayTasks.slice(0, 5).map((task) => {
+                      const color = BRAND_COLOR[task.brand];
+                      const completed = task.status === 'complete';
+                      const isSend = task.type === 'email-send';
+
+                      return (
+                        <button
+                          key={task.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectTask(task.id);
+                          }}
+                          className="text-xs p-1 rounded truncate w-full text-left flex items-center gap-1"
+                          style={{
+                            backgroundColor: `${color}1A`,
+                            borderLeft: `2px solid ${color}`,
+                            opacity: completed && !isSend ? 0.6 : 1,
+                          }}
+                          title={isSend ? `${BRAND_LABEL[task.brand]} · ${(task.recipients || 0).toLocaleString()} recipients` : task.title}
+                        >
+                          {isSend && <Mail size={10} style={{ flexShrink: 0, color }} />}
+                          <span
+                            className="truncate"
+                            style={{
+                              color,
+                              textDecoration: completed && !isSend ? 'line-through' : 'none',
+                            }}
+                          >
+                            {isSend
+                              ? `${BRAND_LABEL[task.brand]} · ${(task.recipients || 0).toLocaleString()}`
+                              : task.title}
+                          </span>
+                          {completed && <Check size={10} style={{ flexShrink: 0, color, marginLeft: 'auto' }} />}
+                        </button>
+                      );
+                    })}
+                    {dayTasks.length > 5 && (
+                      <div className="text-xs text-text-secondary">+{dayTasks.length - 5} more</div>
                     )}
                   </div>
                 </div>

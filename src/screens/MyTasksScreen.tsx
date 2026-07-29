@@ -68,6 +68,7 @@ export function MyTasksScreen() {
     'radio-links': 'Radio Links',
     'capcom': 'Capcom',
     'ircl': 'IRCL',
+    'idaro': 'IDARO',
   };
 
   const priorityLabels: Record<string, string> = {
@@ -109,6 +110,7 @@ export function MyTasksScreen() {
               <option value="radio-links">Radio Links</option>
               <option value="capcom">Capcom</option>
               <option value="ircl">IRCL</option>
+              <option value="idaro">IDARO</option>
             </select>
 
             <select

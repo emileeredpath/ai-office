@@ -72,6 +72,9 @@ const hydrateTask = (task: any): Task => ({
     ...entry,
     timestamp: toDate(entry.timestamp) || new Date(),
   })),
+  type: task.type ?? 'task',
+  recipients: task.recipients ?? null,
+  subject: task.subject ?? null,
 });
 
 const hydrateDates = (data: any) => {

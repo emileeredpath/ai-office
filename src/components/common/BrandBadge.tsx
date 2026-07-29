@@ -10,6 +10,7 @@ const BRAND_LABELS: Record<Brand, string> = {
   'radio-links': 'Radio Links',
   'capcom': 'Capcom',
   'ircl': 'IRCL',
+  'idaro': 'IDARO',
 };
 
 export function BrandBadge({ brand }: BrandBadgeProps) {

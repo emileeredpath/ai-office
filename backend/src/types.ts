@@ -1,4 +1,6 @@
-export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl';
+export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro';
+
+export type TaskType = 'task' | 'email-send';
 
 export type TaskStatus =
   | 'backlog'
@@ -41,6 +43,9 @@ export interface TaskRecord {
   lastBriefGenerated: string | null;
   source: string | null;
   sourceConversationId: string | null;
+  type: TaskType;
+  recipients: number | null;
+  subject: string | null;
 }
 
 export interface ActionSource {

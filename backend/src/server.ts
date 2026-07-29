@@ -8,9 +8,11 @@ import tasksRouter from './routes/tasks.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
 import { initMarketingTables } from './db/marketingRepository.js';
+import { seedTasksIfEmpty } from './db/taskRepository.js';
 
 const app = express();
 initMarketingTables();
+seedTasksIfEmpty();
 const PORT = process.env.PORT || 3001;
 
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')

@@ -13,6 +13,7 @@ const BRAND_COLOURS: Record<Brand, string> = {
   'radio-links': '#0F6E56',
   capcom: '#534AB7',
   ircl: '#1D9E75',
+  idaro: '#DB2777',
 };
 
 export function AddCampaignModal({ onClose }: AddCampaignModalProps) {
@@ -105,6 +106,7 @@ export function AddCampaignModal({ onClose }: AddCampaignModalProps) {
               <option value="radio-links">Radio Links</option>
               <option value="capcom">Capcom</option>
               <option value="ircl">IRCL</option>
+              <option value="idaro">IDARO</option>
             </select>
           </div>
 

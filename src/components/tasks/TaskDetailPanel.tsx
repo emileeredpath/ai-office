@@ -140,6 +140,7 @@ export function TaskDetailPanel() {
               <option value="radio-links">Radio Links</option>
               <option value="capcom">Capcom</option>
               <option value="ircl">IRCL</option>
+              <option value="idaro">IDARO</option>
             </select>
           </div>
 

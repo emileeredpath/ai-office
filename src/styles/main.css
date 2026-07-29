@@ -18,6 +18,7 @@
   --color-brand-radio-links: #0f6e56;
   --color-brand-capcom: #534ab7;
   --color-brand-ircl: #1d9e75;
+  --color-brand-idaro: #db2777;
 
   /* Status colors */
   --color-status-in-progress: #3b82f6;
@@ -433,6 +434,11 @@ body {
 
 .badge-brand-ircl {
   background-color: var(--color-brand-ircl);
+  color: white;
+}
+
+.badge-brand-idaro {
+  background-color: var(--color-brand-idaro);
   color: white;
 }
 

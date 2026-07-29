@@ -1,4 +1,6 @@
-export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl';
+export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro';
+
+export type TaskType = 'task' | 'email-send';
 
 export type TaskStatus =
   | 'backlog'
@@ -55,6 +57,9 @@ export interface Task {
   approver: 'john' | 'lydia' | 'customer' | null;
   blockerReason: string | null;
   lastBriefGenerated: string | null;
+  type: TaskType;
+  recipients: number | null;
+  subject: string | null;
 }
 
 export interface CampaignResults {

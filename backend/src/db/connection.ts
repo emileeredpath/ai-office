@@ -33,7 +33,10 @@ db.exec(`
     blocker_reason TEXT,
     last_brief_generated TEXT,
     source TEXT,
-    source_conversation_id TEXT
+    source_conversation_id TEXT,
+    type TEXT NOT NULL DEFAULT 'task',
+    recipients INTEGER,
+    subject TEXT
   );
 
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -136,5 +139,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_daily_dashboard_date ON daily_dashboard_snapshot(date);
   CREATE INDEX IF NOT EXISTS idx_quick_capture_created ON quick_capture_items(created_at);
 `);
+
+// CREATE TABLE IF NOT EXISTS above only defines the shape for a brand-new
+// database — a tasks table that already existed on disk (e.g. a live Railway
+// volume from before these columns existed) needs them added explicitly.
+const existingTaskColumns = new Set(
+  (db.prepare('PRAGMA table_info(tasks)').all() as unknown as { name: string }[]).map((c) => c.name)
+);
+if (!existingTaskColumns.has('type')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'task'`);
+}
+if (!existingTaskColumns.has('recipients')) {
+  db.exec('ALTER TABLE tasks ADD COLUMN recipients INTEGER');
+}
+if (!existingTaskColumns.has('subject')) {
+  db.exec('ALTER TABLE tasks ADD COLUMN subject TEXT');
+}
 
 export default db;

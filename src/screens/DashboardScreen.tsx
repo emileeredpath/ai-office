@@ -32,6 +32,7 @@ const BRAND_COLORS: Record<string, string> = {
   'radio-links': '#0F6E56',
   capcom: '#534AB7',
   ircl: '#1D9E75',
+  idaro: '#DB2777',
 };
 
 const BRAND_LABELS: Record<string, string> = {
@@ -40,6 +41,7 @@ const BRAND_LABELS: Record<string, string> = {
   'radio-links': 'Radio Links',
   capcom: 'Capcom',
   ircl: 'IRCL',
+  idaro: 'IDARO',
 };
 
 function exportTasksAsCSV(tasks: Task[], campaigns: Campaign[]) {
