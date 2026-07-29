@@ -2,31 +2,14 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Mail, Check } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
-import { Brand, Task } from '@/types/index';
+import { Task } from '@/types/index';
+import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import {
   getDaysInMonth,
   getFirstDayOfMonth,
   getMonthName,
   isSameDay,
 } from '@/utils/dateUtils';
-
-const BRAND_COLOR: Record<Brand, string> = {
-  mtech: '#0D1B2A',
-  brentwood: '#3B82F6',
-  'radio-links': '#0F6E56',
-  capcom: '#534AB7',
-  ircl: '#1D9E75',
-  idaro: '#DB2777',
-};
-
-const BRAND_LABEL: Record<Brand, string> = {
-  mtech: 'MTech',
-  brentwood: 'Brentwood',
-  'radio-links': 'Radio Links',
-  capcom: 'Capcom',
-  ircl: 'IRCL',
-  idaro: 'IDARO',
-};
 
 export function CalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());

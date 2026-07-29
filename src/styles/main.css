@@ -11,14 +11,23 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
-  /* Brand colors */
-  --color-brand-mtech: #0d1b2a;
+  /* Brand colors — from MTech Brand Guidelines (Design System brief) */
+  --color-brand-mtech: #1d2a3a;
   --color-brand-mtech-accent: #f97031;
-  --color-brand-brentwood: #3b82f6;
-  --color-brand-radio-links: #0f6e56;
-  --color-brand-capcom: #534ab7;
-  --color-brand-ircl: #1d9e75;
+  --color-brand-brentwood: #3a82c6;
+  --color-brand-brentwood-secondary: #45b2c4;
+  --color-brand-radio-links: #23772d;
+  --color-brand-radio-links-secondary: #84b93a;
+  --color-brand-capcom: #524495;
+  --color-brand-capcom-secondary: #5785c4;
+  --color-brand-ircl: #251f4b;
+  --color-brand-ircl-secondary: #3a82c6;
   --color-brand-idaro: #db2777;
+  --color-brand-cta: #ef5f12;
+
+  /* Typography */
+  --font-heading: 'Ubuntu', sans-serif;
+  --font-body: 'Aptos', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
 
   /* Status colors */
   --color-status-in-progress: #3b82f6;
@@ -40,13 +49,35 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
 }
 
 body {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   line-height: 1.5;
+}
+
+/* Headings default to Ubuntu Bold; any component setting its own font-size
+   via a Tailwind utility (text-3xl etc) keeps that size — this only supplies
+   the family + weight so headings read consistently across the app. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 22px;
+}
+
+h3 {
+  font-size: 18px;
 }
 
 /* Utility classes */

@@ -2,19 +2,11 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { Campaign, Brand, CampaignStatus } from '@/types/index';
+import { BRAND_COLOR as BRAND_COLOURS } from '@/utils/brandColors';
 
 interface AddCampaignModalProps {
   onClose: () => void;
 }
-
-const BRAND_COLOURS: Record<Brand, string> = {
-  mtech: '#0D1B2A',
-  brentwood: '#3B82F6',
-  'radio-links': '#0F6E56',
-  capcom: '#534AB7',
-  ircl: '#1D9E75',
-  idaro: '#DB2777',
-};
 
 export function AddCampaignModal({ onClose }: AddCampaignModalProps) {
   const addCampaign = useAppStore((s) => s.addCampaign);
