@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical } from 'lucide-react';
+import { X, MoreVertical, ArrowUpDown } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { useAppStore } from '@/store/useAppStore';
-import { StatusBadge } from '@/components/common/StatusBadge';
 import { BrandBadge } from '@/components/common/BrandBadge';
-import { formatDate, formatDateShort } from '@/utils/dateUtils';
-import { Brand } from '@/types/index';
+import { formatDateShort } from '@/utils/dateUtils';
+import { Brand, Task } from '@/types/index';
 import '@/styles/campaignDetailPanel.css';
+
+type SortKey = 'date' | 'cost' | 'recipients';
 
 const ENTITY_OPTIONS: { value: Brand; label: string }[] = [
   { value: 'mtech', label: 'MTech Group' },
@@ -28,12 +30,52 @@ export function CampaignDetailPanel() {
   const campaignTasks = campaign ? tasks.filter((t) => t.campaignId === campaign.id) : [];
 
   const [notes, setNotes] = useState(campaign?.notes || '');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     setNotes(campaign?.notes || '');
   }, [selectedCampaignId]);
 
   if (!campaign) return null;
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortValue = (t: Task, key: SortKey): number => {
+    if (key === 'date') return t.deadline ? new Date(t.deadline).getTime() : 0;
+    if (key === 'cost') return t.cost ?? 0;
+    return t.recipients ?? 0;
+  };
+
+  const sortedSends = [...campaignTasks].sort((a, b) => {
+    const diff = sortValue(a, sortKey) - sortValue(b, sortKey);
+    return sortDir === 'asc' ? diff : -diff;
+  });
+
+  // Financial/reach totals — sum only tasks that actually carry the field,
+  // so a campaign with a mix of costed and uncosted sends doesn't understate.
+  const sendTasks = campaignTasks.filter((t) => t.type === 'email-send');
+  const totalRecipients = sendTasks.reduce((sum, t) => sum + (t.recipients || 0), 0);
+  const totalTaskCost = campaignTasks.reduce((sum, t) => sum + (t.cost || 0), 0);
+  const spendPerRecipient = totalRecipients > 0 && campaign.spend > 0 ? campaign.spend / totalRecipients : null;
+  const sendDates = sendTasks
+    .filter((t) => t.deadline)
+    .map((t) => new Date(t.deadline as Date).getTime())
+    .sort((a, b) => a - b);
+  const dateRange =
+    sendDates.length > 0
+      ? { first: new Date(sendDates[0]), last: new Date(sendDates[sendDates.length - 1]) }
+      : null;
+  const costChartData = sendTasks
+    .filter((t) => t.cost != null)
+    .map((t) => ({ name: t.title.length > 18 ? `${t.title.slice(0, 16)}…` : t.title, cost: t.cost || 0 }));
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newNotes = e.target.value;
@@ -100,6 +142,54 @@ export function CampaignDetailPanel() {
               className="input"
             />
           </div>
+        </div>
+
+        {/* Financial summary — auto-summed from linked task costs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '1.5rem',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.5rem',
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: '8px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+              Total actual spend
+            </p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+              £{campaign.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            {campaign.budget != null && (
+              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                of £{campaign.budget.toLocaleString('en-GB')} budget
+                {campaign.budget > 0 && ` (${Math.round((campaign.spend / campaign.budget) * 100)}%)`}
+              </p>
+            )}
+          </div>
+          {spendPerRecipient != null && (
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                Cost per recipient
+              </p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                £{spendPerRecipient.toFixed(3)}
+              </p>
+            </div>
+          )}
+          {totalRecipients > 0 && (
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                Total recipients
+              </p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                {totalRecipients.toLocaleString()}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Sends from — multi-entity */}
@@ -285,20 +375,80 @@ export function CampaignDetailPanel() {
         {/* Divider */}
         <div className="campaign-detail-divider"></div>
 
-        {/* Linked Tasks */}
+        {/* Linked Tasks / sends breakdown */}
         <div>
-          <h3 className="campaign-detail-section-title">LINKED TASKS</h3>
+          <h3 className="campaign-detail-section-title">SENDS &amp; TASKS</h3>
           {campaignTasks.length > 0 ? (
-            <div className="space-y-2">
-              {campaignTasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between p-2 bg-surface rounded">
-                  <div>
-                    <p className="text-sm text-text-primary font-medium">{task.title}</p>
-                    <p className="text-xs text-text-secondary">{task.brand} • {task.status}</p>
-                  </div>
+            <>
+              <p className="text-xs text-text-secondary mb-3">
+                {sendTasks.length} send{sendTasks.length === 1 ? '' : 's'}
+                {totalRecipients > 0 && ` · ${totalRecipients.toLocaleString()} recipients`}
+                {totalTaskCost > 0 && ` · £${totalTaskCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                {dateRange && ` · ${formatDateShort(dateRange.first)} – ${formatDateShort(dateRange.last)}`}
+              </p>
+
+              {costChartData.length > 1 && (
+                <div style={{ height: 24 * costChartData.length + 20, marginBottom: '1rem' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={costChartData} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
+                      <XAxis type="number" hide />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        width={110}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
+                      />
+                      <Tooltip formatter={(value: number) => [`£${value.toFixed(2)}`, 'Cost']} />
+                      <Bar dataKey="cost" fill="#3B82F6" radius={3} barSize={14} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+              )}
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Send</th>
+                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('date')}>
+                        <span className="inline-flex items-center gap-1">Date <ArrowUpDown size={11} /></span>
+                      </th>
+                      <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('recipients')}>
+                        <span className="inline-flex items-center gap-1">Recipients <ArrowUpDown size={11} /></span>
+                      </th>
+                      <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('cost')}>
+                        <span className="inline-flex items-center gap-1">Cost <ArrowUpDown size={11} /></span>
+                      </th>
+                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedSends.map((task) => (
+                      <tr key={task.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          <div className="flex items-center gap-1.5">
+                            <BrandBadge brand={task.brand} />
+                            <span className="text-text-primary">{task.title}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)' }}>
+                          {task.deadline ? formatDateShort(task.deadline) : '—'}
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                          {task.recipients != null ? task.recipients.toLocaleString() : '—'}
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                          {task.cost != null ? `£${task.cost.toFixed(2)}` : '—'}
+                        </td>
+                        <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)' }}>{task.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <p className="text-sm text-text-secondary">No tasks linked to this campaign</p>
           )}

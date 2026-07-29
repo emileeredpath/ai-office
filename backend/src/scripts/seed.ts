@@ -99,7 +99,10 @@ const seedCampaigns = [
     primaryIndustry: 'Existing Customers',
     secondaryIndustry: 'Service & Repair',
     theme: 'Quarterly service and repair reminder',
-    status: 'active' as const,
+    // All four linked sends went out and completed on 29 Jul — see the
+    // Campaigns History brief. Completed status is what puts it in the
+    // history/archive section of the Campaigns page.
+    status: 'completed' as const,
     startDate: '2026-07-29',
     endDate: '2026-07-29',
     budget: null,
