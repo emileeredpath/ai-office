@@ -37,7 +37,9 @@ db.exec(`
     type TEXT NOT NULL DEFAULT 'task',
     recipients INTEGER,
     subject TEXT,
-    assigned_to TEXT
+    assigned_to TEXT,
+    cost REAL,
+    currency TEXT
   );
 
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -169,5 +171,8 @@ addColumnIfMissing('tasks', 'assigned_to', 'TEXT');
 addColumnIfMissing('tasks', 'type', "TEXT NOT NULL DEFAULT 'task'");
 addColumnIfMissing('tasks', 'recipients', 'INTEGER');
 addColumnIfMissing('tasks', 'subject', 'TEXT');
+// Cost tracking — see the Calendar Improvements + Cost Tracking brief.
+addColumnIfMissing('tasks', 'cost', 'REAL');
+addColumnIfMissing('tasks', 'currency', 'TEXT');
 
 export default db;

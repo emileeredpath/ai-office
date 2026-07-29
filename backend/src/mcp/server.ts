@@ -248,6 +248,37 @@ export function createAiOfficeMcpServer(): McpServer {
     }
   );
 
+  server.registerTool(
+    'ai_office_update_campaign',
+    {
+      title: 'Update a campaign in AI Office',
+      description:
+        'Update fields on an existing campaign, including its Actual Spend (£). This is a higher-risk action: the first call (without confirmed: true) returns a preview instead of applying it — show that to the user, then re-call with confirmed: true once they agree. Note: actualSpend is overwritten automatically the next time a linked task\'s cost changes (via ai_office_create_task / ai_office_update_task with campaign_id set) — prefer setting task costs over setting actualSpend directly where a task exists for the spend.',
+      inputSchema: {
+        campaign_id: z.string().min(1),
+        name: z.string().optional(),
+        status: z.enum(['planning', 'active', 'on-hold', 'completed']).optional(),
+        startDate: z.string().optional().describe('ISO date, e.g. 2026-08-01'),
+        endDate: z.string().optional().describe('ISO date, e.g. 2026-09-30'),
+        budget: z.number().nullable().optional(),
+        actualSpend: z.number().optional().describe('Actual spend in £ — the "Actual Spend (£)" field on the campaign card'),
+        entities: z.array(z.enum(BRANDS)).optional(),
+        colour: z.string().optional().describe('Hex colour for the campaign, e.g. #3B82F6'),
+        notes: z.string().optional(),
+        confirmed: z.boolean().optional().describe('Set true only after the user has approved the previewed change'),
+      },
+    },
+    async ({ confirmed, ...payload }) => {
+      const result = executeAction({
+        action: 'update_campaign',
+        payload,
+        source: { type: 'claude' },
+        confirmed,
+      });
+      return toToolResult(result);
+    }
+  );
+
   // MarketingOS Tools
   server.registerTool(
     'marketingos_get_objectives',

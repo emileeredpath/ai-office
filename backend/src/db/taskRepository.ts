@@ -25,6 +25,8 @@ interface TaskRow {
   type: string;
   recipients: number | null;
   subject: string | null;
+  cost: number | null;
+  currency: string | null;
 }
 
 function rowToRecord(row: TaskRow): TaskRecord {
@@ -52,6 +54,8 @@ function rowToRecord(row: TaskRow): TaskRecord {
     type: (row.type as TaskRecord['type']) || 'task',
     recipients: row.recipients,
     subject: row.subject,
+    cost: row.cost,
+    currency: row.currency,
   };
 }
 
@@ -78,11 +82,11 @@ export function insertTask(task: TaskRecord): void {
       id, title, notes, brand, status, priority, deadline, start_date, campaign_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
       blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to,
-      type, recipients, subject
+      type, recipients, subject, cost, currency
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
       @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo,
-      @type, @recipients, @subject)`
+      @type, @recipients, @subject, @cost, @currency)`
   ).run({
     id: task.id,
     title: task.title,
@@ -107,6 +111,8 @@ export function insertTask(task: TaskRecord): void {
     type: task.type,
     recipients: task.recipients,
     subject: task.subject,
+    cost: task.cost,
+    currency: task.currency,
   });
 }
 
@@ -136,7 +142,8 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
       deadline = @deadline, start_date = @startDate, campaign_id = @campaignId,
       completed_at = @completedAt, previous_status = @previousStatus, history = @history,
       approval_required = @approvalRequired, approver = @approver, blocker_reason = @blockerReason,
-      last_brief_generated = @lastBriefGenerated, type = @type, recipients = @recipients, subject = @subject
+      last_brief_generated = @lastBriefGenerated, type = @type, recipients = @recipients, subject = @subject,
+      cost = @cost, currency = @currency
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -158,6 +165,8 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     type: merged.type,
     recipients: merged.recipients,
     subject: merged.subject,
+    cost: merged.cost,
+    currency: merged.currency,
   });
 
   return getTaskById(id);

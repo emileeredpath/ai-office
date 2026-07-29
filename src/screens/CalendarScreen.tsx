@@ -89,6 +89,7 @@ export function CalendarScreen() {
       new Date(t.deadline) <= monthEnd,
   );
   const totalRecipients = sendsThisMonth.reduce((sum, t) => sum + (t.recipients || 0), 0);
+  const totalCost = sendsThisMonth.reduce((sum, t) => sum + (t.cost || 0), 0);
 
   return (
     <div className="flex-1 overflow-y-auto p-8">
@@ -101,6 +102,7 @@ export function CalendarScreen() {
           <p className="text-sm text-text-secondary mb-6">
             {getMonthName(currentDate.getMonth())}: {sendsThisMonth.length} send
             {sendsThisMonth.length === 1 ? '' : 's'} · {totalRecipients.toLocaleString()} recipients
+            {totalCost > 0 && <> · £{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>}
           </p>
         )}
 
@@ -217,7 +219,13 @@ export function CalendarScreen() {
                             borderLeft: `2px solid ${color}`,
                             opacity: completed && !isSend ? 0.6 : 1,
                           }}
-                          title={isSend ? `${BRAND_LABEL[task.brand]} · ${(task.recipients || 0).toLocaleString()} recipients` : task.title}
+                          title={
+                            isSend
+                              ? `${BRAND_LABEL[task.brand]} · ${(task.recipients || 0).toLocaleString()} recipients${
+                                  task.cost != null ? ` · £${task.cost.toFixed(2)}` : ''
+                                }`
+                              : task.title
+                          }
                         >
                           {isSend && <Mail size={10} style={{ flexShrink: 0, color }} />}
                           <span
@@ -228,7 +236,9 @@ export function CalendarScreen() {
                             }}
                           >
                             {isSend
-                              ? `${BRAND_LABEL[task.brand]} · ${(task.recipients || 0).toLocaleString()}`
+                              ? `${BRAND_LABEL[task.brand]} · ${(task.recipients || 0).toLocaleString()}${
+                                  task.cost != null ? ` · £${task.cost.toFixed(2)}` : ''
+                                }`
                               : task.title}
                           </span>
                           {completed && <Check size={10} style={{ flexShrink: 0, color, marginLeft: 'auto' }} />}

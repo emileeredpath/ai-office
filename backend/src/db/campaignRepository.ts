@@ -211,6 +211,19 @@ export function deleteCampaignRow(id: string): boolean {
   return result.changes > 0;
 }
 
+// Actual spend is preferably the sum of its tasks' costs (see the Calendar
+// Improvements + Cost Tracking brief) — called whenever a task's cost or
+// campaign link changes. A campaign with no costed tasks keeps whatever
+// spend was last set manually (via the dashboard or update_campaign), so
+// this never clobbers a manually-entered figure with a false zero.
+export function recalculateCampaignSpend(campaignId: string): CampaignRecord | undefined {
+  const row = db
+    .prepare(`SELECT SUM(cost) as total FROM tasks WHERE campaign_id = ? AND cost IS NOT NULL`)
+    .get(campaignId) as unknown as { total: number | null };
+  if (row.total === null) return getCampaignById(campaignId);
+  return updateCampaignRow(campaignId, { spend: row.total });
+}
+
 export function getCampaignProgress(id: string): { total: number; complete: number } {
   const row = db
     .prepare(

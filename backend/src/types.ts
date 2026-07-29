@@ -49,6 +49,12 @@ export interface TaskRecord {
   // Nullable and unused today — reserved for the per-person to-do list phase
   // so adding real user accounts later doesn't require a schema change.
   assignedTo: string | null;
+  // Spend for this item. Conventionally stored as the £ figure ready for
+  // display/summing — conversion (if the source invoice was in another
+  // currency) happens at point of entry, not in the app. `currency` just
+  // records what the original invoice was in, for audit purposes.
+  cost: number | null;
+  currency: string | null;
 }
 
 export interface ActionSource {

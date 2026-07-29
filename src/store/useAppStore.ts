@@ -71,6 +71,8 @@ const hydrateTask = (task: any): Task => ({
   type: task.type ?? 'task',
   recipients: task.recipients ?? null,
   subject: task.subject ?? null,
+  cost: task.cost ?? null,
+  currency: task.currency ?? null,
 });
 
 const hydrateCampaign = (campaign: any): Campaign => ({
@@ -157,6 +159,11 @@ export const useAppStore = create<AppState>((set, get) => {
           payload.deadline = updates.deadline ? updates.deadline.toISOString() : null;
         }
         if (updates.campaignId !== undefined) payload.campaign_id = updates.campaignId;
+        if (updates.type !== undefined) payload.type = updates.type;
+        if (updates.recipients !== undefined) payload.recipients = updates.recipients;
+        if (updates.subject !== undefined) payload.subject = updates.subject;
+        if (updates.cost !== undefined) payload.cost = updates.cost;
+        if (updates.currency !== undefined) payload.currency = updates.currency;
 
         const response = await updateTaskAction(id, payload);
         if (!response.success) {

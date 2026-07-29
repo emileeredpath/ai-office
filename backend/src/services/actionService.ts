@@ -8,6 +8,11 @@ import {
   insertTask,
   updateTaskRow,
 } from '../db/taskRepository.js';
+import {
+  getCampaignById,
+  updateCampaignRow,
+  recalculateCampaignSpend,
+} from '../db/campaignRepository.js';
 import type { ActionRequest, ActionResult, ActionSource, TaskRecord, TaskHistoryEntry } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -20,11 +25,12 @@ const ALLOWED_ACTIONS = new Set([
   'complete_task',
   'search_workspace',
   'get_workspace_context',
+  'update_campaign',
 ]);
 
 // Actions that mutate data and are not safe to silently retry/auto-apply
 // without the caller (Claude, on the user's behalf) explicitly confirming.
-const HIGH_RISK_ACTIONS = new Set(['complete_task', 'update_task']);
+const HIGH_RISK_ACTIONS = new Set(['complete_task', 'update_task', 'update_campaign']);
 
 const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
 const STATUSES = [
@@ -54,6 +60,8 @@ const createTaskSchema = z.object({
   type: z.enum(TASK_TYPES).optional().describe('"email-send" marks this as a logged send rather than a general task'),
   recipients: z.number().int().min(0).optional().describe('Recipient count for an email-send'),
   subject: z.string().max(300).optional().describe('Email subject line for an email-send'),
+  cost: z.number().min(0).optional().describe('Spend for this item, in £ — convert to GBP before passing this in if the source invoice was in another currency'),
+  currency: z.string().max(10).optional().describe('Original invoice currency, e.g. "USD" — for audit only, defaults to GBP'),
 });
 
 const updateTaskSchema = z.object({
@@ -68,6 +76,8 @@ const updateTaskSchema = z.object({
   type: z.enum(TASK_TYPES).optional(),
   recipients: z.number().int().min(0).nullable().optional(),
   subject: z.string().max(300).nullable().optional(),
+  cost: z.number().min(0).nullable().optional(),
+  currency: z.string().max(10).nullable().optional(),
 });
 
 const completeTaskSchema = z.object({
@@ -80,6 +90,21 @@ const searchWorkspaceSchema = z.object({
   brand: z.enum(BRANDS).optional(),
   type: z.enum(TASK_TYPES).optional(),
   limit: z.number().int().min(1).max(50).optional(),
+});
+
+const CAMPAIGN_STATUSES = ['planning', 'active', 'on-hold', 'completed'] as const;
+
+const updateCampaignSchema = z.object({
+  campaign_id: z.string().min(1, 'campaign_id is required'),
+  name: z.string().trim().min(1).max(300).optional(),
+  status: z.enum(CAMPAIGN_STATUSES).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  budget: z.number().nullable().optional(),
+  actualSpend: z.number().optional().describe('Actual spend in £ — the field shown as "Actual spend (£)" on the campaign card. Overwritten automatically the next time a linked task\'s cost changes, so prefer setting task costs where possible.'),
+  entities: z.array(z.enum(BRANDS)).optional(),
+  colour: z.string().max(20).optional(),
+  notes: z.string().max(10000).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -197,6 +222,8 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     recipients: input.recipients ?? null,
     subject: input.subject ?? null,
     assignedTo: null,
+    cost: input.cost ?? null,
+    currency: input.currency ?? (input.cost != null ? 'GBP' : null),
   };
 
   insertTask(task);
@@ -211,6 +238,10 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     confirmed: true,
     automatic: true,
   });
+
+  if (task.campaignId && task.cost != null) {
+    recalculateCampaignSpend(task.campaignId);
+  }
 
   return {
     success: true,
@@ -251,6 +282,13 @@ function doUpdateTask(payload: unknown, source: ActionSource | undefined, reques
   if (input.type !== undefined) updates.type = input.type;
   if (input.recipients !== undefined) updates.recipients = input.recipients;
   if (input.subject !== undefined) updates.subject = input.subject;
+  if (input.cost !== undefined) {
+    updates.cost = input.cost;
+    if (input.currency === undefined && input.cost != null && existing.currency == null) {
+      updates.currency = 'GBP';
+    }
+  }
+  if (input.currency !== undefined) updates.currency = input.currency;
   if (input.status !== undefined) {
     updates.status = input.status;
     if (input.status !== 'complete' && existing.status === 'complete') {
@@ -281,6 +319,16 @@ function doUpdateTask(payload: unknown, source: ActionSource | undefined, reques
     confirmed: true,
     automatic: false,
   });
+
+  // Keep campaign spend in sync with its tasks' costs whenever either the
+  // cost or the campaign link itself changes. Recompute both the old and
+  // new campaign if a task moved between them.
+  if (updates.cost !== undefined || updates.campaignId !== undefined) {
+    if (existing.campaignId) recalculateCampaignSpend(existing.campaignId);
+    if (updated.campaignId && updated.campaignId !== existing.campaignId) {
+      recalculateCampaignSpend(updated.campaignId);
+    }
+  }
 
   return {
     success: true,
@@ -379,9 +427,64 @@ function doSearchWorkspace(payload: unknown): ActionResult {
         deadline: t.deadline,
         type: t.type,
         recipients: t.recipients,
+        cost: t.cost,
+        campaignId: t.campaignId,
       })),
     },
     message: `Found ${tasks.length} matching task(s).`,
+  };
+}
+
+function doUpdateCampaign(payload: unknown, source: ActionSource | undefined, requestId: string | undefined, confirmed: boolean): ActionResult {
+  const parsed = updateCampaignSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'update_campaign', message: 'Invalid update data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const input = parsed.data;
+  const existing = getCampaignById(input.campaign_id);
+  if (!existing) {
+    return { success: false, action: 'update_campaign', message: `No campaign found with id ${input.campaign_id}.` };
+  }
+
+  if (!confirmed) {
+    return {
+      success: false,
+      action: 'update_campaign',
+      requires_confirmation: true,
+      message: `About to update "${existing.name}". Confirm to apply.`,
+      preview: { campaign_id: existing.id, current: existing, changes: input },
+    };
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.status !== undefined) updates.status = input.status;
+  if (input.startDate !== undefined) updates.startDate = input.startDate;
+  if (input.endDate !== undefined) updates.endDate = input.endDate;
+  if (input.budget !== undefined) updates.budget = input.budget;
+  if (input.actualSpend !== undefined) updates.spend = input.actualSpend;
+  if (input.entities !== undefined) updates.entities = input.entities;
+  if (input.colour !== undefined) updates.colour = input.colour;
+  if (input.notes !== undefined) updates.notes = input.notes;
+
+  const updated = updateCampaignRow(input.campaign_id, updates)!;
+  writeAuditLog({
+    action: 'update_campaign',
+    resourceType: 'campaign',
+    resourceId: updated.id,
+    previousValue: existing,
+    newValue: updated,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return {
+    success: true,
+    action: 'update_campaign',
+    result: { id: updated.id, name: updated.name, spend: updated.spend },
+    message: `Campaign "${updated.name}" updated.`,
   };
 }
 
@@ -452,6 +555,9 @@ export function executeAction(request: ActionRequest): ActionResult {
       break;
     case 'get_workspace_context':
       result = doGetWorkspaceContext();
+      break;
+    case 'update_campaign':
+      result = doUpdateCampaign(payload, source, requestId, isConfirmed);
       break;
     default:
       result = { success: false, action, message: 'Not implemented.' };

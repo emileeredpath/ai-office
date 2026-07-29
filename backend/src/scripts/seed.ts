@@ -4,7 +4,7 @@
 // than once — it skips entirely if the campaigns table is already non-empty,
 // so it never overwrites real data created afterwards via the dashboard or
 // Claude.
-import { getAllCampaigns, insertCampaign } from '../db/campaignRepository.js';
+import { getAllCampaigns, insertCampaign, recalculateCampaignSpend } from '../db/campaignRepository.js';
 import { getAllTasks, insertTask } from '../db/taskRepository.js';
 import type { TaskRecord } from '../types.js';
 
@@ -30,6 +30,8 @@ function task(overrides: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' |
     type: 'task',
     recipients: null,
     subject: null,
+    cost: null,
+    currency: null,
     ...overrides,
   };
 }
@@ -89,6 +91,27 @@ const seedCampaigns = [
     engagement: 5.2,
     colour: '#0F6E56',
   },
+  {
+    id: 'campaign-4',
+    name: 'Service & Repair Campaign',
+    brand: 'mtech' as const,
+    entities: ['brentwood' as const, 'capcom' as const, 'radio-links' as const, 'ircl' as const],
+    primaryIndustry: 'Existing Customers',
+    secondaryIndustry: 'Service & Repair',
+    theme: 'Quarterly service and repair reminder',
+    status: 'active' as const,
+    startDate: '2026-07-29',
+    endDate: '2026-07-29',
+    budget: null,
+    // Left at 0 deliberately — recalculateCampaignSpend sums it from the
+    // linked tasks' costs the first time any of them change, same as it
+    // would for a campaign created via Claude.
+    spend: 0,
+    conversions: 0,
+    leads: 0,
+    engagement: 0,
+    colour: '#F97031',
+  },
 ];
 
 const seedTasks: TaskRecord[] = [
@@ -129,11 +152,13 @@ const seedTasks: TaskRecord[] = [
   task({ id: 'task-35', title: 'HSBC Social Posts', brand: 'brentwood', status: 'complete', startDate: '2026-07-01', createdAt: '2026-07-01', completedAt: '2026-07-06' }),
   task({ id: 'task-36', title: 'IRCL — stickers, leaflets, MTech tape', brand: 'ircl', status: 'complete', priority: 'high', startDate: '2026-06-25', createdAt: '2026-06-25', completedAt: '2026-07-02' }),
   // Service and Repair Email Campaign — quarterly per-brand sends (Calendar Improvements brief)
-  task({ id: 'task-37', title: 'Service and Repair Email — Brentwood', brand: 'brentwood', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 6,044 recipients', type: 'email-send', recipients: 6044, subject: 'Service & Repair — Brentwood' }),
-  task({ id: 'task-38', title: 'Service and Repair Email — Capcom', brand: 'capcom', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 1,554 recipients', type: 'email-send', recipients: 1554, subject: 'Service & Repair — Capcom' }),
-  task({ id: 'task-39', title: 'Service and Repair Email — Radio Links', brand: 'radio-links', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 1,464 recipients', type: 'email-send', recipients: 1464, subject: 'Service & Repair — Radio Links' }),
-  task({ id: 'task-40', title: 'Service and Repair Email — IRCL', brand: 'ircl', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 243 recipients', type: 'email-send', recipients: 243, subject: 'Service & Repair — IRCL' }),
-  task({ id: 'task-41', title: 'Service and Repair Email — IDARO', brand: 'idaro', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 51 recipients', type: 'email-send', recipients: 51, subject: 'Service & Repair — IDARO' }),
+  task({ id: 'task-37', title: 'Service and Repair Email — Brentwood', brand: 'brentwood', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', campaignId: 'campaign-4', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 6,044 recipients — £72.73 (converted from $96.68 @ ~£0.7524/USD)', type: 'email-send', recipients: 6044, subject: 'Service & Repair — Brentwood', cost: 72.73, currency: 'GBP' }),
+  task({ id: 'task-38', title: 'Service and Repair Email — Capcom', brand: 'capcom', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', campaignId: 'campaign-4', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 1,554 recipients — £22.05 (converted from $29.30 @ ~£0.7524/USD)', type: 'email-send', recipients: 1554, subject: 'Service & Repair — Capcom', cost: 22.05, currency: 'GBP' }),
+  task({ id: 'task-39', title: 'Service and Repair Email — Radio Links', brand: 'radio-links', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', campaignId: 'campaign-4', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 1,464 recipients — £21.04 (converted from $27.96 @ ~£0.7524/USD)', type: 'email-send', recipients: 1464, subject: 'Service & Repair — Radio Links', cost: 21.04, currency: 'GBP' }),
+  task({ id: 'task-40', title: 'Service and Repair Email — IRCL', brand: 'ircl', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', campaignId: 'campaign-4', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 243 recipients — £7.26 (converted from $9.65 @ ~£0.7524/USD)', type: 'email-send', recipients: 243, subject: 'Service & Repair — IRCL', cost: 7.26, currency: 'GBP' }),
+  // IDARO's send is deliberately not linked to campaign-4 — it's tracked as
+  // a standalone item, per the brief.
+  task({ id: 'task-41', title: 'Service and Repair Email — IDARO', brand: 'idaro', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 51 recipients — £5.09 (converted from $6.77 @ ~£0.7524/USD)', type: 'email-send', recipients: 51, subject: 'Service & Repair — IDARO', cost: 5.09, currency: 'GBP' }),
 ];
 
 export function runSeed() {
@@ -144,6 +169,12 @@ export function runSeed() {
 
   for (const campaign of seedCampaigns) insertCampaign(campaign);
   for (const t of seedTasks) insertTask(t);
+
+  // insertTask() doesn't recompute campaign spend itself (only the
+  // actionService path does, since that's what create_task/update_task go
+  // through) — do it once here so a fresh database starts with correct totals.
+  const campaignIdsWithCosts = new Set(seedTasks.filter((t) => t.cost != null && t.campaignId).map((t) => t.campaignId!));
+  for (const campaignId of campaignIdsWithCosts) recalculateCampaignSpend(campaignId);
 
   console.log(`Seeded ${seedCampaigns.length} campaigns and ${seedTasks.length} tasks.`);
 }

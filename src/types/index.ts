@@ -60,6 +60,8 @@ export interface Task {
   type: TaskType;
   recipients: number | null;
   subject: string | null;
+  cost: number | null;
+  currency: string | null;
 }
 
 export interface CampaignResults {
