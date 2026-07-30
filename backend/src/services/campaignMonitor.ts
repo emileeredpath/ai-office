@@ -6,9 +6,9 @@
 //
 // IMPORTANT — two things this file cannot verify from this environment:
 // 1. No CAMPAIGN_MONITOR_API_KEY is available here, and this sandbox can't
-//    reach api.campaignmonitor.com, so the HTTP layer is written strictly
-//    to CM's documented v3.1 REST contract but has not been exercised
-//    against a live account. Test against a real key before trusting it.
+//    reach the API host, so the HTTP layer is written strictly to CM's
+//    documented v3.1 REST contract but has not been exercised against a
+//    live account. Test against a real key before trusting it.
 // 2. Campaign Monitor's public API does not have a documented, universal
 //    "cost" field on a sent campaign (spend is normally an account/invoice
 //    concept, not a per-campaign one). `extractCost` below defensively
@@ -20,7 +20,10 @@ import db from '../db/connection.js';
 import { findTaskByExternalId, insertTask, updateTaskRow } from '../db/taskRepository.js';
 import type { Brand, TaskRecord } from '../types.js';
 
-const API_BASE = 'https://api.campaignmonitor.com/api/v3.1';
+// Campaign Monitor's API has always lived on api.createsend.com — a holdover
+// from "CreateSend", the product's name before the Campaign Monitor rebrand.
+// api.campaignmonitor.com (what the brief specified) does not serve the API.
+const API_BASE = 'https://api.createsend.com/api/v3.1';
 const SOURCE = 'campaign-monitor';
 
 interface CmClient {
