@@ -9,6 +9,7 @@ import {
 } from '../db/marketingOsRepository.js';
 import { getAllCampaigns, insertCampaign, getCampaignProgress } from '../db/campaignRepository.js';
 import { syncCampaignMonitor } from '../services/campaignMonitor.js';
+import { getBrandTraffic } from '../services/ga4.js';
 import type { ActionResult } from '../types.js';
 import { nanoid } from 'nanoid';
 
@@ -422,6 +423,23 @@ export function createAiOfficeMcpServer(): McpServer {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         isError: !result.success,
+      };
+    }
+  );
+
+  server.registerTool(
+    'ai_office_get_website_traffic',
+    {
+      title: 'Get per-brand GA4 website traffic',
+      description:
+        'Fetch live sessions and active users for this week and this month from each brand entity\'s GA4 property (Brentwood, Radio Links, Capcom, IRCL). Requires GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* env var on the server.',
+      inputSchema: {},
+    },
+    async () => {
+      const result = await getBrandTraffic();
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        isError: !result.configured || result.errors.length > 0,
       };
     }
   );

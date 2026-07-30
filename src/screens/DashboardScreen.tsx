@@ -1,8 +1,24 @@
+import { useEffect, useState } from 'react';
 import { Mail, Download } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
-import { Campaign, Task } from '@/types/index';
+import { Campaign, Task, Brand } from '@/types/index';
+import { apiFetch } from '@/services/apiConfig';
+
+interface BrandTraffic {
+  brand: Brand;
+  sessionsWeek: number;
+  usersWeek: number;
+  sessionsMonth: number;
+  usersMonth: number;
+}
+
+interface Ga4Result {
+  configured: boolean;
+  brands: BrandTraffic[];
+  errors: string[];
+}
 
 function exportTasksAsCSV(tasks: Task[], campaigns: Campaign[]) {
   const csvHeaders = ['Task ID', 'Title', 'Brand', 'Status', 'Priority', 'Deadline', 'Campaign', 'Notes', 'Created At'];
@@ -67,6 +83,14 @@ export function DashboardScreen() {
   const tasks = useAppStore((s) => s.tasks);
   const campaigns = useAppStore((s) => s.campaigns);
   const selectTask = useAppStore((s) => s.selectTask);
+
+  const [traffic, setTraffic] = useState<Ga4Result | null>(null);
+  useEffect(() => {
+    apiFetch('/api/analytics/ga4')
+      .then((r) => r.json())
+      .then(setTraffic)
+      .catch(() => setTraffic(null));
+  }, []);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -242,6 +266,38 @@ export function DashboardScreen() {
             )}
           </div>
         </section>
+
+        {/* Website Traffic — per-brand GA4, only shown once configured on the
+            server. Silent otherwise, same as any other optional integration. */}
+        {traffic?.configured && traffic.brands.length > 0 && (
+          <section style={{ marginTop: '2rem' }}>
+            <h2 className="text-text-primary" style={{ marginBottom: '1rem' }}>
+              Website traffic
+            </h2>
+            <div className="card">
+              <div className="space-y-3">
+                {traffic.brands.map((b) => (
+                  <div key={b.brand} className="flex items-center gap-3">
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded"
+                      style={{ backgroundColor: BRAND_COLOR[b.brand], color: '#fff', width: 100, textAlign: 'center', flexShrink: 0 }}
+                    >
+                      {BRAND_LABEL[b.brand]}
+                    </span>
+                    <span className="text-sm text-text-secondary" style={{ flex: 1 }}>
+                      This week: <span className="text-text-primary font-medium">{b.sessionsWeek.toLocaleString()}</span> sessions,{' '}
+                      <span className="text-text-primary font-medium">{b.usersWeek.toLocaleString()}</span> users
+                    </span>
+                    <span className="text-sm text-text-secondary">
+                      This month: <span className="text-text-primary font-medium">{b.sessionsMonth.toLocaleString()}</span> sessions,{' '}
+                      <span className="text-text-primary font-medium">{b.usersMonth.toLocaleString()}</span> users
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

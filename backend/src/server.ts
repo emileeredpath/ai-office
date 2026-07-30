@@ -8,6 +8,7 @@ import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import campaignsRouter from './routes/campaigns.js';
 import campaignMonitorRouter from './routes/campaignMonitor.js';
+import analyticsRouter from './routes/analytics.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
 import authRouter from './routes/auth.js';
@@ -52,6 +53,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/tasks', requireSession, tasksRouter);
 app.use('/api/campaigns', requireSession, campaignsRouter);
 app.use('/api/campaign-monitor', requireSession, campaignMonitorRouter);
+app.use('/api/analytics', requireSession, analyticsRouter);
 app.use('/api/actions', requireSession, actionsRouter);
 app.use('/api/marketingos', requireSession, marketingosRouter);
 
