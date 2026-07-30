@@ -52,6 +52,29 @@ export function MyTasksScreen() {
     return groups;
   }, [filteredTasks, groupBy]);
 
+  // When grouping by status, order sections deliberately — in-progress work
+  // up top where it's actionable, completed tasks pushed to the bottom —
+  // rather than whatever order statuses happened to first appear in the data.
+  const STATUS_GROUP_ORDER: TaskStatus[] = [
+    'in-progress',
+    'waiting-approval',
+    'waiting-john',
+    'waiting-customer',
+    'approved-ready',
+    'not-started',
+    'backlog',
+    'blocked',
+    'complete',
+  ];
+
+  const sortedGroupEntries = useMemo(() => {
+    const entries = Object.entries(groupedTasks);
+    if (groupBy !== 'status') return entries;
+    return entries.sort(
+      ([a], [b]) => STATUS_GROUP_ORDER.indexOf(a as TaskStatus) - STATUS_GROUP_ORDER.indexOf(b as TaskStatus)
+    );
+  }, [groupedTasks, groupBy]);
+
   const statusLabels: Record<string, string> = {
     'backlog': 'Backlog',
     'not-started': 'Not Started',
@@ -160,7 +183,7 @@ export function MyTasksScreen() {
 
         {/* Task Groups */}
         <div className="space-y-6">
-          {Object.entries(groupedTasks).map(([groupKey, groupTasks]) => (
+          {sortedGroupEntries.map(([groupKey, groupTasks]) => (
             <div key={groupKey}>
               <h2 className="text-lg font-semibold text-text-primary mb-4">
                 {getGroupLabel(groupKey)} ({groupTasks.length})
@@ -177,7 +200,7 @@ export function MyTasksScreen() {
             </div>
           ))}
 
-          {Object.entries(groupedTasks).length === 0 && (
+          {sortedGroupEntries.length === 0 && (
             <p className="text-text-secondary">No tasks found matching your filters</p>
           )}
         </div>
