@@ -9,7 +9,7 @@ export const BRAND_COLOR: Record<Brand, string> = {
   'radio-links': '#23772D',
   capcom: '#524495',
   ircl: '#251F4B',
-  idaro: '#DB2777',
+  idaro: '#39FF14',
 };
 
 export const BRAND_LABEL: Record<Brand, string> = {
@@ -20,3 +20,9 @@ export const BRAND_LABEL: Record<Brand, string> = {
   ircl: 'IRCL',
   idaro: 'IDARO',
 };
+
+// Text colour for a solid brand-colour background — every brand is dark
+// enough for white text except IDARO's neon green, which needs dark text.
+export function brandBadgeTextColor(brand: Brand): string {
+  return brand === 'idaro' ? '#0D1B2A' : '#fff';
+}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Mail, Download } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
-import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
+import { BRAND_COLOR, BRAND_LABEL, brandBadgeTextColor } from '@/utils/brandColors';
 import { Campaign, Task, Brand } from '@/types/index';
 import { apiFetch } from '@/services/apiConfig';
 
@@ -238,7 +238,13 @@ export function DashboardScreen() {
                   <div key={b.brand} className="flex items-center gap-3">
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded"
-                      style={{ backgroundColor: BRAND_COLOR[b.brand as keyof typeof BRAND_COLOR], color: '#fff', width: 100, textAlign: 'center', flexShrink: 0 }}
+                      style={{
+                        backgroundColor: BRAND_COLOR[b.brand as keyof typeof BRAND_COLOR],
+                        color: brandBadgeTextColor(b.brand as Brand),
+                        width: 100,
+                        textAlign: 'center',
+                        flexShrink: 0,
+                      }}
                     >
                       {BRAND_LABEL[b.brand as keyof typeof BRAND_LABEL]}
                     </span>
@@ -280,7 +286,13 @@ export function DashboardScreen() {
                   <div key={b.brand} className="flex items-center gap-3">
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded"
-                      style={{ backgroundColor: BRAND_COLOR[b.brand], color: '#fff', width: 100, textAlign: 'center', flexShrink: 0 }}
+                      style={{
+                        backgroundColor: BRAND_COLOR[b.brand],
+                        color: brandBadgeTextColor(b.brand),
+                        width: 100,
+                        textAlign: 'center',
+                        flexShrink: 0,
+                      }}
                     >
                       {BRAND_LABEL[b.brand]}
                     </span>

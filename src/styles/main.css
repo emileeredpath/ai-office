@@ -22,7 +22,7 @@
   --color-brand-capcom-secondary: #5785c4;
   --color-brand-ircl: #251f4b;
   --color-brand-ircl-secondary: #3a82c6;
-  --color-brand-idaro: #db2777;
+  --color-brand-idaro: #39ff14;
   --color-brand-cta: #ef5f12;
 
   /* Typography */
@@ -470,7 +470,9 @@ h3 {
 
 .badge-brand-idaro {
   background-color: var(--color-brand-idaro);
-  color: white;
+  /* Neon green is too bright for white text to pass contrast — dark text
+     instead, same principle as the other brand badges just inverted. */
+  color: #0d1b2a;
 }
 
 /* Scrollbar styling */
