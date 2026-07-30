@@ -5,6 +5,7 @@ A self-contained Vue 3 component for the MTech Brentwood Communications website.
 ## Files
 
 - `interactive-showcase.html` — the complete component (HTML + CSS + Vue 3 JS in one file)
+- `wordpress-plugin/mtech-interactive-showcase/` — drop-in WordPress plugin version (see below)
 - `README.md` — this guide
 
 ## Quick preview
@@ -49,13 +50,24 @@ Each field:
 
 ## WordPress installation
 
-### Option A — Custom HTML block (fastest)
+### Option A — Plugin (recommended)
+
+Use the ready-made plugin in `wordpress-plugin/mtech-interactive-showcase/`:
+
+1. Zip the `mtech-interactive-showcase` folder (or upload it as-is via SFTP) to `/wp-content/plugins/`.
+2. Activate it under **Plugins** in wp-admin.
+3. Add `[interactive-showcase]` to any page or post. Multiple instances on one page are supported — give each a unique `id` attribute, e.g. `[interactive-showcase id="radio-links"]`.
+4. Pass a real illustration with `[interactive-showcase image="https://yoursite.com/wp-content/uploads/building.png"]`.
+
+See `wordpress-plugin/mtech-interactive-showcase/readme.txt` for full shortcode options (custom marker data via JSON, filtering the default technology list, replicating for other brands).
+
+### Option B — Custom HTML block (fastest, no plugin install)
 1. Copy everything from `<div id="mtech-showcase-app">` down to the closing `</script>` tag (i.e. skip the `<!doctype>`/`<html>`/`<head>`/`<body>` wrapper at the top and bottom — that part is only for standalone preview).
 2. In the WordPress block editor, add a **Custom HTML** block and paste it in.
 3. Update the image path and marker data as above, then publish.
 
-### Option B — Shortcode (recommended for reuse across pages)
-Add this to your theme's `functions.php` (or a small site-specific plugin):
+### Option C — Roll-your-own shortcode from the standalone file
+If you'd rather not use the packaged plugin (e.g. you want the shortcode defined in your own theme), add this to your theme's `functions.php` (or a small site-specific plugin):
 
 ```php
 function mtech_interactive_showcase_shortcode( $atts ) {
