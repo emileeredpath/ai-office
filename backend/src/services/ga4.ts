@@ -19,13 +19,14 @@ const DATA_API_BASE = 'https://analyticsdata.googleapis.com/v1beta';
 const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
 
 // Which env var holds each brand's GA4 property ID. Only entities that
-// actually have their own site/property are listed — add more here if
-// MTech Group or IDARO ever get one.
+// actually have their own site/property are listed.
 const PROPERTY_ID_ENV: Partial<Record<Brand, string>> = {
+  mtech: 'GA4_PROPERTY_ID_MTECH',
   brentwood: 'GA4_PROPERTY_ID_BRENTWOOD',
   'radio-links': 'GA4_PROPERTY_ID_RADIO_LINKS',
   capcom: 'GA4_PROPERTY_ID_CAPCOM',
   ircl: 'GA4_PROPERTY_ID_IRCL',
+  idaro: 'GA4_PROPERTY_ID_IDARO',
 };
 
 export interface BrandTraffic {
