@@ -497,42 +497,81 @@ export function CampaignDetailPanel() {
                 </div>
               )}
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Send</th>
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('date')}>
-                        <span className="inline-flex items-center gap-1">Date <ArrowUpDown size={11} /></span>
+                    <tr style={{ backgroundColor: '#3a82c6', height: '50px' }}>
+                      <th style={{ textAlign: 'left', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Send Name</th>
+                      <th style={{ textAlign: 'left', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('date')}>
+                        <span className="inline-flex items-center gap-1">Date <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
                       </th>
-                      <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('recipients')}>
-                        <span className="inline-flex items-center gap-1">Recipients <ArrowUpDown size={11} /></span>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('recipients')}>
+                        <span className="inline-flex items-center gap-1">Recipients <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
                       </th>
-                      <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('cost')}>
-                        <span className="inline-flex items-center gap-1">Cost <ArrowUpDown size={11} /></span>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Open Rate %</th>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Click Rate %</th>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('cost')}>
+                        <span className="inline-flex items-center gap-1">Cost <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
                       </th>
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Status</th>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ROI</th>
+                      <th style={{ textAlign: 'center', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedSends.map((task) => (
-                      <tr key={task.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td style={{ padding: '6px 8px' }}>
-                          <div className="flex items-center gap-1.5">
+                    {sortedSends.map((task, index) => (
+                      <tr
+                        key={task.id}
+                        style={{
+                          height: '50px',
+                          borderBottom: '1px solid var(--color-border)',
+                          backgroundColor: index % 2 === 0 ? 'transparent' : 'var(--color-surface)',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f7ff')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : 'var(--color-surface)')}
+                      >
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                          <div className="flex items-center gap-2">
                             <BrandBadge brand={task.brand} />
-                            <span className="text-text-primary">{task.title}</span>
+                            <span>{task.title}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'left' }}>
                           {task.deadline ? formatDateShort(task.deadline) : '—'}
                         </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', textAlign: 'right' }}>
                           {task.recipients != null ? task.recipients.toLocaleString() : '—'}
                         </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
+                          {campaign.results?.emailOpenRate != null ? `${campaign.results.emailOpenRate.toFixed(1)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
+                          {campaign.results?.emailClickRate != null ? `${campaign.results.emailClickRate.toFixed(1)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', textAlign: 'right' }}>
                           {task.cost != null ? `£${task.cost.toFixed(2)}` : '—'}
                         </td>
-                        <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)' }}>{task.status}</td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, textAlign: 'right', color: (campaign.spend ?? 0) > (task.cost ?? 0) ? '#28a745' : (campaign.spend ?? 0) < (task.cost ?? 0) ? '#dc3545' : 'var(--color-text-secondary)' }}>
+                          {task.cost != null && campaign.spend != null && campaign.spend > 0
+                            ? `${((campaign.spend - task.cost) / task.cost * 100).toFixed(0)}%`
+                            : '—'}
+                        </td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '3px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              textTransform: 'capitalize',
+                              backgroundColor: task.status === 'complete' ? '#d4edda' : '#fff3cd',
+                              color: task.status === 'complete' ? '#155724' : '#856404',
+                            }}
+                          >
+                            {task.status === 'complete' ? '✓ Done' : 'Pending'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
