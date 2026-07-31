@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, MoreVertical, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BriefGenerator } from '@/components/tasks/BriefGenerator';
@@ -25,6 +25,7 @@ export function TaskDetailPanel() {
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(task?.notes || '');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setNotes(task?.notes || '');
@@ -94,49 +95,58 @@ export function TaskDetailPanel() {
               Mark complete
             </button>
           )}
-          <div style={{ position: 'relative' }}>
+          <div>
             <button
+              ref={moreButtonRef}
               className="btn-more"
               onClick={() => setShowMoreMenu((v) => !v)}
-              style={{ position: 'relative' }}
             >
               <MoreVertical size={20} />
             </button>
             {showMoreMenu && (
-              <div
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '100%',
-                  marginTop: '4px',
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  zIndex: 10,
-                  minWidth: '160px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                }}
-              >
-                <button
-                  onClick={handleDeleteTask}
+              <>
+                <div
+                  onClick={() => setShowMoreMenu(false)}
                   style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '8px 12px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: '#ff4444',
-                    fontWeight: 500,
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9,
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 68, 68, 0.1)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                />
+                <div
+                  style={{
+                    position: 'fixed',
+                    backgroundColor: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: '6px',
+                    zIndex: 10,
+                    minWidth: '150px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    top: moreButtonRef.current ? moreButtonRef.current.getBoundingClientRect().bottom + 4 : 0,
+                    right: 16,
+                  }}
                 >
-                  Delete task
-                </button>
-              </div>
+                  <button
+                    onClick={handleDeleteTask}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 12px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      color: '#ef4444',
+                      fontWeight: 500,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    Delete task
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>
