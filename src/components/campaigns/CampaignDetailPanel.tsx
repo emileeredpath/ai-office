@@ -135,58 +135,62 @@ export function CampaignDetailPanel() {
   return (
     <div className="campaign-detail-panel">
       {/* Header */}
-      <div className="campaign-detail-header" style={{ position: 'relative' }}>
+      <div className="campaign-detail-header" style={{ position: 'relative', overflow: 'visible' }}>
         <button className="btn-close" onClick={() => selectCampaign(null)}>
           <X size={20} />
         </button>
-        <button
-          className="btn-more"
-          onClick={() => setShowMoreMenu(!showMoreMenu)}
-          title="More options"
-        >
-          <MoreVertical size={20} />
-        </button>
-        {showMoreMenu && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: '4px',
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '6px',
-              zIndex: 1000,
-              minWidth: '160px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              overflow: 'hidden',
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn-more"
+            onClick={() => {
+              console.log('Clicked more button, current state:', showMoreMenu);
+              setShowMoreMenu(!showMoreMenu);
             }}
+            title="More options"
           >
-            <button
-              onClick={() => {
-                handleDeleteCampaign();
-                setShowMoreMenu(false);
-              }}
+            <MoreVertical size={20} />
+          </button>
+          {showMoreMenu && (
+            <div
               style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                padding: '10px 12px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: '#ef4444',
-                fontWeight: 500,
-                transition: 'background-color 0.2s',
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                right: 0,
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                zIndex: 9999,
+                minWidth: '160px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                overflow: 'hidden',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
-              Delete campaign
-            </button>
-          </div>
-        )}
+              <button
+                onClick={() => {
+                  handleDeleteCampaign();
+                  setShowMoreMenu(false);
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  color: '#ef4444',
+                  fontWeight: 500,
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                Delete campaign
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}

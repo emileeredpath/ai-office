@@ -97,7 +97,10 @@ export function TaskDetailPanel() {
           <div style={{ position: 'relative' }}>
             <button
               className="btn-more"
-              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              onClick={() => {
+                console.log('Clicked more button, current state:', showMoreMenu);
+                setShowMoreMenu(!showMoreMenu);
+              }}
               title="More options"
             >
               <MoreVertical size={20} />
@@ -106,13 +109,12 @@ export function TaskDetailPanel() {
               <div
                 style={{
                   position: 'absolute',
-                  top: '100%',
+                  top: 'calc(100% + 4px)',
                   right: 0,
-                  marginTop: '4px',
                   backgroundColor: 'var(--color-surface)',
                   border: '1px solid var(--color-border)',
                   borderRadius: '6px',
-                  zIndex: 1000,
+                  zIndex: 9999,
                   minWidth: '160px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   overflow: 'hidden',
