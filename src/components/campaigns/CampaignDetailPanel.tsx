@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical, ArrowUpDown } from 'lucide-react';
+import { X, MoreVertical, ArrowUpDown, Check } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
@@ -26,16 +26,20 @@ export function CampaignDetailPanel() {
     s.selectedCampaignId ? s.campaigns.find((c) => c.id === s.selectedCampaignId) ?? null : null
   );
   const updateCampaign = useAppStore((s) => s.updateCampaign);
+  const updateTask = useAppStore((s) => s.updateTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const selectTask = useAppStore((s) => s.selectTask);
   const tasks = useAppStore((s) => s.tasks);
 
   const campaignTasks = campaign ? tasks.filter((t) => t.campaignId === campaign.id) : [];
+  const unlinkedTasks = tasks.filter((t) => !t.campaignId);
 
   const [notes, setNotes] = useState(campaign?.notes || '');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
+  const [selectedUnlinkedIds, setSelectedUnlinkedIds] = useState<Set<string>>(new Set());
+  const [isLinking, setIsLinking] = useState(false);
 
   useEffect(() => {
     setNotes(campaign?.notes || '');
@@ -88,6 +92,31 @@ export function CampaignDetailPanel() {
     setTimeout(() => {
       updateCampaign(campaign.id, { notes: newNotes });
     }, 500);
+  };
+
+  const handleToggleUnlinkedTask = (taskId: string) => {
+    setSelectedUnlinkedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleLinkSelectedTasks = async () => {
+    if (selectedUnlinkedIds.size === 0) return;
+    setIsLinking(true);
+    try {
+      for (const taskId of selectedUnlinkedIds) {
+        await updateTask(taskId, { campaignId: campaign.id });
+      }
+      setSelectedUnlinkedIds(new Set());
+    } finally {
+      setIsLinking(false);
+    }
   };
 
   const completedTasks = campaignTasks.filter((t) => t.status === 'complete').length;
@@ -486,6 +515,78 @@ export function CampaignDetailPanel() {
             <p className="text-sm text-text-secondary">No tasks linked to this campaign</p>
           )}
         </div>
+
+        {/* Divider */}
+        <div className="campaign-detail-divider"></div>
+
+        {/* Link Unlinked Tasks */}
+        {unlinkedTasks.length > 0 && (
+          <div>
+            <h3 className="campaign-detail-section-title">LINK TASKS TO CAMPAIGN</h3>
+            <p className="text-xs text-text-secondary mb-3">
+              {unlinkedTasks.length} unlinked task{unlinkedTasks.length === 1 ? '' : 's'} in the system
+            </p>
+            <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+              <div style={{ paddingTop: 0 }}>
+                {unlinkedTasks.map((task) => (
+                  <label
+                    key={task.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      borderBottom: '1px solid var(--color-border)',
+                      cursor: 'pointer',
+                      backgroundColor: selectedUnlinkedIds.has(task.id) ? 'var(--color-surface)' : 'transparent',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUnlinkedIds.has(task.id)}
+                      onChange={() => handleToggleUnlinkedTask(task.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {task.title}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        {task.deadline ? formatDateShort(task.deadline) : 'No deadline'} · {task.status}
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                      {task.priority}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {selectedUnlinkedIds.size > 0 && (
+              <button
+                onClick={handleLinkSelectedTasks}
+                disabled={isLinking}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isLinking ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  opacity: isLinking ? 0.6 : 1,
+                }}
+              >
+                <Check size={14} />
+                Link {selectedUnlinkedIds.size} task{selectedUnlinkedIds.size === 1 ? '' : 's'} to campaign
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="campaign-detail-divider"></div>
