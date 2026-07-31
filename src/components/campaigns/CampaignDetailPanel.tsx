@@ -173,53 +173,42 @@ export function CampaignDetailPanel() {
           </div>
         </div>
 
-        {/* Financial summary — auto-summed from linked task costs */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '1.5rem',
-            padding: '1rem 1.25rem',
-            marginBottom: '1.5rem',
-            backgroundColor: 'var(--color-surface)',
-            borderRadius: '8px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-              Total actual spend
-            </p>
-            <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-              £{campaign.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            {campaign.budget != null && (
-              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                of £{campaign.budget.toLocaleString('en-GB')} budget
-                {campaign.budget > 0 && ` (${Math.round((campaign.spend / campaign.budget) * 100)}%)`}
-              </p>
+        {/* Financial summary — spend/budget already shown in the editable
+            field above; this only adds numbers not shown anywhere else. */}
+        {(spendPerRecipient != null || totalRecipients > 0) && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '1.5rem',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.5rem',
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: '8px',
+              flexWrap: 'wrap',
+            }}
+          >
+            {spendPerRecipient != null && (
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Cost per recipient
+                </p>
+                <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  £{spendPerRecipient.toFixed(3)}
+                </p>
+              </div>
+            )}
+            {totalRecipients > 0 && (
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Total recipients
+                </p>
+                <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {totalRecipients.toLocaleString()}
+                </p>
+              </div>
             )}
           </div>
-          {spendPerRecipient != null && (
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-                Cost per recipient
-              </p>
-              <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                £{spendPerRecipient.toFixed(3)}
-              </p>
-            </div>
-          )}
-          {totalRecipients > 0 && (
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-                Total recipients
-              </p>
-              <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {totalRecipients.toLocaleString()}
-              </p>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Sends from — multi-entity */}
         <div className="campaign-detail-field mb-4">
