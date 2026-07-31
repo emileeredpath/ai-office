@@ -38,7 +38,7 @@ interface Ga4Result {
 
 // Placeholder until Acumatica API access exists — see the Dashboard
 // Redesign brief. Swap this for the real instance URL whenever it's ready.
-const ACUMATICA_URL = '';
+const ACUMATICA_URL = 'https://brentwoodcommunications.acumatica.com/Main?CompanyID=MTECH+Brentwood+Communications+(Live)&ScreenId=DB000055';
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
   planning: 'Planning',

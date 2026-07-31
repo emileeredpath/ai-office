@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // Placeholder until Acumatica API access exists — see the Dashboard
 // Redesign brief. Swap this for the real instance URL whenever it's ready.
-const ACUMATICA_URL = '';
+const ACUMATICA_URL = 'https://brentwoodcommunications.acumatica.com/Main?CompanyID=MTECH+Brentwood+Communications+(Live)&ScreenId=DB000055';
 
 type SortOption = 'date' | 'name' | 'spend';
 
