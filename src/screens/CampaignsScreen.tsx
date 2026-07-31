@@ -1,11 +1,17 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDateShort } from '@/utils/dateUtils';
-import { Campaign, CampaignResults } from '@/types/index';
+import { Brand, Campaign, CampaignResults, CampaignStatus } from '@/types/index';
 import { AddCampaignModal } from '@/components/campaigns/AddCampaignModal';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Placeholder until Acumatica API access exists — see the Dashboard
+// Redesign brief. Swap this for the real instance URL whenever it's ready.
+const ACUMATICA_URL = '';
+
+type SortOption = 'date' | 'name' | 'spend';
 
 const EMPTY_RESULTS_FORM = {
   emailOpenRate: '',
@@ -50,6 +56,9 @@ export function CampaignsScreen() {
   const [loggingCampaignId, setLoggingCampaignId] = useState<string | null>(null);
   const [resultsForm, setResultsForm] = useState(EMPTY_RESULTS_FORM);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [filterBrand, setFilterBrand] = useState<Brand | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<CampaignStatus | 'all'>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date');
 
   const getCampaignProgress = (campaignId: string) => {
     const campaignTasks = tasks.filter((t) => t.campaignId === campaignId);
@@ -92,15 +101,25 @@ export function CampaignsScreen() {
     setResultsForm(EMPTY_RESULTS_FORM);
   };
 
-  // Active campaigns sorted to the top (most recently started first), completed
-  // ones grouped below and visually muted — a single page that reads as a
-  // history rather than losing finished campaigns from view entirely.
-  const activeCampaigns = campaigns
-    .filter((c) => c.status !== 'completed')
-    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  const completedCampaigns = campaigns
-    .filter((c) => c.status === 'completed')
-    .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+  const sortCampaigns = (list: Campaign[]) => {
+    const sorted = [...list];
+    if (sortBy === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === 'spend') sorted.sort((a, b) => b.spend - a.spend);
+    else sorted.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    return sorted;
+  };
+
+  const filteredCampaigns = campaigns.filter((c) => {
+    if (filterBrand !== 'all' && !(c.entities && c.entities.length > 0 ? c.entities : [c.brand]).includes(filterBrand)) return false;
+    if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+    return true;
+  });
+
+  // Active campaigns sorted to the top, completed ones grouped below and
+  // visually muted — a single page that reads as a history rather than
+  // losing finished campaigns from view entirely.
+  const activeCampaigns = sortCampaigns(filteredCampaigns.filter((c) => c.status !== 'completed'));
+  const completedCampaigns = sortCampaigns(filteredCampaigns.filter((c) => c.status === 'completed'));
 
   const renderCampaignGrid = (list: Campaign[], muted = false) => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -303,6 +322,18 @@ export function CampaignsScreen() {
                 </div>
               </div>
             )}
+
+            {ACUMATICA_URL && (
+              <a
+                href={ACUMATICA_URL}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="btn btn-secondary text-sm mt-4 w-full flex items-center justify-center gap-2"
+              >
+                View in Acumatica <ExternalLink size={13} />
+              </a>
+            )}
           </div>
         );
       })}
@@ -313,7 +344,7 @@ export function CampaignsScreen() {
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-text-primary">Campaigns</h1>
           {isEditor && (
             <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
@@ -323,22 +354,88 @@ export function CampaignsScreen() {
           )}
         </div>
 
-        {campaigns.length > 0 ? (
-          <>
-            {renderCampaignGrid(activeCampaigns)}
+        {/* Filters */}
+        {campaigns.length > 0 && (
+          <div className="flex gap-3 flex-wrap mb-8">
+            <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value as Brand | 'all')} className="input" style={{ maxWidth: 180 }}>
+              <option value="all">All brands</option>
+              <option value="mtech">MTech</option>
+              <option value="brentwood">Brentwood</option>
+              <option value="radio-links">Radio Links</option>
+              <option value="capcom">Capcom</option>
+              <option value="ircl">IRCL</option>
+              <option value="idaro">IDARO</option>
+            </select>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as CampaignStatus | 'all')} className="input" style={{ maxWidth: 180 }}>
+              <option value="all">All statuses</option>
+              <option value="planning">Planning</option>
+              <option value="active">Active</option>
+              <option value="on-hold">On Hold</option>
+              <option value="completed">Completed</option>
+            </select>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="input" style={{ maxWidth: 180 }}>
+              <option value="date">Sort by date</option>
+              <option value="name">Sort by name</option>
+              <option value="spend">Sort by spend</option>
+            </select>
+          </div>
+        )}
 
-            {completedCampaigns.length > 0 && (
-              <div className="mt-10">
-                <h2 className="text-lg font-semibold text-text-secondary mb-4">
-                  Completed ({completedCampaigns.length})
-                </h2>
-                {renderCampaignGrid(completedCampaigns, true)}
-              </div>
-            )}
-          </>
+        {campaigns.length > 0 ? (
+          activeCampaigns.length > 0 || completedCampaigns.length > 0 ? (
+            <>
+              {activeCampaigns.length > 0 && renderCampaignGrid(activeCampaigns)}
+
+              {completedCampaigns.length > 0 && (
+                <div className="mt-10">
+                  <h2 className="text-lg font-semibold text-text-secondary mb-4">
+                    Completed ({completedCampaigns.length})
+                  </h2>
+                  {renderCampaignGrid(completedCampaigns, true)}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-text-secondary text-center py-12">No campaigns match these filters.</p>
+          )
         ) : (
           <p className="text-text-secondary text-center py-12">No campaigns yet. Create one to get started.</p>
         )}
+
+        {/* Acumatica */}
+        <div
+          className="mt-10"
+          style={{
+            background: 'var(--color-bg)',
+            border: '0.5px solid var(--color-border)',
+            borderRadius: 12,
+            padding: '1.25rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+          }}
+        >
+          <div>
+            <p className="font-semibold text-text-primary" style={{ margin: '0 0 4px' }}>Acumatica integration</p>
+            <p className="text-sm text-text-secondary" style={{ margin: 0 }}>
+              Manage detailed campaign codes, budgets, and timelines in Acumatica
+            </p>
+          </div>
+          {ACUMATICA_URL ? (
+            <a
+              href={ACUMATICA_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-secondary flex items-center gap-2"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Open Acumatica <ExternalLink size={14} />
+            </a>
+          ) : (
+            <span className="text-xs text-text-secondary" style={{ whiteSpace: 'nowrap' }}>URL not yet configured</span>
+          )}
+        </div>
       </div>
 
       {showAddModal && <AddCampaignModal onClose={() => setShowAddModal(false)} />}
