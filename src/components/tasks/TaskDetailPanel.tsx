@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical, CheckCircle2, RotateCcw } from 'lucide-react';
+import { X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BriefGenerator } from '@/components/tasks/BriefGenerator';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -24,7 +24,6 @@ export function TaskDetailPanel() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(task?.notes || '');
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   useEffect(() => {
     setNotes(task?.notes || '');
@@ -62,7 +61,6 @@ export function TaskDetailPanel() {
 
   const handleDeleteTask = async () => {
     if (!window.confirm(`Delete "${task.title}"? This cannot be undone.`)) return;
-    setShowMoreMenu(false);
     await deleteTask(task.id);
     selectTask(null);
   };
@@ -94,58 +92,29 @@ export function TaskDetailPanel() {
               Mark complete
             </button>
           )}
-          <div style={{ position: 'relative' }}>
-            <button
-              className="btn-more"
-              onClick={() => {
-                console.log('Clicked more button, current state:', showMoreMenu);
-                setShowMoreMenu(!showMoreMenu);
-              }}
-              title="More options"
-            >
-              <MoreVertical size={20} />
-            </button>
-            {showMoreMenu && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  right: 0,
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  zIndex: 9999,
-                  minWidth: '160px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  onClick={() => {
-                    handleDeleteTask();
-                    setShowMoreMenu(false);
-                  }}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 12px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: '#ef4444',
-                    fontWeight: 500,
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  Delete task
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={handleDeleteTask}
+            style={{
+              padding: '6px 10px',
+              backgroundColor: 'transparent',
+              border: '1px solid #ef4444',
+              borderRadius: '4px',
+              color: '#ef4444',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+            title="Delete this task"
+          >
+            Delete
+          </button>
         </div>
       </div>
 
