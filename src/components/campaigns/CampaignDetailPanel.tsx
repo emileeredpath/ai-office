@@ -171,6 +171,21 @@ export function CampaignDetailPanel() {
               className="input"
             />
           </div>
+
+          <div className="campaign-detail-field">
+            <label>Budget (£)</label>
+            <input
+              type="number"
+              value={campaign.budget ?? ''}
+              placeholder="Not set"
+              onChange={(e) =>
+                updateCampaign(campaign.id, {
+                  budget: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+              className="input"
+            />
+          </div>
         </div>
 
         {/* Financial summary — spend/budget already shown in the editable
