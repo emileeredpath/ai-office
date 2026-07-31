@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<!--
+  MTech Brentwood Communications — Interactive Communication Systems Showcase
+
+  This file works two ways:
+  1. Standalone: open it directly in a browser, or host it anywhere as-is.
+  2. WordPress: copy everything from <div id="mtech-showcase-app"> down to the
+     closing </script> tag into a "Custom HTML" block (or the shortcode wrapper
+     described in README.md). The <!doctype>/<html>/<head>/<body> wrapper below
+     is only needed for standalone use and can be discarded in WordPress.
+
+  See README.md for installation, customization and the WordPress shortcode.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Interactive Communication Systems Showcase — MTech Brentwood</title>
+</head>
+<body>
+
+<div id="mtech-showcase-app" class="mtech-showcase">
+  <div class="showcase-grid">
+
+    <!-- Illustration -->
+    <div class="illustration-panel">
+      <div class="illustration-frame">
+        <img
+          :src="illustrationSrc"
+          alt="MTech Brentwood building cutaway illustration showing communication technologies"
+          class="illustration-img"
+        />
+        <button
+          v-for="marker in markers"
+          :key="marker.id"
+          type="button"
+          class="marker"
+          :class="{ 'marker--active': activeId === marker.id }"
+          :style="{ left: marker.x + '%', top: marker.y + '%' }"
+          :aria-label="'View details for ' + marker.title"
+          :aria-pressed="activeId === marker.id"
+          @click="selectMarker(marker.id)"
+        >
+          <span class="marker-pulse"></span>
+          <span class="marker-dot"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Popup panel -->
+    <div class="popup-panel">
+      <div class="popup-card" v-if="activeMarker" :key="activeMarker.id">
+        <button type="button" class="popup-close" aria-label="Close" @click="closeMarker">✕</button>
+        <div class="popup-icon">{{ activeMarker.icon }}</div>
+        <h3 class="popup-title">{{ activeMarker.title }}</h3>
+        <p class="popup-description">{{ activeMarker.description }}</p>
+        <a :href="activeMarker.link" class="popup-cta">Learn More</a>
+
+        <div class="popup-nav">
+          <button type="button" class="popup-nav-btn" @click="cycleMarker(-1)" aria-label="Previous technology">‹</button>
+          <span class="popup-nav-count">{{ activeIndex + 1 }} / {{ markers.length }}</span>
+          <button type="button" class="popup-nav-btn" @click="cycleMarker(1)" aria-label="Next technology">›</button>
+        </div>
+      </div>
+
+      <div class="popup-placeholder" v-else>
+        <p>Select a technology marker on the illustration to learn more.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  #mtech-showcase-app,
+  #mtech-showcase-app * {
+    box-sizing: border-box;
+  }
+
+  .mtech-showcase {
+    --mtech-navy: #1d2a3a;
+    --mtech-blue: #3a82c6;
+    --mtech-orange: #ef5f12;
+    --mtech-orange-dark: #d94d0a;
+    --mtech-light-grey: #f8f9fa;
+    --mtech-text-grey: #666;
+    --mtech-border-grey: #e8e8e6;
+
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Aptos', sans-serif;
+    color: var(--mtech-navy);
+  }
+
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  /* ---------- Illustration ---------- */
+  .illustration-panel {
+    background: var(--mtech-light-grey);
+    border: 1px solid var(--mtech-border-grey);
+    border-radius: 12px;
+    padding: 30px;
+  }
+
+  .illustration-frame {
+    position: relative;
+    width: 100%;
+    /* Fixed ratio keeps markers correctly placed while the image loads (or if it
+       fails to load) instead of collapsing to zero height. Match this to the
+       final illustration's actual width/height ratio. */
+    aspect-ratio: 1600 / 1100;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #eef1f3;
+  }
+
+  .illustration-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* The illustration already draws a blue icon badge at each technology's location.
+     This layer is a transparent hit-target with a ring cue on top — it must never
+     paint over the badge, or the hand-drawn icon underneath gets hidden. */
+  .marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 6.2%;
+    aspect-ratio: 1;
+    min-width: 34px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .marker-dot {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    background: transparent;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .marker-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--mtech-blue);
+    background: transparent;
+    animation: mtech-pulse 2.2s ease-out infinite;
+  }
+
+  @keyframes mtech-pulse {
+    0% {
+      transform: scale(0.88);
+      opacity: 0.65;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+
+  .marker:hover .marker-dot {
+    border-color: rgba(58, 130, 198, 0.55);
+    transform: scale(1.06);
+  }
+
+  .marker--active .marker-dot {
+    border-color: var(--mtech-orange);
+    transform: scale(1.1);
+  }
+
+  .marker--active .marker-pulse {
+    border-color: var(--mtech-orange);
+  }
+
+  .marker:focus-visible .marker-dot {
+    outline: 2px solid var(--mtech-orange);
+    outline-offset: 3px;
+    border-color: var(--mtech-orange);
+  }
+
+  /* ---------- Popup panel ---------- */
+  .popup-panel {
+    position: relative;
+  }
+
+  .popup-card,
+  .popup-placeholder {
+    background: #fff;
+    border: 1px solid var(--mtech-border-grey);
+    border-radius: 12px;
+    padding: 25px;
+  }
+
+  .popup-placeholder {
+    color: var(--mtech-text-grey);
+    text-align: center;
+    font-size: 15px;
+  }
+
+  .popup-card {
+    position: relative;
+    animation: mtech-fade-in 0.3s ease;
+  }
+
+  @keyframes mtech-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .popup-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--mtech-border-grey);
+    background: var(--mtech-light-grey);
+    color: var(--mtech-navy);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .popup-close:hover {
+    background: #eee;
+  }
+
+  .popup-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+
+  .popup-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    padding-right: 30px;
+    color: var(--mtech-navy);
+  }
+
+  .popup-description {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--mtech-text-grey);
+    margin: 0 0 20px;
+  }
+
+  .popup-cta {
+    display: inline-block;
+    background: var(--mtech-orange);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 26px;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+  }
+
+  .popup-cta:hover {
+    background: var(--mtech-orange-dark);
+  }
+
+  .popup-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--mtech-border-grey);
+  }
+
+  .popup-nav-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--mtech-border-grey);
+    background: var(--mtech-light-grey);
+    color: var(--mtech-navy);
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .popup-nav-btn:hover {
+    background: #eee;
+  }
+
+  .popup-nav-count {
+    font-size: 13px;
+    color: var(--mtech-text-grey);
+  }
+
+  /* ---------- Desktop layout ---------- */
+  @media (min-width: 1024px) {
+    .showcase-grid {
+      grid-template-columns: 1.4fr 1fr;
+      align-items: start;
+    }
+
+    .popup-panel {
+      position: sticky;
+      top: 20px;
+    }
+  }
+
+  /* ---------- Tablet ---------- */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .illustration-panel {
+      padding: 24px;
+    }
+  }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 767px) {
+    .mtech-showcase {
+      padding: 12px;
+    }
+
+    .illustration-panel {
+      padding: 16px;
+      border-radius: 10px;
+    }
+
+    .popup-card,
+    .popup-placeholder {
+      padding: 20px;
+    }
+
+    .popup-title {
+      font-size: 19px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marker-pulse {
+      animation: none;
+      opacity: 0.5;
+    }
+    .popup-card {
+      animation: none;
+    }
+  }
+</style>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  (function () {
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+      setup() {
+        // Original architectural illustration, drawn to match the marker positions below.
+        const illustrationSrc = ref('assets/building-illustration.svg');
+
+        // Edit this array to add, remove, reorder or reposition technologies.
+        // x/y are percentages of the illustration's width/height — they line up with the
+        // icon badges baked into assets/building-illustration.svg (roof mast, drone, desks, etc).
+        // If you swap in a different illustration, re-tune x/y to match its icon positions.
+        const markers = ref([
+          { id: 'radio', title: 'Two-Way Radios', description: 'Own your communication. Stay in control.', icon: '📡', link: 'https://www.brentwoodradios.co.uk/what-we-do/two-way-radios-for-sale/', x: 67.6, y: 38.0 },
+          { id: 'poc', title: 'PoC Radios', description: 'All-in-one device. Smart communications. Lower costs.', icon: '📱', link: 'https://www.brentwoodradios.co.uk/idaro-devices/', x: 60.2, y: 27.8 },
+          { id: 'cctv', title: 'CCTV & Access Control', description: 'See clearly. Stay in control. Protect what matters.', icon: '🎥', link: 'https://www.brentwoodradios.co.uk/cctv-access-control/', x: 74.2, y: 18.6 },
+          { id: 'bodycam', title: 'Body Worn Cameras', description: 'See everything, miss nothing.', icon: '🎦', link: 'https://www.brentwoodradios.co.uk/bodycams/', x: 61.0, y: 44.7 },
+          { id: 'sensors', title: 'Smart Sensors', description: 'Smart monitoring for safer environments.', icon: '📶', link: '/smart-sensors/', x: 85.7, y: 16.7 },
+          { id: 'av', title: 'Audio Visual', description: 'Radio and audio-visual solutions for events and venues worldwide.', icon: '🔊', link: 'https://www.brentwoodradios.co.uk/audio-visual/', x: 55.3, y: 49.2 },
+          { id: 'ai', title: 'MTech AI', description: 'Every voice becomes action. Transform your radio network into a 24/7 virtual dispatcher.', icon: '🤖', link: '/mtech-ai/', x: 80.8, y: 38.8 },
+          { id: 'drones', title: 'Drones', description: 'Smarter. Safer. Faster. Capture aerial data and improve site safety.', icon: '🚁', link: '/drones/', x: 61.6, y: 64.8 },
+          { id: 'vape', title: 'Vape Detectors', description: 'Detect vaping and vandalism in real time. Protect students and staff, deter misuse instantly.', icon: '🚭', link: 'https://www.brentwoodradios.co.uk/vape-detectors/', x: 37.5, y: 20.7 },
+        ]);
+
+        const activeId = ref(null);
+
+        const activeIndex = computed(() =>
+          markers.value.findIndex((m) => m.id === activeId.value)
+        );
+
+        const activeMarker = computed(() =>
+          activeIndex.value === -1 ? null : markers.value[activeIndex.value]
+        );
+
+        function selectMarker(id) {
+          activeId.value = activeId.value === id ? null : id;
+        }
+
+        function closeMarker() {
+          activeId.value = null;
+        }
+
+        function cycleMarker(step) {
+          if (!markers.value.length) return;
+          const current = activeIndex.value === -1 ? 0 : activeIndex.value;
+          const next = (current + step + markers.value.length) % markers.value.length;
+          activeId.value = markers.value[next].id;
+        }
+
+        return {
+          illustrationSrc,
+          markers,
+          activeId,
+          activeIndex,
+          activeMarker,
+          selectMarker,
+          closeMarker,
+          cycleMarker,
+        };
+      },
+    }).mount('#mtech-showcase-app');
+  })();
+</script>
+
+</body>
+</html>
