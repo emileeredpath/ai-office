@@ -5,9 +5,11 @@ import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDateShort } from '@/utils/dateUtils';
 import { Brand, Task } from '@/types/index';
+import { PlanTab } from '@/components/campaigns/PlanTab';
 import '@/styles/campaignDetailPanel.css';
 
 type SortKey = 'date' | 'cost' | 'recipients';
+type PanelTab = 'overview' | 'plan';
 
 const ENTITY_OPTIONS: { value: Brand; label: string }[] = [
   { value: 'mtech', label: 'MTech Group' },
@@ -25,6 +27,7 @@ export function CampaignDetailPanel() {
   );
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
+  const selectTask = useAppStore((s) => s.selectTask);
   const tasks = useAppStore((s) => s.tasks);
 
   const campaignTasks = campaign ? tasks.filter((t) => t.campaignId === campaign.id) : [];
@@ -32,9 +35,11 @@ export function CampaignDetailPanel() {
   const [notes, setNotes] = useState(campaign?.notes || '');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [activeTab, setActiveTab] = useState<PanelTab>('overview');
 
   useEffect(() => {
     setNotes(campaign?.notes || '');
+    setActiveTab('overview');
   }, [selectedCampaignId]);
 
   if (!campaign) return null;
@@ -105,6 +110,30 @@ export function CampaignDetailPanel() {
         {/* Title */}
         <h1 className="campaign-detail-title">{campaign.name}</h1>
 
+        {/* Tabs */}
+        <div className="flex gap-1" style={{ marginBottom: '1.5rem', marginTop: '-0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+          {(['overview', 'plan'] as PanelTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="text-sm font-medium"
+              style={{
+                padding: '0.5rem 0.25rem',
+                marginRight: '1.25rem',
+                textTransform: 'capitalize',
+                color: activeTab === tab ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                borderBottom: activeTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent',
+              }}
+            >
+              {tab === 'plan' ? 'Plan' : 'Overview'}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'plan' ? (
+          <PlanTab campaign={campaign} campaignTasks={campaignTasks} onSelectTask={selectTask} />
+        ) : (
+        <>
         {/* Field Row 1 */}
         <div className="campaign-detail-fields">
           <div className="campaign-detail-field">
@@ -467,6 +496,8 @@ export function CampaignDetailPanel() {
             className="campaign-detail-textarea"
           />
         </div>
+        </>
+        )}
       </div>
     </div>
   );
