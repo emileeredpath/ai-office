@@ -27,6 +27,8 @@ export function CampaignDetailPanel() {
   );
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const updateTask = useAppStore((s) => s.updateTask);
+  const deleteCampaign = useAppStore((s) => s.deleteCampaign);
+  const deleteTask = useAppStore((s) => s.deleteTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const selectTask = useAppStore((s) => s.selectTask);
   const tasks = useAppStore((s) => s.tasks);
@@ -40,6 +42,7 @@ export function CampaignDetailPanel() {
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [selectedUnlinkedIds, setSelectedUnlinkedIds] = useState<Set<string>>(new Set());
   const [isLinking, setIsLinking] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   useEffect(() => {
     setNotes(campaign?.notes || '');
@@ -119,6 +122,13 @@ export function CampaignDetailPanel() {
     }
   };
 
+  const handleDeleteCampaign = async () => {
+    if (!window.confirm(`Delete "${campaign.name}"? This cannot be undone.`)) return;
+    setShowMoreMenu(false);
+    await deleteCampaign(campaign.id);
+    selectCampaign(null);
+  };
+
   const completedTasks = campaignTasks.filter((t) => t.status === 'complete').length;
   const progress = campaignTasks.length > 0 ? Math.round((completedTasks / campaignTasks.length) * 100) : 0;
 
@@ -129,9 +139,51 @@ export function CampaignDetailPanel() {
         <button className="btn-close" onClick={() => selectCampaign(null)}>
           <X size={20} />
         </button>
-        <button className="btn-more">
-          <MoreVertical size={20} />
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn-more"
+            onClick={() => setShowMoreMenu((v) => !v)}
+            style={{ position: 'relative' }}
+          >
+            <MoreVertical size={20} />
+          </button>
+          {showMoreMenu && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                marginTop: '4px',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                zIndex: 10,
+                minWidth: '160px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              }}
+            >
+              <button
+                onClick={handleDeleteCampaign}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 12px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  color: '#ff4444',
+                  fontWeight: 500,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 68, 68, 0.1)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                Delete campaign
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}

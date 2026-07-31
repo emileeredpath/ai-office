@@ -15,6 +15,7 @@ export function TaskDetailPanel() {
   const updateTask = useAppStore((s) => s.updateTask);
   const completeTask = useAppStore((s) => s.completeTask);
   const reopenTask = useAppStore((s) => s.reopenTask);
+  const deleteTask = useAppStore((s) => s.deleteTask);
   const selectTask = useAppStore((s) => s.selectTask);
   const getCampaignById = useAppStore((s) => s.getCampaignById);
   const campaigns = useAppStore((s) => s.campaigns);
@@ -23,6 +24,7 @@ export function TaskDetailPanel() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(task?.notes || '');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   useEffect(() => {
     setNotes(task?.notes || '');
@@ -58,6 +60,13 @@ export function TaskDetailPanel() {
     }
   };
 
+  const handleDeleteTask = async () => {
+    if (!window.confirm(`Delete "${task.title}"? This cannot be undone.`)) return;
+    setShowMoreMenu(false);
+    await deleteTask(task.id);
+    selectTask(null);
+  };
+
   return (
     <div className="task-detail-panel">
       {/* Header */}
@@ -85,9 +94,51 @@ export function TaskDetailPanel() {
               Mark complete
             </button>
           )}
-          <button className="btn-more">
-            <MoreVertical size={20} />
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn-more"
+              onClick={() => setShowMoreMenu((v) => !v)}
+              style={{ position: 'relative' }}
+            >
+              <MoreVertical size={20} />
+            </button>
+            {showMoreMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '4px',
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '6px',
+                  zIndex: 10,
+                  minWidth: '160px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                }}
+              >
+                <button
+                  onClick={handleDeleteTask}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px 12px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#ff4444',
+                    fontWeight: 500,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 68, 68, 0.1)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  Delete task
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
