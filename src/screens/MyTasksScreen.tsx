@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { TaskRow } from '@/components/tasks/TaskRow';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
@@ -12,6 +12,7 @@ type FilterPriority = 'all' | 'high' | 'medium' | 'low';
 
 export function MyTasksScreen() {
   const tasks = useAppStore((s) => s.tasks);
+  const campaigns = useAppStore((s) => s.campaigns);
   const { isEditor } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -19,6 +20,17 @@ export function MyTasksScreen() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterPriority, setFilterPriority] = useState<FilterPriority>('all');
   const [groupBy, setGroupBy] = useState<'status' | 'brand' | 'campaign' | 'priority'>('status');
+  // Collapsed by default — groups expand on click so a long list (e.g. 24
+  // "Not Started" tasks) doesn't dump everything on screen at once.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -106,7 +118,8 @@ export function MyTasksScreen() {
     if (groupBy === 'status') return statusLabels[key] || key;
     if (groupBy === 'brand') return brandLabels[key] || key;
     if (groupBy === 'priority') return priorityLabels[key] || key;
-    return key === 'uncategorized' ? 'No Campaign' : `Campaign: ${key}`;
+    if (key === 'uncategorized') return 'No Campaign';
+    return campaigns.find((c) => c.id === key)?.name || key;
   };
 
   return (
@@ -181,24 +194,35 @@ export function MyTasksScreen() {
           </div>
         </div>
 
-        {/* Task Groups */}
-        <div className="space-y-6">
-          {sortedGroupEntries.map(([groupKey, groupTasks]) => (
-            <div key={groupKey}>
-              <h2 className="text-lg font-semibold text-text-primary mb-4">
-                {getGroupLabel(groupKey)} ({groupTasks.length})
-              </h2>
-              <div className="card">
-                <table className="table">
-                  <tbody>
-                    {groupTasks.map((task) => (
-                      <TaskRow key={task.id} task={task} />
-                    ))}
-                  </tbody>
-                </table>
+        {/* Task Groups — collapsed by default, click to expand */}
+        <div className="space-y-3">
+          {sortedGroupEntries.map(([groupKey, groupTasks]) => {
+            const isExpanded = expandedGroups.has(groupKey);
+            return (
+              <div key={groupKey} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <button
+                  onClick={() => toggleGroup(groupKey)}
+                  className="w-full flex items-center gap-2 text-left"
+                  style={{ padding: '1rem 1.25rem' }}
+                >
+                  {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  <h2 className="text-base font-semibold text-text-primary" style={{ margin: 0 }}>
+                    {getGroupLabel(groupKey)}
+                  </h2>
+                  <span className="text-sm text-text-secondary">({groupTasks.length})</span>
+                </button>
+                {isExpanded && (
+                  <table className="table" style={{ borderTop: '1px solid var(--color-border)' }}>
+                    <tbody>
+                      {groupTasks.map((task) => (
+                        <TaskRow key={task.id} task={task} />
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {sortedGroupEntries.length === 0 && (
             <p className="text-text-secondary">No tasks found matching your filters</p>
