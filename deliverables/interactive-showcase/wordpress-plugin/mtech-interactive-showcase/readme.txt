@@ -10,7 +10,7 @@ Interactive building-illustration showcase with clickable technology markers, fo
 
 == Description ==
 
-Adds an `[interactive-showcase]` shortcode that renders 8 clickable/tappable
+Adds an `[interactive-showcase]` shortcode that renders 9 clickable/tappable
 markers over a building illustration. Clicking a marker opens a popup with an
 icon, title, short description and a "Learn More" link. Fully responsive
 (desktop side-by-side layout, mobile/tablet stacked layout).
@@ -48,7 +48,7 @@ The JSON file should be an array of objects shaped like:
 
 == Customizing the default technologies ==
 
-Without a `data` attribute, the shortcode uses the 8 MTech Brentwood
+Without a `data` attribute, the shortcode uses the 9 MTech Brentwood
 technologies defined in `mtech_showcase_default_markers()` inside
 `mtech-interactive-showcase.php`. To change them site-wide without editing
 that function directly, hook the `mtech_showcase_markers` filter from your

@@ -34,14 +34,15 @@ function mtech_showcase_enqueue_vue() {
  */
 function mtech_showcase_default_markers() {
 	return array(
-		array( 'id' => 'radio',    'title' => 'Two-Way Radios',          'description' => 'Own your communication. Stay in control.',                                                     'icon' => '📡', 'link' => '/radio-communications/', 'x' => 15, 'y' => 30 ),
-		array( 'id' => 'poc',      'title' => 'PoC Radios',               'description' => 'All-in-one device. Smart communications. Lower costs.',                                          'icon' => '📱', 'link' => '/poc-radios/',            'x' => 32, 'y' => 20 ),
-		array( 'id' => 'cctv',     'title' => 'CCTV & Access Control',    'description' => 'See clearly. Stay in control. Protect what matters.',                                            'icon' => '🎥', 'link' => '/cctv-access-control/',   'x' => 78, 'y' => 25 ),
-		array( 'id' => 'bodycam',  'title' => 'Body Worn Cameras',        'description' => 'See everything, miss nothing.',                                                                  'icon' => '🎦', 'link' => '/body-worn-cameras/',     'x' => 60, 'y' => 45 ),
-		array( 'id' => 'sensors',  'title' => 'Smart Sensors',            'description' => 'Smart monitoring for safer environments.',                                                        'icon' => '📶', 'link' => '/smart-sensors/',         'x' => 20, 'y' => 65 ),
-		array( 'id' => 'av',       'title' => 'Audio Visual',             'description' => 'Radio and audio-visual solutions for events and venues worldwide.',                                'icon' => '🔊', 'link' => '/audio-visual/',          'x' => 45, 'y' => 75 ),
-		array( 'id' => 'ai',       'title' => 'MTech AI',                 'description' => 'Every voice becomes action. Transform your radio network into a 24/7 virtual dispatcher.',        'icon' => '🤖', 'link' => '/mtech-ai/',              'x' => 70, 'y' => 68 ),
-		array( 'id' => 'drones',   'title' => 'Drones',                   'description' => 'Smarter. Safer. Faster. Capture aerial data and improve site safety.',                             'icon' => '🚁', 'link' => '/drones/',                'x' => 85, 'y' => 82 ),
+		array( 'id' => 'radio',    'title' => 'Two-Way Radios',          'description' => 'Own your communication. Stay in control.',                                                     'icon' => '📡', 'link' => 'https://www.brentwoodradios.co.uk/what-we-do/two-way-radios-for-sale/', 'x' => 9.5,  'y' => 5.5 ),
+		array( 'id' => 'poc',      'title' => 'PoC Radios',               'description' => 'All-in-one device. Smart communications. Lower costs.',                                          'icon' => '📱', 'link' => 'https://www.brentwoodradios.co.uk/idaro-devices/',                       'x' => 25,   'y' => 52.2 ),
+		array( 'id' => 'cctv',     'title' => 'CCTV & Access Control',    'description' => 'See clearly. Stay in control. Protect what matters.',                                            'icon' => '🎥', 'link' => 'https://www.brentwoodradios.co.uk/cctv-access-control/',                 'x' => 83.3, 'y' => 51.1 ),
+		array( 'id' => 'bodycam',  'title' => 'Body Worn Cameras',        'description' => 'See everything, miss nothing.',                                                                  'icon' => '🎦', 'link' => 'https://www.brentwoodradios.co.uk/bodycams/',                            'x' => 19.2, 'y' => 76.7 ),
+		array( 'id' => 'sensors',  'title' => 'Smart Sensors',            'description' => 'Smart monitoring for safer environments.',                                                        'icon' => '📶', 'link' => '/smart-sensors/',                                                         'x' => 54.2, 'y' => 47.8 ),
+		array( 'id' => 'av',       'title' => 'Audio Visual',             'description' => 'Radio and audio-visual solutions for events and venues worldwide.',                                'icon' => '🔊', 'link' => 'https://www.brentwoodradios.co.uk/audio-visual/',                        'x' => 46.7, 'y' => 32.2 ),
+		array( 'id' => 'ai',       'title' => 'MTech AI',                 'description' => 'Every voice becomes action. Transform your radio network into a 24/7 virtual dispatcher.',        'icon' => '🤖', 'link' => '/mtech-ai/',                                                              'x' => 73.3, 'y' => 33.3 ),
+		array( 'id' => 'drones',   'title' => 'Drones',                   'description' => 'Smarter. Safer. Faster. Capture aerial data and improve site safety.',                             'icon' => '🚁', 'link' => '/drones/',                                                                'x' => 81.7, 'y' => 10 ),
+		array( 'id' => 'vape',     'title' => 'Vape Detectors',           'description' => 'Detect vaping and vandalism in real time. Protect students and staff, deter misuse instantly.',    'icon' => '🚭', 'link' => 'https://www.brentwoodradios.co.uk/vape-detectors/',                      'x' => 46.7, 'y' => 78.9 ),
 	);
 }
 
@@ -61,7 +62,7 @@ function mtech_showcase_shortcode( $atts ) {
 
 	$atts = shortcode_atts(
 		array(
-			'image' => MTECH_SHOWCASE_URL . 'assets/building-illustration-placeholder.svg',
+			'image' => MTECH_SHOWCASE_URL . 'assets/building-illustration.svg',
 			'data'  => '',
 			'id'    => 'instance-' . $instance,
 		),

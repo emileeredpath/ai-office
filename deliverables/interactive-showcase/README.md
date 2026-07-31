@@ -1,35 +1,40 @@
 # Interactive Communication Systems Showcase
 
-A self-contained Vue 3 component for the MTech Brentwood Communications website. Shows 8 technologies as clickable/tappable markers over an architectural building illustration, each opening a short description with a "Learn More" link.
+A self-contained Vue 3 component for the MTech Brentwood Communications website. Shows 9 technologies as clickable/tappable markers over an original architectural building-cutaway illustration, each opening a short description with a "Learn More" link.
 
 ## Files
 
 - `interactive-showcase.html` — the complete component (HTML + CSS + Vue 3 JS in one file)
+- `assets/building-illustration.svg` / `.png` — the original building-cutaway artwork (see **The illustration** below)
 - `wordpress-plugin/mtech-interactive-showcase/` — drop-in WordPress plugin version (see below)
 - `README.md` — this guide
 
 ## Quick preview
 
-Open `interactive-showcase.html` directly in a browser. It uses a placeholder image reference (`building-illustration.png`) — see **Replacing the illustration** below to swap in the real artwork.
+Open `interactive-showcase.html` directly in a browser (or a local server, since it loads `assets/building-illustration.svg` by relative path).
 
-## Replacing the illustration
+## The illustration
 
-Find this line near the top of the `<script>` block:
+`assets/building-illustration.svg` is an original 3-floor building cutaway (roof, floor slabs, desks, meeting rooms, reception, corridor) drawn in a soft grey line-art / pencil-sketch style, with a small MTech-blue icon badge baked into the artwork at each technology's location — a rooftop mast for Two-Way Radios, a drone over the roof, desks and door sensors for the rest. It's vector (SVG), so it stays crisp at any size; a rasterised `building-illustration.png` (2400×1800) is included too, in case your CMS media library doesn't accept SVG uploads.
+
+The interactive marker layer sits **on top of** these baked-in badges as a transparent hit-target — it never paints a solid dot over the icon, only a hover/active ring and a pulse cue, so the hand-drawn icon stays visible underneath at all times. If you replace the illustration with different artwork, keep this in mind: either bake your own icon badges into the image, or fall back to the marker's `icon` emoji as the sole visual (remove the `.marker-dot`/`.marker-pulse` "ring-only" styling and give it a background fill again).
+
+**To swap the illustration:** find this line near the top of the `<script>` block:
 
 ```js
-const illustrationSrc = ref('building-illustration.png');
+const illustrationSrc = ref('assets/building-illustration.svg');
 ```
 
-Replace `'building-illustration.png'` with the final image URL (a WordPress media library URL, or any absolute path). The image should be roughly landscape/portrait-matched to how the markers below are positioned — if you use a very different aspect ratio, you'll need to re-tune marker x/y values (see next section).
+Point it at your own image (WordPress media library URL or any path). If the new artwork doesn't already have icon badges lined up with the `markers` array's `x`/`y` values, re-tune those coordinates to match — see next section.
 
 ## Editing technology markers
 
-All 8 technologies live in one array in the `<script>` block:
+All 9 technologies live in one array in the `<script>` block:
 
 ```js
 const markers = ref([
-  { id: 'radio', title: 'Two-Way Radios', description: 'Own your communication. Stay in control.', icon: '📡', link: '/radio-communications/', x: 15, y: 30 },
-  // ...7 more
+  { id: 'radio', title: 'Two-Way Radios', description: 'Own your communication. Stay in control.', icon: '📡', link: 'https://www.brentwoodradios.co.uk/what-we-do/two-way-radios-for-sale/', x: 9.5, y: 5.5 },
+  // ...8 more
 ]);
 ```
 
@@ -120,7 +125,7 @@ Duplicate `interactive-showcase.html` per brand (e.g. `interactive-showcase-radi
 
 - Only one popup is shown at a time; clicking a marker while another is open swaps the content.
 - Clicking the same marker twice closes the popup.
-- Previous/next arrows in the popup footer let users cycle through all 8 technologies without returning to the illustration (useful on mobile).
+- Previous/next arrows in the popup footer let users cycle through all 9 technologies without returning to the illustration (useful on mobile).
 - Desktop (≥1024px): illustration and popup sit side-by-side in a grid; the popup panel is `position: sticky` so it stays in view while the page scrolls.
 - Mobile/tablet (<1024px): illustration is full width, popup appears directly below it as a single column.
 - Respects `prefers-reduced-motion` — pulse and fade animations are toned down for users who request reduced motion.
@@ -133,16 +138,35 @@ Duplicate `interactive-showcase.html` per brand (e.g. `interactive-showcase-radi
 3. **Analytics tracking on clicks** — not implemented (kept out of scope for this pass, per the brief's focus on quality over extras). To add later: call your analytics event (e.g. `gtag('event', 'showcase_marker_click', { technology: marker.id })`) inside `selectMarker()`.
 4. **Keyboard navigation** — markers are real `<button>` elements, so they're natively focusable and clickable via <kbd>Tab</kbd>/<kbd>Enter</kbd>/<kbd>Space</kbd>. Left/right cycling through technologies is available via the popup's `‹`/`›` buttons (also keyboard-accessible). Arrow-key cycling while focused on the illustration wasn't added, to keep this pass focused — straightforward to add to `cycleMarker()` with a `keydown` listener if wanted.
 
+## Confirmed vs. placeholder links
+
+Of the 9 technologies, these link to real, confirmed pages:
+
+| Technology | URL |
+|---|---|
+| Two-Way Radios | https://www.brentwoodradios.co.uk/what-we-do/two-way-radios-for-sale/ |
+| PoC Radios | https://www.brentwoodradios.co.uk/idaro-devices/ (IDARO is MTech's PoC radio product line) |
+| CCTV & Access Control | https://www.brentwoodradios.co.uk/cctv-access-control/ |
+| Body Worn Cameras | https://www.brentwoodradios.co.uk/bodycams/ |
+| Audio Visual | https://www.brentwoodradios.co.uk/audio-visual/ |
+| Vape Detectors *(bonus 9th technology, not in the original brief)* | https://www.brentwoodradios.co.uk/vape-detectors/ |
+
+Still placeholder (`/smart-sensors/`, `/mtech-ai/`, `/drones/`) — swap in the real URLs in both `interactive-showcase.html` and `wordpress-plugin/mtech-interactive-showcase/mtech-interactive-showcase.php` (`mtech_showcase_default_markers()`) before launch:
+
+- Smart Sensors
+- MTech AI
+- Drones
+
 ## Testing checklist
 
-- [x] All 8 markers clickable and functional
+- [x] All 9 markers clickable and functional
 - [x] Popup opens/closes smoothly (fade transition)
-- [x] Buttons link to placeholder pages — **update `link` values to real URLs before launch**
+- [x] 6 of 9 buttons link to real, confirmed pages — see table above for the 3 still on placeholder links
 - [x] Animations use CSS only (pulse, fade) — no JS-driven animation loops
 - [x] Responsive layout at 375px / 768px / 1024px breakpoints
 - [x] Touch (tap) works identically to click — markers are standard buttons
 - [x] Only one popup visible at a time
 - [x] Close button (✕) works
 - [x] Markers remain visible/clickable at all breakpoints
-- [ ] Final architectural illustration swapped in (placeholder image reference currently in place)
-- [ ] Real "Learn More" destination URLs confirmed for all 8 technologies
+- [x] Original building-cutaway illustration in place, with icon badges aligned to marker positions
+- [ ] Real "Learn More" destination URLs confirmed for Smart Sensors, MTech AI and Drones
