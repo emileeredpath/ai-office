@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Workflow, Settings, Target } from 'lucide-react';
+import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, Settings } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { CampaignDetailPanel } from '@/components/campaigns/CampaignDetailPanel';
@@ -8,22 +8,18 @@ import { MyTasksScreen } from '@/screens/MyTasksScreen';
 import { CampaignsScreen } from '@/screens/CampaignsScreen';
 import { CalendarScreen } from '@/screens/CalendarScreen';
 import { DashboardScreen } from '@/screens/DashboardScreen';
-import { PipelineScreen } from '@/screens/PipelineScreen';
 import { MetricsScreen } from '@/screens/MetricsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
-import { ObjectivesScreen } from '@/screens/ObjectivesScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'pipeline' | 'metrics' | 'objectives' | 'settings';
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'metrics' | 'settings';
 
 const NAVIGATION_ITEMS = [
   { id: 'home' as Screen, icon: Home, label: 'Home' },
   { id: 'tasks' as Screen, icon: CheckSquare, label: 'My Tasks' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
-  { id: 'pipeline' as Screen, icon: Workflow, label: 'Pipeline' },
-  { id: 'objectives' as Screen, icon: Target, label: 'Objectives' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Dashboard' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
@@ -49,10 +45,6 @@ export default function App() {
         return <MyTasksScreen />;
       case 'campaigns':
         return <CampaignsScreen />;
-      case 'pipeline':
-        return <PipelineScreen />;
-      case 'objectives':
-        return <ObjectivesScreen />;
       case 'dashboard':
         return <DashboardScreen />;
       case 'metrics':
