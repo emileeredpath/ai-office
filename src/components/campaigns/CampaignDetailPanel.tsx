@@ -1,24 +1,23 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical, ArrowUpDown, Check } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { X, Plus, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDateShort } from '@/utils/dateUtils';
-import { Brand, Task } from '@/types/index';
-import { PlanTab } from '@/components/campaigns/PlanTab';
+import { Task } from '@/types/index';
 import '@/styles/campaignDetailPanel.css';
 
-type SortKey = 'date' | 'cost' | 'recipients';
-type PanelTab = 'overview' | 'plan';
+type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding';
 
-const ENTITY_OPTIONS: { value: Brand; label: string }[] = [
-  { value: 'mtech', label: 'MTech Group' },
-  { value: 'brentwood', label: 'Brentwood Communications' },
-  { value: 'radio-links', label: 'Radio Links' },
-  { value: 'capcom', label: 'Capcom' },
-  { value: 'ircl', label: 'IRCL' },
-  { value: 'idaro', label: 'IDARO' },
-];
+interface ConfirmModal {
+  field: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+  onConfirm: () => void;
+}
+
+interface Toast {
+  message: string;
+  id: number;
+}
 
 export function CampaignDetailPanel() {
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
@@ -26,109 +25,88 @@ export function CampaignDetailPanel() {
     s.selectedCampaignId ? s.campaigns.find((c) => c.id === s.selectedCampaignId) ?? null : null
   );
   const updateCampaign = useAppStore((s) => s.updateCampaign);
-  const updateTask = useAppStore((s) => s.updateTask);
   const deleteCampaign = useAppStore((s) => s.deleteCampaign);
-  const deleteTask = useAppStore((s) => s.deleteTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
-  const selectTask = useAppStore((s) => s.selectTask);
   const tasks = useAppStore((s) => s.tasks);
 
   const campaignTasks = campaign ? tasks.filter((t) => t.campaignId === campaign.id) : [];
-  const unlinkedTasks = tasks.filter((t) => !t.campaignId);
+  const emailSends = campaignTasks.filter((t) => t.type === 'email-send');
 
-  const [notes, setNotes] = useState(campaign?.notes || '');
-  const [sortKey, setSortKey] = useState<SortKey>('date');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
-  const [selectedUnlinkedIds, setSelectedUnlinkedIds] = useState<Set<string>>(new Set());
-  const [isLinking, setIsLinking] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toastIdCounter, setToastIdCounter] = useState(0);
+
+  // Overview tab fields
+  const [budget, setBudget] = useState(campaign?.budget?.toString() || '');
+  const [spend, setSpend] = useState(campaign?.spend?.toString() || '');
+  const [valueGenerated, setValueGenerated] = useState(campaign?.valueGenerated?.toString() || '');
+  const [leads, setLeads] = useState(campaign?.leads?.toString() || '');
+  const [notes, setNotes] = useState(campaign?.notes || '');
+
+  // Funding tab fields
+  const [vendor, setVendor] = useState(campaign?.vendor || '');
+  const [scheme, setScheme] = useState(campaign?.scheme || '');
+  const [cofundRate, setCofundRate] = useState(campaign?.cofundRate?.toString() || '');
+  const [claimStatus, setClaimStatus] = useState(campaign?.claimStatus || '');
+
+  // Schedule tab fields
+  const [schedule, setSchedule] = useState(campaign?.schedule || []);
 
   useEffect(() => {
-    setNotes(campaign?.notes || '');
-    setActiveTab('overview');
+    if (campaign) {
+      setBudget(campaign.budget?.toString() || '');
+      setSpend(campaign.spend?.toString() || '');
+      setValueGenerated(campaign.valueGenerated?.toString() || '');
+      setLeads(campaign.leads?.toString() || '');
+      setNotes(campaign.notes || '');
+      setVendor(campaign.vendor || '');
+      setScheme(campaign.scheme || '');
+      setCofundRate(campaign.cofundRate?.toString() || '');
+      setClaimStatus(campaign.claimStatus || '');
+      setSchedule(campaign.schedule || []);
+      setActiveTab('overview');
+    }
   }, [selectedCampaignId]);
 
   if (!campaign) return null;
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
-
-  const sortValue = (t: Task, key: SortKey): number => {
-    if (key === 'date') return t.deadline ? new Date(t.deadline).getTime() : 0;
-    if (key === 'cost') return t.cost ?? 0;
-    return t.recipients ?? 0;
-  };
-
-  const sortedSends = [...campaignTasks].sort((a, b) => {
-    const diff = sortValue(a, sortKey) - sortValue(b, sortKey);
-    return sortDir === 'asc' ? diff : -diff;
-  });
-
-  // Financial/reach totals — sum only tasks that actually carry the field,
-  // so a campaign with a mix of costed and uncosted sends doesn't understate.
-  const sendTasks = campaignTasks.filter((t) => t.type === 'email-send');
-  const totalRecipients = sendTasks.reduce((sum, t) => sum + (t.recipients || 0), 0);
-  const totalTaskCost = campaignTasks.reduce((sum, t) => sum + (t.cost || 0), 0);
-  const spendPerRecipient = totalRecipients > 0 && campaign.spend > 0 ? campaign.spend / totalRecipients : null;
-  const sendDates = sendTasks
-    .filter((t) => t.deadline)
-    .map((t) => new Date(t.deadline as Date).getTime())
-    .sort((a, b) => a - b);
-  const dateRange =
-    sendDates.length > 0
-      ? { first: new Date(sendDates[0]), last: new Date(sendDates[sendDates.length - 1]) }
-      : null;
-  const costChartData = sendTasks
-    .filter((t) => t.cost != null)
-    .map((t) => ({ name: t.title.length > 18 ? `${t.title.slice(0, 16)}…` : t.title, cost: t.cost || 0 }));
-
-  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newNotes = e.target.value;
-    setNotes(newNotes);
+  const showToast = (message: string) => {
+    const id = toastIdCounter;
+    setToastIdCounter(id + 1);
+    setToasts((prev) => [...prev, { message, id }]);
     setTimeout(() => {
-      updateCampaign(campaign.id, { notes: newNotes });
-    }, 500);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
   };
 
-  const handleToggleUnlinkedTask = (taskId: string) => {
-    setSelectedUnlinkedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
-      }
-      return next;
+  const showConfirm = (field: string, oldValue: any, newValue: any, onConfirm: () => void) => {
+    setConfirmModal({
+      field,
+      oldValue: String(oldValue || ''),
+      newValue: String(newValue || ''),
+      onConfirm,
     });
   };
 
-  const handleLinkSelectedTasks = async () => {
-    if (selectedUnlinkedIds.size === 0) return;
-    setIsLinking(true);
-    try {
-      for (const taskId of selectedUnlinkedIds) {
-        await updateTask(taskId, { campaignId: campaign.id });
-      }
-      setSelectedUnlinkedIds(new Set());
-    } finally {
-      setIsLinking(false);
-    }
+  const handleFieldChange = (fieldName: string, oldValue: any, newValue: any, onSave: () => void) => {
+    if (String(oldValue || '') === String(newValue || '')) return;
+    showConfirm(fieldName, oldValue, newValue, () => {
+      onSave();
+      showToast(`✓ ${fieldName} saved`);
+    });
   };
 
-  const handleDeleteCampaign = async () => {
-    if (!window.confirm(`Delete "${campaign.name}"? This cannot be undone.`)) return;
-    await deleteCampaign(campaign.id);
-    selectCampaign(null);
-  };
+  const roi = campaign.spend > 0 && campaign.valueGenerated ?
+    Math.round(((campaign.valueGenerated - campaign.spend) / campaign.spend) * 100) : 0;
 
-  const completedTasks = campaignTasks.filter((t) => t.status === 'complete').length;
-  const progress = campaignTasks.length > 0 ? Math.round((completedTasks / campaignTasks.length) * 100) : 0;
+  const recipients = campaign.recipients || emailSends.reduce((sum, t) => sum + (t.recipients || 0), 0);
+
+  // Funding calculations
+  const eligibleSpend = campaign.budget || 0;
+  const recoverable = campaign.cofundRate != null && campaign.budget
+    ? Math.round((campaign.budget * campaign.cofundRate) / 100)
+    : 0;
 
   return (
     <div className="campaign-detail-panel">
@@ -138,7 +116,12 @@ export function CampaignDetailPanel() {
           <X size={20} />
         </button>
         <button
-          onClick={handleDeleteCampaign}
+          onClick={() => {
+            if (window.confirm(`Delete "${campaign.name}"? This cannot be undone.`)) {
+              deleteCampaign(campaign.id);
+              selectCampaign(null);
+            }
+          }}
           style={{
             padding: '6px 10px',
             backgroundColor: 'transparent',
@@ -164,12 +147,11 @@ export function CampaignDetailPanel() {
 
       {/* Content */}
       <div className="campaign-detail-content">
-        {/* Title */}
         <h1 className="campaign-detail-title">{campaign.name}</h1>
 
         {/* Tabs */}
-        <div className="flex gap-1" style={{ marginBottom: '1.5rem', marginTop: '-0.75rem', borderBottom: '1px solid var(--color-border)' }}>
-          {(['overview', 'plan'] as PanelTab[]).map((tab) => (
+        <div className="flex gap-1 mb-6 border-b border-border">
+          {(['overview', 'schedule', 'sends', 'funding'] as PanelTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -182,494 +164,436 @@ export function CampaignDetailPanel() {
                 borderBottom: activeTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent',
               }}
             >
-              {tab === 'plan' ? 'Plan' : 'Overview'}
+              {tab === 'overview' ? 'Overview' : tab === 'schedule' ? 'Schedule' : tab === 'sends' ? 'Sends' : 'Funding'}
             </button>
           ))}
         </div>
 
-        {activeTab === 'plan' ? (
-          <PlanTab campaign={campaign} campaignTasks={campaignTasks} onSelectTask={selectTask} onUpdateCampaign={updateCampaign} />
-        ) : (
-        <>
-        {/* Field Row 1 */}
-        <div className="campaign-detail-fields">
-          <div className="campaign-detail-field">
-            <label>Brand</label>
-            <div className="flex items-center gap-2">
-              <BrandBadge brand={campaign.brand} />
+        {/* TAB: Overview */}
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            {/* Recipients (read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Recipients</label>
+              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary">
+                {recipients.toLocaleString()} (read-only)
+              </div>
             </div>
-          </div>
 
-          <div className="campaign-detail-field">
-            <label>Status</label>
-            <select
-              value={campaign.status}
-              onChange={(e) => updateCampaign(campaign.id, { status: e.target.value as any })}
-              className="input"
-            >
-              <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="on-hold">On Hold</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
+            {/* Budget */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Budget (£)</label>
+              <input
+                type="number"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                onBlur={() => {
+                  const newValue = budget ? Number(budget) : null;
+                  handleFieldChange('Budget', campaign.budget, newValue, () => {
+                    updateCampaign(campaign.id, { budget: newValue });
+                  });
+                }}
+                className="input w-full"
+                placeholder="Not set"
+              />
+            </div>
 
-          <div className="campaign-detail-field">
-            <label>Actual spend (£)</label>
-            <input
-              type="number"
-              value={campaign.spend || ''}
-              placeholder="Not set"
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  spend: e.target.value ? Number(e.target.value) : 0,
-                })
-              }
-              className="input"
-            />
-          </div>
+            {/* Actual Spend */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Actual Spend (£)</label>
+              <input
+                type="number"
+                value={spend}
+                onChange={(e) => setSpend(e.target.value)}
+                onBlur={() => {
+                  const newValue = spend ? Number(spend) : 0;
+                  handleFieldChange('Actual Spend', campaign.spend, newValue, () => {
+                    updateCampaign(campaign.id, { spend: newValue });
+                  });
+                }}
+                className="input w-full"
+                placeholder="0"
+              />
+            </div>
 
-          <div className="campaign-detail-field">
-            <label>Budget (£)</label>
-            <input
-              type="number"
-              value={campaign.budget ?? ''}
-              placeholder="Not set"
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  budget: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              className="input"
-            />
-          </div>
-        </div>
+            {/* Value Generated */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Value Generated (£)</label>
+              <input
+                type="number"
+                value={valueGenerated}
+                onChange={(e) => setValueGenerated(e.target.value)}
+                onBlur={() => {
+                  const newValue = valueGenerated ? Number(valueGenerated) : null;
+                  handleFieldChange('Value Generated', campaign.valueGenerated, newValue, () => {
+                    updateCampaign(campaign.id, { valueGenerated: newValue });
+                  });
+                }}
+                className="input w-full"
+                placeholder="Not set"
+              />
+            </div>
 
-        {/* Financial summary — spend/budget already shown in the editable
-            field above; this only adds numbers not shown anywhere else. */}
-        {(spendPerRecipient != null || totalRecipients > 0) && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '1.5rem',
-              padding: '1rem 1.25rem',
-              marginBottom: '1.5rem',
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '8px',
-              flexWrap: 'wrap',
-            }}
-          >
-            {spendPerRecipient != null && (
-              <div>
-                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-                  Cost per recipient
-                </p>
-                <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  £{spendPerRecipient.toFixed(3)}
-                </p>
+            {/* Leads */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Leads</label>
+              <input
+                type="number"
+                value={leads}
+                onChange={(e) => setLeads(e.target.value)}
+                onBlur={() => {
+                  const newValue = leads ? Number(leads) : 0;
+                  handleFieldChange('Leads', campaign.leads, newValue, () => {
+                    updateCampaign(campaign.id, { leads: newValue });
+                  });
+                }}
+                className="input w-full"
+                placeholder="0"
+              />
+            </div>
+
+            {/* ROI (calculated, read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">ROI</label>
+              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary font-semibold">
+                {roi >= 0 ? '+' : ''}{roi}% (calculated, read-only)
               </div>
-            )}
-            {totalRecipients > 0 && (
-              <div>
-                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-                  Total recipients
-                </p>
-                <p style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                  {totalRecipients.toLocaleString()}
-                </p>
-              </div>
-            )}
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Notes</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={() => {
+                  if (notes !== campaign.notes) {
+                    updateCampaign(campaign.id, { notes });
+                    showToast('✓ Notes saved');
+                  }
+                }}
+                className="input w-full"
+                rows={4}
+                placeholder="Add any notes..."
+              />
+            </div>
           </div>
         )}
 
-        {/* Sends from — multi-entity */}
-        <div className="campaign-detail-field mb-4">
-          <label>Sends from</label>
-          <div className="flex flex-wrap gap-3 mt-1">
-            {ENTITY_OPTIONS.map((entity) => {
-              const checked = (campaign.entities || [campaign.brand]).includes(entity.value);
-              return (
-                <label key={entity.value} className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(e) => {
-                      const current = campaign.entities || [campaign.brand];
-                      const next = e.target.checked
-                        ? [...current, entity.value]
-                        : current.filter((b) => b !== entity.value);
-                      updateCampaign(campaign.id, { entities: next.length > 0 ? next : [entity.value] });
-                    }}
-                  />
-                  {entity.label}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Metrics Row 1 */}
-        <div className="campaign-detail-fields">
-          <div className="campaign-detail-field">
-            <label>Leads</label>
-            <input
-              type="number"
-              value={campaign.leads}
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  leads: e.target.value ? Number(e.target.value) : 0,
-                })
-              }
-              className="input"
-            />
-          </div>
-
-          <div className="campaign-detail-field">
-            <label>Conversions</label>
-            <input
-              type="number"
-              value={campaign.conversions}
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  conversions: e.target.value ? Number(e.target.value) : 0,
-                })
-              }
-              className="input"
-            />
-          </div>
-        </div>
-
-        {/* Metrics Row 2 */}
-        <div className="campaign-detail-fields">
-          <div className="campaign-detail-field">
-            <label>Engagement (%)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={campaign.engagement}
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  engagement: e.target.value ? Number(e.target.value) : 0,
-                })
-              }
-              className="input"
-            />
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="campaign-detail-divider"></div>
-
-        {/* Field Row 2 */}
-        <div className="campaign-detail-fields">
-          <div className="campaign-detail-field">
-            <label>Start date</label>
-            <input
-              type="date"
-              value={
-                campaign.startDate
-                  ? campaign.startDate instanceof Date
-                    ? campaign.startDate.toISOString().split('T')[0]
-                    : String(campaign.startDate).split('T')[0]
-                  : ''
-              }
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  startDate: e.target.value ? new Date(e.target.value) : new Date(),
-                })
-              }
-              className="input"
-            />
-          </div>
-
-          <div className="campaign-detail-field">
-            <label>End date</label>
-            <input
-              type="date"
-              value={
-                campaign.endDate
-                  ? campaign.endDate instanceof Date
-                    ? campaign.endDate.toISOString().split('T')[0]
-                    : String(campaign.endDate).split('T')[0]
-                  : ''
-              }
-              onChange={(e) =>
-                updateCampaign(campaign.id, {
-                  endDate: e.target.value ? new Date(e.target.value) : new Date(),
-                })
-              }
-              className="input"
-            />
-          </div>
-        </div>
-
-        {/* Field Row 3 */}
-        <div className="campaign-detail-fields">
-          <div className="campaign-detail-field">
-            <label>Primary industry</label>
-            <input
-              type="text"
-              value={campaign.primaryIndustry}
-              onChange={(e) =>
-                updateCampaign(campaign.id, { primaryIndustry: e.target.value })
-              }
-              className="input"
-            />
-          </div>
-
-          <div className="campaign-detail-field">
-            <label>Secondary industry</label>
-            <input
-              type="text"
-              value={campaign.secondaryIndustry}
-              onChange={(e) =>
-                updateCampaign(campaign.id, { secondaryIndustry: e.target.value })
-              }
-              className="input"
-            />
-          </div>
-
-          <div className="campaign-detail-field">
-            <label>Theme</label>
-            <input
-              type="text"
-              value={campaign.theme}
-              onChange={(e) =>
-                updateCampaign(campaign.id, { theme: e.target.value })
-              }
-              className="input"
-            />
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="campaign-detail-divider"></div>
-
-        {/* Progress */}
-        <div>
-          <h3 className="campaign-detail-section-title">PROGRESS</h3>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex-1 bg-surface rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-accent h-full transition-all"
-                style={{ width: `${progress}%` }}
-              ></div>
+        {/* TAB: Schedule */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-4">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid var(--color-border)' }}>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Date</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Element</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Status</th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-text-secondary">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td className="px-3 py-2">
+                        <input
+                          type="date"
+                          value={item.date}
+                          onChange={(e) => {
+                            const updated = [...schedule];
+                            updated[idx].date = e.target.value;
+                            setSchedule(updated);
+                          }}
+                          onBlur={() => {
+                            updateCampaign(campaign.id, { schedule });
+                            showToast('✓ Schedule updated');
+                          }}
+                          className="input text-sm"
+                          style={{ width: '100%' }}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="text"
+                          value={item.element}
+                          onChange={(e) => {
+                            const updated = [...schedule];
+                            updated[idx].element = e.target.value;
+                            setSchedule(updated);
+                          }}
+                          onBlur={() => {
+                            updateCampaign(campaign.id, { schedule });
+                            showToast('✓ Schedule updated');
+                          }}
+                          className="input text-sm"
+                          style={{ width: '100%' }}
+                          placeholder="Element name"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={item.status}
+                          onChange={(e) => {
+                            const updated = [...schedule];
+                            updated[idx].status = e.target.value as any;
+                            setSchedule(updated);
+                          }}
+                          onBlur={() => {
+                            updateCampaign(campaign.id, { schedule });
+                            showToast('✓ Schedule updated');
+                          }}
+                          className="input text-sm"
+                          style={{ width: '100%' }}
+                        >
+                          <option value="planning">Planning</option>
+                          <option value="scheduled">Scheduled</option>
+                          <option value="live">Live</option>
+                          <option value="complete">Complete</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => {
+                            const updated = schedule.filter((_, i) => i !== idx);
+                            setSchedule(updated);
+                            updateCampaign(campaign.id, { schedule: updated });
+                            showToast('✓ Element removed');
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <span className="text-sm font-medium text-text-primary">{progress}%</span>
+
+            <button
+              onClick={() => {
+                const updated = [...schedule, { date: '', element: '', status: 'planning' as const }];
+                setSchedule(updated);
+              }}
+              className="btn btn-secondary text-sm flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Add element
+            </button>
           </div>
-          <p className="text-sm text-text-secondary">
-            {completedTasks} of {campaignTasks.length} tasks complete
-          </p>
-        </div>
+        )}
 
-        {/* Divider */}
-        <div className="campaign-detail-divider"></div>
-
-        {/* Linked Tasks / sends breakdown */}
-        <div>
-          <h3 className="campaign-detail-section-title">SENDS &amp; TASKS</h3>
-          {campaignTasks.length > 0 ? (
-            <>
-              <p className="text-xs text-text-secondary mb-3">
-                {sendTasks.length} send{sendTasks.length === 1 ? '' : 's'}
-                {totalRecipients > 0 && ` · ${totalRecipients.toLocaleString()} recipients`}
-                {totalTaskCost > 0 && ` · £${totalTaskCost.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                {dateRange && ` · ${formatDateShort(dateRange.first)} – ${formatDateShort(dateRange.last)}`}
-              </p>
-
-              {costChartData.length > 1 && (
-                <div style={{ height: 24 * costChartData.length + 20, marginBottom: '1rem' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={costChartData} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
-                      <XAxis type="number" hide />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        width={110}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
-                      />
-                      <Tooltip formatter={(value: number) => [`£${value.toFixed(2)}`, 'Cost']} />
-                      <Bar dataKey="cost" fill="#3B82F6" radius={3} barSize={14} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        {/* TAB: Sends */}
+        {activeTab === 'sends' && (
+          <div className="space-y-4">
+            {emailSends.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr style={{ backgroundColor: '#3a82c6', height: '50px' }}>
-                      <th style={{ textAlign: 'left', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Send Name</th>
-                      <th style={{ textAlign: 'left', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('date')}>
-                        <span className="inline-flex items-center gap-1">Date <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
-                      </th>
-                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('recipients')}>
-                        <span className="inline-flex items-center gap-1">Recipients <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
-                      </th>
-                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Open Rate %</th>
-                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Click Rate %</th>
-                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('cost')}>
-                        <span className="inline-flex items-center gap-1">Cost <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
-                      </th>
-                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ROI</th>
-                      <th style={{ textAlign: 'center', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</th>
+                    <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid var(--color-border)' }}>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Send Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Date</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Recipients</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Open %</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Click %</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Cost (£)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedSends.map((task, index) => (
-                      <tr
-                        key={task.id}
-                        style={{
-                          height: '50px',
-                          borderBottom: '1px solid var(--color-border)',
-                          backgroundColor: index % 2 === 0 ? 'transparent' : 'var(--color-surface)',
-                          transition: 'background-color 0.2s',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f7ff')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : 'var(--color-surface)')}
-                      >
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                          <div className="flex items-center gap-2">
-                            <BrandBadge brand={task.brand} />
-                            <span>{task.title}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'left' }}>
-                          {task.deadline ? formatDateShort(task.deadline) : '—'}
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', textAlign: 'right' }}>
-                          {task.recipients != null ? task.recipients.toLocaleString() : '—'}
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
-                          {campaign.results?.emailOpenRate != null ? `${campaign.results.emailOpenRate.toFixed(1)}%` : '—'}
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
-                          {campaign.results?.emailClickRate != null ? `${campaign.results.emailClickRate.toFixed(1)}%` : '—'}
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', textAlign: 'right' }}>
-                          {task.cost != null ? `£${task.cost.toFixed(2)}` : '—'}
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, textAlign: 'right', color: (campaign.spend ?? 0) > (task.cost ?? 0) ? '#28a745' : (campaign.spend ?? 0) < (task.cost ?? 0) ? '#dc3545' : 'var(--color-text-secondary)' }}>
-                          {task.cost != null && campaign.spend != null && campaign.spend > 0
-                            ? `${((campaign.spend - task.cost) / task.cost * 100).toFixed(0)}%`
-                            : '—'}
-                        </td>
-                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', textAlign: 'center' }}>
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              padding: '4px 8px',
-                              borderRadius: '3px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              textTransform: 'capitalize',
-                              backgroundColor: task.status === 'complete' ? '#d4edda' : '#fff3cd',
-                              color: task.status === 'complete' ? '#155724' : '#856404',
-                            }}
-                          >
-                            {task.status === 'complete' ? '✓ Done' : 'Pending'}
-                          </span>
-                        </td>
+                    {emailSends.map((task, idx) => (
+                      <tr key={task.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--color-surface)' }}>
+                        <td className="px-3 py-2 text-text-primary">{task.title}</td>
+                        <td className="px-3 py-2 text-text-secondary">{task.deadline ? formatDateShort(task.deadline) : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-primary">{task.recipients ? task.recipients.toLocaleString() : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{campaign.results?.emailOpenRate != null ? `${campaign.results.emailOpenRate.toFixed(1)}%` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{campaign.results?.emailClickRate != null ? `${campaign.results.emailClickRate.toFixed(1)}%` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-primary">{task.cost != null ? `£${task.cost.toFixed(2)}` : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </>
-          ) : (
-            <p className="text-sm text-text-secondary">No tasks linked to this campaign</p>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="campaign-detail-divider"></div>
-
-        {/* Link Unlinked Tasks */}
-        {unlinkedTasks.length > 0 && (
-          <div>
-            <h3 className="campaign-detail-section-title">LINK TASKS TO CAMPAIGN</h3>
-            <p className="text-xs text-text-secondary mb-3">
-              {unlinkedTasks.length} unlinked task{unlinkedTasks.length === 1 ? '' : 's'} in the system
-            </p>
-            <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-              <div style={{ paddingTop: 0 }}>
-                {unlinkedTasks.map((task) => (
-                  <label
-                    key={task.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 10px',
-                      borderBottom: '1px solid var(--color-border)',
-                      cursor: 'pointer',
-                      backgroundColor: selectedUnlinkedIds.has(task.id) ? 'var(--color-surface)' : 'transparent',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedUnlinkedIds.has(task.id)}
-                      onChange={() => handleToggleUnlinkedTask(task.id)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {task.title}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                        {task.deadline ? formatDateShort(task.deadline) : 'No deadline'} · {task.status}
-                      </div>
-                    </div>
-                    <div style={{ flexShrink: 0, fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      {task.priority}
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-            {selectedUnlinkedIds.size > 0 && (
-              <button
-                onClick={handleLinkSelectedTasks}
-                disabled={isLinking}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  backgroundColor: 'var(--color-accent)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: isLinking ? 'not-allowed' : 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  opacity: isLinking ? 0.6 : 1,
-                }}
-              >
-                <Check size={14} />
-                Link {selectedUnlinkedIds.size} task{selectedUnlinkedIds.size === 1 ? '' : 's'} to campaign
-              </button>
+            ) : (
+              <p className="text-text-secondary text-center py-8">No email sends synced yet. Campaign Monitor will auto-sync when sends are completed.</p>
             )}
           </div>
         )}
 
-        {/* Divider */}
-        <div className="campaign-detail-divider"></div>
+        {/* TAB: Funding */}
+        {activeTab === 'funding' && (
+          <div className="space-y-4">
+            {/* Vendor */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Vendor</label>
+              <select
+                value={vendor}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  handleFieldChange('Vendor', campaign.vendor, newValue, () => {
+                    updateCampaign(campaign.id, { vendor: (newValue || null) as any });
+                    setVendor(newValue);
+                  });
+                }}
+                className="input w-full"
+              >
+                <option value="">None</option>
+                <option value="motorola">Motorola</option>
+                <option value="hytera">Hytera</option>
+                <option value="airsys">Airsys</option>
+                <option value="telox">Telox</option>
+              </select>
+            </div>
 
-        {/* Meeting Notes */}
-        <div>
-          <h3 className="campaign-detail-section-title">MEETING NOTES</h3>
-          <textarea
-            value={notes}
-            onChange={handleNotesChange}
-            placeholder="Add meeting notes, key decisions, or action items..."
-            className="campaign-detail-textarea"
-          />
-        </div>
-        </>
+            {/* Scheme */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Scheme</label>
+              <input
+                type="text"
+                value={scheme}
+                onChange={(e) => setScheme(e.target.value)}
+                onBlur={() => {
+                  if (scheme !== campaign.scheme) {
+                    updateCampaign(campaign.id, { scheme });
+                    showToast('✓ Scheme saved');
+                  }
+                }}
+                className="input w-full"
+                placeholder="e.g. XEVA Marketing Funds"
+              />
+            </div>
+
+            {/* Co-fund % */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Co-fund % (0–100)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={cofundRate}
+                onChange={(e) => setCofundRate(e.target.value)}
+                onBlur={() => {
+                  const newValue = cofundRate ? Number(cofundRate) : null;
+                  handleFieldChange('Co-fund %', campaign.cofundRate, newValue, () => {
+                    updateCampaign(campaign.id, { cofundRate: newValue });
+                  });
+                }}
+                className="input w-full"
+                placeholder="0"
+              />
+            </div>
+
+            {/* Claim Status */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Claim Status</label>
+              <select
+                value={claimStatus}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  handleFieldChange('Claim Status', campaign.claimStatus, newValue, () => {
+                    updateCampaign(campaign.id, { claimStatus: (newValue || null) as any });
+                    setClaimStatus(newValue);
+                  });
+                }}
+                className="input w-full"
+              >
+                <option value="">Not set</option>
+                <option value="eligible">Eligible</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+
+            {/* Eligible Spend (calculated, read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Eligible Spend (£)</label>
+              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary">
+                £{eligibleSpend.toLocaleString()} (read-only, calculated from budget)
+              </div>
+            </div>
+
+            {/* Recoverable Amount (calculated, read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Recoverable Amount (£)</label>
+              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary">
+                £{recoverable.toLocaleString()} (read-only, eligible × co-fund %)
+              </div>
+            </div>
+          </div>
         )}
+      </div>
+
+      {/* Confirm Modal */}
+      {confirmModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setConfirmModal(null)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              minWidth: '300px',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-text-primary font-semibold mb-3">Confirm change?</p>
+            <p className="text-sm text-text-secondary mb-4">
+              {confirmModal.field}: {confirmModal.oldValue || '(empty)'} → {confirmModal.newValue || '(empty)'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="btn btn-primary flex-1"
+              >
+                Confirm & save
+              </button>
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="btn btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toasts */}
+      <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 999 }}>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            style={{
+              backgroundColor: '#10b981',
+              color: 'white',
+              padding: '0.75rem 1rem',
+              borderRadius: '4px',
+              marginBottom: '0.5rem',
+              minWidth: '200px',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            {toast.message}
+          </div>
+        ))}
       </div>
     </div>
   );
