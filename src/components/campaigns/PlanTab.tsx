@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import { CAMPAIGN_PLAN_MARKDOWN } from '@/data/campaignPlans';
 import { parsePlanMarkdown, PlanSection } from '@/utils/planMarkdown';
@@ -86,6 +86,10 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
   const [uploadError, setUploadError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
+  useEffect(() => {
+    console.log('PlanTab mounted for campaign:', campaign.name);
+  }, [campaign.id]);
+
   const handleUploadClick = () => {
     console.log('Upload clicked - creating file input');
     const input = document.createElement('input');
@@ -93,6 +97,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
     input.accept = '.md';
     input.onchange = (e: any) => handleFileSelect(e);
     input.click();
+    console.log('File input created and clicked');
   };
 
   const markdown = CAMPAIGN_PLAN_MARKDOWN[campaign.id];
