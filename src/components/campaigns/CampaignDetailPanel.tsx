@@ -191,7 +191,7 @@ export function CampaignDetailPanel() {
             {/* Recipients (read-only) */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">Recipients</label>
-              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary">
+              <div className="px-3 py-2 rounded border border-border" style={{ color: '#1e3a8a' }}>
                 {recipients.toLocaleString()} (read-only)
               </div>
             </div>
@@ -271,7 +271,7 @@ export function CampaignDetailPanel() {
             {/* ROI (calculated, read-only) */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">ROI</label>
-              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary font-semibold">
+              <div className="px-3 py-2 rounded border border-border font-semibold" style={{ color: '#1e3a8a' }}>
                 {roi >= 0 ? '+' : ''}{roi}% (calculated, read-only)
               </div>
             </div>
@@ -524,7 +524,7 @@ export function CampaignDetailPanel() {
             {/* Eligible Spend (calculated, read-only) */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">Eligible Spend (£)</label>
-              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary">
+              <div className="px-3 py-2 rounded border border-border" style={{ color: '#1e3a8a' }}>
                 £{eligibleSpend.toLocaleString()} (read-only, calculated from budget)
               </div>
             </div>
@@ -532,7 +532,7 @@ export function CampaignDetailPanel() {
             {/* Recoverable Amount (calculated, read-only) */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">Recoverable Amount (£)</label>
-              <div className="px-3 py-2 bg-surface rounded border border-border text-text-primary">
+              <div className="px-3 py-2 rounded border border-border" style={{ color: '#1e3a8a' }}>
                 £{recoverable.toLocaleString()} (read-only, eligible × co-fund %)
               </div>
             </div>
