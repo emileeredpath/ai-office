@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import { CAMPAIGN_PLAN_MARKDOWN } from '@/data/campaignPlans';
 import { parsePlanMarkdown, PlanSection } from '@/utils/planMarkdown';
@@ -85,45 +85,32 @@ function PlanSectionView({ section, defaultOpen }: { section: PlanSection; defau
 export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaign }: { campaign: Campaign; campaignTasks: Task[]; onSelectTask: (id: string) => void; onUpdateCampaign: (id: string, updates: Partial<Campaign>) => void }) {
   const [uploadError, setUploadError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-
-  useEffect(() => {
-    console.log('PlanTab mounted for campaign:', campaign.name);
-  }, [campaign.id]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadClick = () => {
-    console.log('Upload clicked - creating file input');
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.md';
-    input.onchange = (e: any) => handleFileSelect(e);
-    input.click();
-    console.log('File input created and clicked');
+    console.log('Upload clicked');
+    fileInputRef.current?.click();
   };
 
   const markdown = CAMPAIGN_PLAN_MARKDOWN[campaign.id];
   const plan = markdown ? parsePlanMarkdown(markdown) : null;
 
-  const handleFileSelect = async (e: any) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target?.files?.[0];
-    console.log('File selected:', file?.name, file?.size);
-    if (!file) {
-      console.log('No file');
-      return;
-    }
+    if (!file) return;
 
     setUploadError('');
     setIsUploading(true);
-    console.log('Starting upload...');
 
     try {
-      // Only support markdown files (PDFs cause payload size issues)
+      // Only support markdown files
       if (!file.name.endsWith('.md')) {
         setUploadError('Only .md (markdown) files are supported');
         setIsUploading(false);
         return;
       }
 
-      // Validate file size (1MB max for markdown)
+      // Validate file size (1MB max)
       const maxSize = 1 * 1024 * 1024;
       if (file.size > maxSize) {
         setUploadError('File size must be less than 1MB. Your file is too large.');
@@ -139,18 +126,17 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
         fileType: 'markdown',
       };
 
-      console.log('Uploading plan document:', planDoc.filename);
       await onUpdateCampaign(campaign.id, { planDocument: planDoc });
-
-      console.log('Upload successful!');
       setUploadError('');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error uploading file. Please try again.';
-      console.error('Upload error:', errorMsg, err);
       setUploadError(errorMsg);
     } finally {
-      console.log('Upload finished');
       setIsUploading(false);
+      // Reset the input so selecting the same file again triggers onChange
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -171,7 +157,15 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
     .slice(0, 5);
 
   return (
-    <div>
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".md"
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
+      <div>
       {/* Live Status — always available, real data */}
       <div style={{ marginBottom: '1.5rem' }}>
         <h3 className="campaign-detail-section-title">LIVE STATUS</h3>
@@ -388,6 +382,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
           </div>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
