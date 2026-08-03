@@ -180,4 +180,14 @@ addColumnIfMissing('tasks', 'currency', 'TEXT');
 addColumnIfMissing('tasks', 'external_id', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_source_external ON tasks(source, external_id)');
 
+// Phase 1 campaign fields — see the Phase 1 Design brief.
+addColumnIfMissing('campaigns', 'industry', "TEXT NOT NULL DEFAULT ''");
+addColumnIfMissing('campaigns', 'recipients', 'INTEGER');
+addColumnIfMissing('campaigns', 'value_generated', 'REAL');
+addColumnIfMissing('campaigns', 'vendor', 'TEXT');
+addColumnIfMissing('campaigns', 'scheme', 'TEXT');
+addColumnIfMissing('campaigns', 'cofund_rate', 'REAL');
+addColumnIfMissing('campaigns', 'claim_status', 'TEXT');
+addColumnIfMissing('campaigns', 'schedule', 'TEXT');
+
 export default db;

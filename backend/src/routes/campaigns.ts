@@ -49,6 +49,21 @@ const createCampaignSchema = z.object({
   reactive: z.boolean().optional(),
   notes: z.string().max(10000).optional(),
   results: resultsSchema,
+  // Phase 1 fields
+  industry: z.string().max(200).optional(),
+  recipients: z.number().int().nullable().optional(),
+  valueGenerated: z.number().nullable().optional(),
+  // Funding fields
+  vendor: z.enum(['motorola', 'hytera', 'airsys', 'telox']).nullable().optional(),
+  scheme: z.string().max(200).nullable().optional(),
+  cofundRate: z.number().min(0).max(100).nullable().optional(),
+  claimStatus: z.enum(['eligible', 'pending', 'approved', 'rejected']).nullable().optional(),
+  // Schedule milestones
+  schedule: z.array(z.object({
+    date: z.string(),
+    element: z.string(),
+    status: z.enum(['planning', 'scheduled', 'live', 'complete']),
+  })).optional(),
 });
 
 const updateCampaignSchema = createCampaignSchema.partial();

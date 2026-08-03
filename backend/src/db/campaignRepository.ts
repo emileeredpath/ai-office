@@ -37,6 +37,15 @@ export interface CampaignRecord {
   results: CampaignResults | null;
   createdAt: string;
   updatedAt: string;
+  // Phase 1 fields
+  industry?: string;
+  recipients?: number | null;
+  valueGenerated?: number | null;
+  vendor?: string | null;
+  scheme?: string | null;
+  cofundRate?: number | null;
+  claimStatus?: string | null;
+  schedule?: Array<{ date: string; element: string; status: string }>;
 }
 
 interface CampaignRow {
@@ -61,6 +70,15 @@ interface CampaignRow {
   results: string | null;
   created_at: string;
   updated_at: string;
+  // Phase 1 fields
+  industry?: string;
+  recipients?: number | null;
+  value_generated?: number | null;
+  vendor?: string | null;
+  scheme?: string | null;
+  cofund_rate?: number | null;
+  claim_status?: string | null;
+  schedule?: string | null;
 }
 
 function rowToRecord(row: CampaignRow): CampaignRecord {
@@ -86,6 +104,14 @@ function rowToRecord(row: CampaignRow): CampaignRecord {
     results: row.results ? (JSON.parse(row.results) as CampaignResults) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    industry: row.industry,
+    recipients: row.recipients,
+    valueGenerated: row.value_generated,
+    vendor: row.vendor,
+    scheme: row.scheme,
+    cofundRate: row.cofund_rate,
+    claimStatus: row.claim_status,
+    schedule: row.schedule ? (JSON.parse(row.schedule) as Array<{ date: string; element: string; status: string }>) : undefined,
   };
 }
 
@@ -119,6 +145,15 @@ export interface NewCampaignInput {
   reactive?: boolean;
   notes?: string;
   results?: CampaignResults | null;
+  // Phase 1 fields
+  industry?: string;
+  recipients?: number | null;
+  valueGenerated?: number | null;
+  vendor?: string | null;
+  scheme?: string | null;
+  cofundRate?: number | null;
+  claimStatus?: string | null;
+  schedule?: Array<{ date: string; element: string; status: string }>;
 }
 
 export function insertCampaign(input: NewCampaignInput): CampaignRecord {
@@ -129,10 +164,12 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
     `INSERT INTO campaigns (
       id, name, brand, entities, primary_industry, secondary_industry, theme, status,
       start_date, end_date, budget, spend, conversions, leads, engagement, colour,
-      reactive, notes, results, created_at, updated_at
+      reactive, notes, results, created_at, updated_at, industry, recipients, value_generated,
+      vendor, scheme, cofund_rate, claim_status, schedule
     ) VALUES (@id, @name, @brand, @entities, @primaryIndustry, @secondaryIndustry, @theme, @status,
       @startDate, @endDate, @budget, @spend, @conversions, @leads, @engagement, @colour,
-      @reactive, @notes, @results, @createdAt, @updatedAt)`
+      @reactive, @notes, @results, @createdAt, @updatedAt, @industry, @recipients, @valueGenerated,
+      @vendor, @scheme, @cofundRate, @claimStatus, @schedule)`
   ).run({
     id,
     name: input.name,
@@ -155,6 +192,14 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
     results: input.results ? JSON.stringify(input.results) : null,
     createdAt: now,
     updatedAt: now,
+    industry: input.industry ?? '',
+    recipients: input.recipients ?? null,
+    valueGenerated: input.valueGenerated ?? null,
+    vendor: input.vendor ?? null,
+    scheme: input.scheme ?? null,
+    cofundRate: input.cofundRate ?? null,
+    claimStatus: input.claimStatus ?? null,
+    schedule: input.schedule ? JSON.stringify(input.schedule) : null,
   });
 
   return getCampaignById(id)!;
@@ -169,6 +214,7 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     ...updates,
     entities: updates.entities ?? existing.entities,
     results: updates.results !== undefined ? updates.results : existing.results,
+    schedule: updates.schedule !== undefined ? updates.schedule : existing.schedule,
     updatedAt: new Date().toISOString(),
   } as CampaignRecord;
 
@@ -178,7 +224,9 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
       secondary_industry = @secondaryIndustry, theme = @theme, status = @status,
       start_date = @startDate, end_date = @endDate, budget = @budget, spend = @spend,
       conversions = @conversions, leads = @leads, engagement = @engagement, colour = @colour,
-      reactive = @reactive, notes = @notes, results = @results, updated_at = @updatedAt
+      reactive = @reactive, notes = @notes, results = @results, updated_at = @updatedAt,
+      industry = @industry, recipients = @recipients, value_generated = @valueGenerated,
+      vendor = @vendor, scheme = @scheme, cofund_rate = @cofundRate, claim_status = @claimStatus, schedule = @schedule
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -201,6 +249,14 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     notes: merged.notes,
     results: merged.results ? JSON.stringify(merged.results) : null,
     updatedAt: merged.updatedAt,
+    industry: merged.industry ?? '',
+    recipients: merged.recipients ?? null,
+    valueGenerated: merged.valueGenerated ?? null,
+    vendor: merged.vendor ?? null,
+    scheme: merged.scheme ?? null,
+    cofundRate: merged.cofundRate ?? null,
+    claimStatus: merged.claimStatus ?? null,
+    schedule: merged.schedule ? JSON.stringify(merged.schedule) : null,
   });
 
   return getCampaignById(id);
