@@ -21,6 +21,12 @@ export type CampaignStatus =
   | 'on-hold'
   | 'completed';
 
+export type CampaignScheduleStatus = 'planning' | 'scheduled' | 'live' | 'complete';
+
+export type Vendor = 'motorola' | 'hytera' | 'airsys' | 'telox';
+
+export type ClaimStatus = 'eligible' | 'pending' | 'approved' | 'rejected';
+
 export type AISkill =
   | 'Email Marketing Manager'
   | 'Website Manager'
@@ -82,6 +88,12 @@ export interface PlanDocument {
   fileType: 'markdown' | 'pdf';
 }
 
+export interface ScheduleElement {
+  date: string;
+  element: string;
+  status: CampaignScheduleStatus;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -94,16 +106,30 @@ export interface Campaign {
   startDate: Date;
   endDate: Date;
   budget: number | null;
-  spend: number; // actual spend to date
+  spend: number;
   conversions: number;
   leads: number;
-  engagement: number; // percentage or count
+  engagement: number;
   colour: string;
   tasks: string[];
   reactive: boolean;
   notes: string;
   results: CampaignResults | null;
   planDocument?: PlanDocument;
+
+  // Phase 1 fields
+  industry?: string;
+  recipients?: number | null;
+  valueGenerated?: number | null;
+
+  // Funding fields
+  vendor?: Vendor | null;
+  scheme?: string | null;
+  cofundRate?: number | null;
+  claimStatus?: ClaimStatus | null;
+
+  // Schedule milestones
+  schedule?: ScheduleElement[];
 }
 
 export interface BriefGeneratorState {
