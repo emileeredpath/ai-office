@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical, CheckCircle2, RotateCcw } from 'lucide-react';
+import { X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BriefGenerator } from '@/components/tasks/BriefGenerator';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -15,6 +15,7 @@ export function TaskDetailPanel() {
   const updateTask = useAppStore((s) => s.updateTask);
   const completeTask = useAppStore((s) => s.completeTask);
   const reopenTask = useAppStore((s) => s.reopenTask);
+  const deleteTask = useAppStore((s) => s.deleteTask);
   const selectTask = useAppStore((s) => s.selectTask);
   const getCampaignById = useAppStore((s) => s.getCampaignById);
   const campaigns = useAppStore((s) => s.campaigns);
@@ -58,6 +59,12 @@ export function TaskDetailPanel() {
     }
   };
 
+  const handleDeleteTask = async () => {
+    if (!window.confirm(`Delete "${task.title}"? This cannot be undone.`)) return;
+    await deleteTask(task.id);
+    selectTask(null);
+  };
+
   return (
     <div className="task-detail-panel">
       {/* Header */}
@@ -85,8 +92,28 @@ export function TaskDetailPanel() {
               Mark complete
             </button>
           )}
-          <button className="btn-more">
-            <MoreVertical size={20} />
+          <button
+            onClick={handleDeleteTask}
+            style={{
+              padding: '6px 10px',
+              backgroundColor: 'transparent',
+              border: '1px solid #ef4444',
+              borderRadius: '4px',
+              color: '#ef4444',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+            title="Delete this task"
+          >
+            Delete
           </button>
         </div>
       </div>

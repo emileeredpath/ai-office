@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MoreVertical, ArrowUpDown } from 'lucide-react';
+import { X, MoreVertical, ArrowUpDown, Check } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
@@ -26,16 +26,22 @@ export function CampaignDetailPanel() {
     s.selectedCampaignId ? s.campaigns.find((c) => c.id === s.selectedCampaignId) ?? null : null
   );
   const updateCampaign = useAppStore((s) => s.updateCampaign);
+  const updateTask = useAppStore((s) => s.updateTask);
+  const deleteCampaign = useAppStore((s) => s.deleteCampaign);
+  const deleteTask = useAppStore((s) => s.deleteTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const selectTask = useAppStore((s) => s.selectTask);
   const tasks = useAppStore((s) => s.tasks);
 
   const campaignTasks = campaign ? tasks.filter((t) => t.campaignId === campaign.id) : [];
+  const unlinkedTasks = tasks.filter((t) => !t.campaignId);
 
   const [notes, setNotes] = useState(campaign?.notes || '');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
+  const [selectedUnlinkedIds, setSelectedUnlinkedIds] = useState<Set<string>>(new Set());
+  const [isLinking, setIsLinking] = useState(false);
 
   useEffect(() => {
     setNotes(campaign?.notes || '');
@@ -90,6 +96,37 @@ export function CampaignDetailPanel() {
     }, 500);
   };
 
+  const handleToggleUnlinkedTask = (taskId: string) => {
+    setSelectedUnlinkedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleLinkSelectedTasks = async () => {
+    if (selectedUnlinkedIds.size === 0) return;
+    setIsLinking(true);
+    try {
+      for (const taskId of selectedUnlinkedIds) {
+        await updateTask(taskId, { campaignId: campaign.id });
+      }
+      setSelectedUnlinkedIds(new Set());
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleDeleteCampaign = async () => {
+    if (!window.confirm(`Delete "${campaign.name}"? This cannot be undone.`)) return;
+    await deleteCampaign(campaign.id);
+    selectCampaign(null);
+  };
+
   const completedTasks = campaignTasks.filter((t) => t.status === 'complete').length;
   const progress = campaignTasks.length > 0 ? Math.round((completedTasks / campaignTasks.length) * 100) : 0;
 
@@ -100,8 +137,28 @@ export function CampaignDetailPanel() {
         <button className="btn-close" onClick={() => selectCampaign(null)}>
           <X size={20} />
         </button>
-        <button className="btn-more">
-          <MoreVertical size={20} />
+        <button
+          onClick={handleDeleteCampaign}
+          style={{
+            padding: '6px 10px',
+            backgroundColor: 'transparent',
+            border: '1px solid #ef4444',
+            borderRadius: '4px',
+            color: '#ef4444',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 500,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          title="Delete this campaign"
+        >
+          Delete
         </button>
       </div>
 
@@ -131,7 +188,7 @@ export function CampaignDetailPanel() {
         </div>
 
         {activeTab === 'plan' ? (
-          <PlanTab campaign={campaign} campaignTasks={campaignTasks} onSelectTask={selectTask} />
+          <PlanTab campaign={campaign} campaignTasks={campaignTasks} onSelectTask={selectTask} onUpdateCampaign={updateCampaign} />
         ) : (
         <>
         {/* Field Row 1 */}
@@ -440,42 +497,81 @@ export function CampaignDetailPanel() {
                 </div>
               )}
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Send</th>
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('date')}>
-                        <span className="inline-flex items-center gap-1">Date <ArrowUpDown size={11} /></span>
+                    <tr style={{ backgroundColor: '#3a82c6', height: '50px' }}>
+                      <th style={{ textAlign: 'left', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Send Name</th>
+                      <th style={{ textAlign: 'left', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('date')}>
+                        <span className="inline-flex items-center gap-1">Date <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
                       </th>
-                      <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('recipients')}>
-                        <span className="inline-flex items-center gap-1">Recipients <ArrowUpDown size={11} /></span>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('recipients')}>
+                        <span className="inline-flex items-center gap-1">Recipients <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
                       </th>
-                      <th style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => toggleSort('cost')}>
-                        <span className="inline-flex items-center gap-1">Cost <ArrowUpDown size={11} /></span>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Open Rate %</th>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Click Rate %</th>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('cost')}>
+                        <span className="inline-flex items-center gap-1">Cost <ArrowUpDown size={12} style={{ opacity: 0.8 }} /></span>
                       </th>
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Status</th>
+                      <th style={{ textAlign: 'right', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ROI</th>
+                      <th style={{ textAlign: 'center', padding: '0 15px', color: 'white', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedSends.map((task) => (
-                      <tr key={task.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td style={{ padding: '6px 8px' }}>
-                          <div className="flex items-center gap-1.5">
+                    {sortedSends.map((task, index) => (
+                      <tr
+                        key={task.id}
+                        style={{
+                          height: '50px',
+                          borderBottom: '1px solid var(--color-border)',
+                          backgroundColor: index % 2 === 0 ? 'transparent' : 'var(--color-surface)',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f7ff')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : 'var(--color-surface)')}
+                      >
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                          <div className="flex items-center gap-2">
                             <BrandBadge brand={task.brand} />
-                            <span className="text-text-primary">{task.title}</span>
+                            <span>{task.title}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'left' }}>
                           {task.deadline ? formatDateShort(task.deadline) : '—'}
                         </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', textAlign: 'right' }}>
                           {task.recipients != null ? task.recipients.toLocaleString() : '—'}
                         </td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
+                          {campaign.results?.emailOpenRate != null ? `${campaign.results.emailOpenRate.toFixed(1)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'right' }}>
+                          {campaign.results?.emailClickRate != null ? `${campaign.results.emailClickRate.toFixed(1)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', textAlign: 'right' }}>
                           {task.cost != null ? `£${task.cost.toFixed(2)}` : '—'}
                         </td>
-                        <td style={{ padding: '6px 8px', color: 'var(--color-text-secondary)' }}>{task.status}</td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, textAlign: 'right', color: (campaign.spend ?? 0) > (task.cost ?? 0) ? '#28a745' : (campaign.spend ?? 0) < (task.cost ?? 0) ? '#dc3545' : 'var(--color-text-secondary)' }}>
+                          {task.cost != null && campaign.spend != null && campaign.spend > 0
+                            ? `${((campaign.spend - task.cost) / task.cost * 100).toFixed(0)}%`
+                            : '—'}
+                        </td>
+                        <td style={{ padding: '0 15px', verticalAlign: 'middle', fontSize: '13px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: '3px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              textTransform: 'capitalize',
+                              backgroundColor: task.status === 'complete' ? '#d4edda' : '#fff3cd',
+                              color: task.status === 'complete' ? '#155724' : '#856404',
+                            }}
+                          >
+                            {task.status === 'complete' ? '✓ Done' : 'Pending'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -486,6 +582,78 @@ export function CampaignDetailPanel() {
             <p className="text-sm text-text-secondary">No tasks linked to this campaign</p>
           )}
         </div>
+
+        {/* Divider */}
+        <div className="campaign-detail-divider"></div>
+
+        {/* Link Unlinked Tasks */}
+        {unlinkedTasks.length > 0 && (
+          <div>
+            <h3 className="campaign-detail-section-title">LINK TASKS TO CAMPAIGN</h3>
+            <p className="text-xs text-text-secondary mb-3">
+              {unlinkedTasks.length} unlinked task{unlinkedTasks.length === 1 ? '' : 's'} in the system
+            </p>
+            <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+              <div style={{ paddingTop: 0 }}>
+                {unlinkedTasks.map((task) => (
+                  <label
+                    key={task.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      borderBottom: '1px solid var(--color-border)',
+                      cursor: 'pointer',
+                      backgroundColor: selectedUnlinkedIds.has(task.id) ? 'var(--color-surface)' : 'transparent',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUnlinkedIds.has(task.id)}
+                      onChange={() => handleToggleUnlinkedTask(task.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {task.title}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        {task.deadline ? formatDateShort(task.deadline) : 'No deadline'} · {task.status}
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                      {task.priority}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            {selectedUnlinkedIds.size > 0 && (
+              <button
+                onClick={handleLinkSelectedTasks}
+                disabled={isLinking}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: isLinking ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  opacity: isLinking ? 0.6 : 1,
+                }}
+              >
+                <Check size={14} />
+                Link {selectedUnlinkedIds.size} task{selectedUnlinkedIds.size === 1 ? '' : 's'} to campaign
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="campaign-detail-divider"></div>
