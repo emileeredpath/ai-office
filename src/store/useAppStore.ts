@@ -282,9 +282,13 @@ export const useAppStore = create<AppState>((set, get) => {
         }
         delete (payload as any).tasks;
 
+        console.log('Calling updateCampaignInApi with payload:', payload);
         await updateCampaignInApi(id, payload);
+        console.log('API update complete, syncing campaigns...');
         await get().syncCampaignsFromApi();
+        console.log('Sync complete');
       } catch (err) {
+        console.error('Error updating campaign:', err);
         alert(friendlyErrorMessage(err));
       }
     },
@@ -308,9 +312,20 @@ export const useAppStore = create<AppState>((set, get) => {
 
     syncCampaignsFromApi: async () => {
       try {
+        console.log('Syncing campaigns from API...');
         const rawCampaigns = await fetchCampaignsFromApi();
-        set({ campaigns: rawCampaigns.map(hydrateCampaign) });
-      } catch {
+        console.log('Fetched campaigns, total:', rawCampaigns.length);
+        const hydrated = rawCampaigns.map(hydrateCampaign);
+        console.log('Hydrated campaigns, checking planDocuments...');
+        hydrated.forEach(c => {
+          if (c.planDocument) {
+            console.log('Campaign', c.name, 'has planDocument:', c.planDocument.filename);
+          }
+        });
+        set({ campaigns: hydrated });
+        console.log('Campaign state updated');
+      } catch (err) {
+        console.error('Error syncing campaigns:', err);
         // Keep whatever is currently in state.
       }
     },
