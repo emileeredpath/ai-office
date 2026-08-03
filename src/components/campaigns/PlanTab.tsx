@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import { CAMPAIGN_PLAN_MARKDOWN } from '@/data/campaignPlans';
 import { parsePlanMarkdown, PlanSection } from '@/utils/planMarkdown';
@@ -83,50 +83,60 @@ function PlanSectionView({ section, defaultOpen }: { section: PlanSection; defau
 }
 
 export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaign }: { campaign: Campaign; campaignTasks: Task[]; onSelectTask: (id: string) => void; onUpdateCampaign: (id: string, updates: Partial<Campaign>) => void }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = () => {
+    console.log('Upload clicked');
+    fileInputRef.current?.click();
+  };
 
   const markdown = CAMPAIGN_PLAN_MARKDOWN[campaign.id];
   const plan = markdown ? parsePlanMarkdown(markdown) : null;
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target?.files?.[0];
     if (!file) return;
 
     setUploadError('');
-
-    // Validate file type
-    const isMarkdown = file.name.endsWith('.md');
-    const isPdf = file.name.endsWith('.pdf');
-
-    if (!isMarkdown && !isPdf) {
-      setUploadError('Only .md (markdown) and .pdf files are supported');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      setUploadError('File size must be less than 5MB');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
+    setIsUploading(true);
 
     try {
+      // Only support markdown files
+      if (!file.name.endsWith('.md')) {
+        setUploadError('Only .md (markdown) files are supported');
+        setIsUploading(false);
+        return;
+      }
+
+      // Validate file size (1MB max)
+      const maxSize = 1 * 1024 * 1024;
+      if (file.size > maxSize) {
+        setUploadError('File size must be less than 1MB. Your file is too large.');
+        setIsUploading(false);
+        return;
+      }
+
       const content = await file.text();
       const planDoc: PlanDocument = {
         filename: file.name,
         content,
         uploadDate: new Date(),
-        fileType: isMarkdown ? 'markdown' : 'pdf',
+        fileType: 'markdown',
       };
 
-      onUpdateCampaign(campaign.id, { planDocument: planDoc });
-
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      await onUpdateCampaign(campaign.id, { planDocument: planDoc });
+      setUploadError('');
     } catch (err) {
-      setUploadError('Error reading file. Please try again.');
+      const errorMsg = err instanceof Error ? err.message : 'Error uploading file. Please try again.';
+      setUploadError(errorMsg);
+    } finally {
+      setIsUploading(false);
+      // Reset the input so selecting the same file again triggers onChange
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -147,7 +157,15 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
     .slice(0, 5);
 
   return (
-    <div>
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".md"
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
+      <div>
       {/* Live Status — always available, real data */}
       <div style={{ marginBottom: '1.5rem' }}>
         <h3 className="campaign-detail-section-title">LIVE STATUS</h3>
@@ -227,14 +245,15 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handleUploadClick}
+                  disabled={isUploading}
                   style={{
                     padding: '6px 10px',
-                    backgroundColor: 'var(--color-accent)',
+                    backgroundColor: isUploading ? '#ccc' : 'var(--color-accent)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '4px',
-                    cursor: 'pointer',
+                    cursor: isUploading ? 'not-allowed' : 'pointer',
                     fontSize: '12px',
                     fontWeight: 500,
                     display: 'flex',
@@ -243,7 +262,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
                   }}
                 >
                   <Upload size={14} />
-                  Replace
+                  {isUploading ? 'Uploading...' : 'Replace'}
                 </button>
                 <button
                   onClick={handleRemovePlan}
@@ -317,21 +336,22 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
           <div style={{ textAlign: 'center', padding: '24px', backgroundColor: '#fafafa', borderRadius: '6px', border: '1px dashed var(--color-border)' }}>
             <Upload size={32} style={{ marginBottom: '12px', color: 'var(--color-text-secondary)' }} />
             <p className="text-sm text-text-primary" style={{ marginBottom: '8px', fontWeight: 500 }}>No plan document uploaded yet</p>
-            <p className="text-xs text-text-secondary" style={{ marginBottom: '12px' }}>Upload a markdown (.md) or PDF file to share with your team</p>
+            <p className="text-xs text-text-secondary" style={{ marginBottom: '12px' }}>Upload a markdown (.md) file to share with your team</p>
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleUploadClick}
+              disabled={isUploading}
               style={{
                 padding: '8px 16px',
-                backgroundColor: 'var(--color-accent)',
+                backgroundColor: isUploading ? '#ccc' : 'var(--color-accent)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: 'pointer',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
                 fontSize: '13px',
                 fontWeight: 500,
               }}
             >
-              Upload Plan
+              {isUploading ? 'Uploading...' : 'Upload Plan'}
             </button>
           </div>
         )}
@@ -342,13 +362,6 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
           </p>
         )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".md,.pdf"
-          onChange={handleFileSelect}
-          style={{ display: 'none' }}
-        />
       </div>
 
       {plan && (
@@ -369,6 +382,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
           </div>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

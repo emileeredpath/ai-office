@@ -89,6 +89,9 @@ const hydrateCampaign = (campaign: any): Campaign => ({
   results: campaign.results
     ? { ...campaign.results, loggedAt: toDate(campaign.results.loggedAt) || new Date() }
     : null,
+  planDocument: campaign.planDocument
+    ? { ...campaign.planDocument, uploadDate: toDate(campaign.planDocument.uploadDate) || new Date() }
+    : undefined,
 });
 
 function friendlyErrorMessage(err: unknown): string {
@@ -271,6 +274,11 @@ export const useAppStore = create<AppState>((set, get) => {
           payload.results = updates.results
             ? { ...updates.results, loggedAt: updates.results.loggedAt.toISOString() }
             : null;
+        }
+        if (updates.planDocument !== undefined) {
+          payload.planDocument = updates.planDocument
+            ? { ...updates.planDocument, uploadDate: updates.planDocument.uploadDate.toISOString() }
+            : undefined;
         }
         delete (payload as any).tasks;
 
