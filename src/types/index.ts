@@ -75,6 +75,13 @@ export interface CampaignResults {
   loggedAt: Date;
 }
 
+export interface PlanDocument {
+  filename: string;
+  content: string;
+  uploadDate: Date;
+  fileType: 'markdown' | 'pdf';
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -96,6 +103,7 @@ export interface Campaign {
   reactive: boolean;
   notes: string;
   results: CampaignResults | null;
+  planDocument?: PlanDocument;
 }
 
 export interface BriefGeneratorState {

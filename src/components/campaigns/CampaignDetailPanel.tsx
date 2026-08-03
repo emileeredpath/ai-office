@@ -188,7 +188,7 @@ export function CampaignDetailPanel() {
         </div>
 
         {activeTab === 'plan' ? (
-          <PlanTab campaign={campaign} campaignTasks={campaignTasks} onSelectTask={selectTask} />
+          <PlanTab campaign={campaign} campaignTasks={campaignTasks} onSelectTask={selectTask} onUpdateCampaign={updateCampaign} />
         ) : (
         <>
         {/* Field Row 1 */}
