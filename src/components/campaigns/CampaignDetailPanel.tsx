@@ -118,6 +118,36 @@ export function CampaignDetailPanel() {
 
   const recipients = campaign.recipients || emailSends.reduce((sum, t) => sum + (t.recipients || 0), 0);
 
+  const handleExportSchedule = () => {
+    if (!schedule || schedule.length === 0) {
+      showToast('No schedule elements to export');
+      return;
+    }
+
+    // Build CSV
+    let csv = 'Campaign,Go Live,Element,Status\n';
+    schedule.forEach(({ date, element, status }) => {
+      // Escape quotes in element names
+      const escapedElement = element.replace(/"/g, '""');
+      csv += `"${campaign.name}","${date}","${escapedElement}","${status}"\n`;
+    });
+
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${campaign.name.replace(/\s+/g, '-')}-Schedule-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast('✓ Schedule exported as CSV');
+  };
+
   // Funding calculations
   const eligibleSpend = campaign.budget || 0;
   const recoverable = campaign.cofundRate != null && campaign.budget
@@ -387,16 +417,24 @@ export function CampaignDetailPanel() {
               </table>
             </div>
 
-            <button
-              onClick={() => {
-                const updated = [...schedule, { date: '', element: '', status: 'planning' as const }];
-                setSchedule(updated);
-              }}
-              className="btn btn-secondary text-sm flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Add element
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const updated = [...schedule, { date: '', element: '', status: 'planning' as const }];
+                  setSchedule(updated);
+                }}
+                className="btn btn-secondary text-sm flex items-center gap-2"
+              >
+                <Plus size={16} />
+                Add element
+              </button>
+              <button
+                onClick={handleExportSchedule}
+                className="btn btn-secondary text-sm"
+              >
+                Export as CSV
+              </button>
+            </div>
           </div>
         )}
 
