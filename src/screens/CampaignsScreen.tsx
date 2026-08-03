@@ -430,25 +430,25 @@ export function CampaignsScreen() {
         {/* Roll-up metrics */}
         {campaigns.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-            <div style={{ backgroundColor: '#f9fafb', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
               <p className="text-xs font-semibold text-text-secondary mb-1">Campaigns</p>
               <p className="text-2xl font-bold text-text-primary">{metrics.campaigns}</p>
             </div>
-            <div style={{ backgroundColor: '#f9fafb', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
               <p className="text-xs font-semibold text-text-secondary mb-1">Budget</p>
               <p className="text-2xl font-bold text-text-primary">{formatCurrency(metrics.budget)}</p>
             </div>
-            <div style={{ backgroundColor: '#f9fafb', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
               <p className="text-xs font-semibold text-text-secondary mb-1">Actual Spend</p>
               <p className="text-2xl font-bold text-text-primary">{formatCurrency(metrics.spend)}</p>
               <p className="text-xs text-text-secondary mt-1">{metrics.budget > 0 ? Math.round((metrics.spend / metrics.budget) * 100) : 0}%</p>
             </div>
-            <div style={{ backgroundColor: '#f9fafb', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
               <p className="text-xs font-semibold text-text-secondary mb-1">Leads / Value</p>
               <p className="text-2xl font-bold text-text-primary">{metrics.leads}</p>
               <p className="text-xs text-text-secondary mt-1">{formatCurrency(metrics.valueGenerated)}</p>
             </div>
-            <div style={{ backgroundColor: '#f9fafb', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
               <p className="text-xs font-semibold text-text-secondary mb-1">Fundable Spend</p>
               <p className="text-2xl font-bold text-text-primary">{formatCurrency(metrics.fundableSpend)}</p>
             </div>
