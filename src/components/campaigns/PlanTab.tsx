@@ -92,10 +92,15 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    console.log('File selected:', file?.name, file?.size);
+    if (!file) {
+      console.log('No file');
+      return;
+    }
 
     setUploadError('');
     setIsUploading(true);
+    console.log('Starting upload...');
 
     try {
       // Only support markdown files (PDFs cause payload size issues)
@@ -123,15 +128,18 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
         fileType: 'markdown',
       };
 
+      console.log('Uploading plan document:', planDoc.filename);
       await onUpdateCampaign(campaign.id, { planDocument: planDoc });
 
+      console.log('Upload successful!');
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadError('');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error uploading file. Please try again.';
+      console.error('Upload error:', errorMsg, err);
       setUploadError(errorMsg);
-      console.error('Upload error:', err);
     } finally {
+      console.log('Upload finished');
       setIsUploading(false);
     }
   };
