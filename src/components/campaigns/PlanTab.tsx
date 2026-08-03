@@ -241,7 +241,10 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    console.log('Replace button clicked, ref:', fileInputRef.current);
+                    fileInputRef.current?.click();
+                  }}
                   disabled={isUploading}
                   style={{
                     padding: '6px 10px',
@@ -334,7 +337,10 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
             <p className="text-sm text-text-primary" style={{ marginBottom: '8px', fontWeight: 500 }}>No plan document uploaded yet</p>
             <p className="text-xs text-text-secondary" style={{ marginBottom: '12px' }}>Upload a markdown (.md) file to share with your team</p>
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                console.log('Upload button clicked, ref:', fileInputRef.current);
+                fileInputRef.current?.click();
+              }}
               disabled={isUploading}
               style={{
                 padding: '8px 16px',
