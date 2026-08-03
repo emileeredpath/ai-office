@@ -69,6 +69,22 @@ export function CampaignDetailPanel() {
     }
   }, [selectedCampaignId]);
 
+  // Sync local state when campaign data changes (after updateCampaign)
+  useEffect(() => {
+    if (campaign) {
+      setBudget(campaign.budget?.toString() || '');
+      setSpend(campaign.spend?.toString() || '');
+      setValueGenerated(campaign.valueGenerated?.toString() || '');
+      setLeads(campaign.leads?.toString() || '');
+      setNotes(campaign.notes || '');
+      setVendor(campaign.vendor || '');
+      setScheme(campaign.scheme || '');
+      setCofundRate(campaign.cofundRate?.toString() || '');
+      setClaimStatus(campaign.claimStatus || '');
+      setSchedule(campaign.schedule || []);
+    }
+  }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
+
   if (!campaign) return null;
 
   const showToast = (message: string) => {
