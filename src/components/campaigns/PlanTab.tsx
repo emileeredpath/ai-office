@@ -87,6 +87,10 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    console.log('Campaign planDocument updated:', campaign.planDocument ? campaign.planDocument.filename : 'none');
+  }, [campaign.planDocument]);
+
   const handleUploadClick = () => {
     console.log('Upload clicked');
     fileInputRef.current?.click();
@@ -119,6 +123,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
       }
 
       const content = await file.text();
+      console.log('File content read, length:', content.length);
       const planDoc: PlanDocument = {
         filename: file.name,
         content,
@@ -126,7 +131,9 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
         fileType: 'markdown',
       };
 
+      console.log('Calling onUpdateCampaign with planDocument:', planDoc.filename);
       await onUpdateCampaign(campaign.id, { planDocument: planDoc });
+      console.log('onUpdateCampaign completed');
       setUploadError('');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error uploading file. Please try again.';
