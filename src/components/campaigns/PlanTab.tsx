@@ -83,15 +83,23 @@ function PlanSectionView({ section, defaultOpen }: { section: PlanSection; defau
 }
 
 export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaign }: { campaign: Campaign; campaignTasks: Task[]; onSelectTask: (id: string) => void; onUpdateCampaign: (id: string, updates: Partial<Campaign>) => void }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  const handleUploadClick = () => {
+    console.log('Upload clicked - creating file input');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.md';
+    input.onchange = (e: any) => handleFileSelect(e);
+    input.click();
+  };
 
   const markdown = CAMPAIGN_PLAN_MARKDOWN[campaign.id];
   const plan = markdown ? parsePlanMarkdown(markdown) : null;
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileSelect = async (e: any) => {
+    const file = e.target?.files?.[0];
     console.log('File selected:', file?.name, file?.size);
     if (!file) {
       console.log('No file');
@@ -106,7 +114,6 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
       // Only support markdown files (PDFs cause payload size issues)
       if (!file.name.endsWith('.md')) {
         setUploadError('Only .md (markdown) files are supported');
-        if (fileInputRef.current) fileInputRef.current.value = '';
         setIsUploading(false);
         return;
       }
@@ -115,7 +122,6 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
       const maxSize = 1 * 1024 * 1024;
       if (file.size > maxSize) {
         setUploadError('File size must be less than 1MB. Your file is too large.');
-        if (fileInputRef.current) fileInputRef.current.value = '';
         setIsUploading(false);
         return;
       }
@@ -132,7 +138,6 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
       await onUpdateCampaign(campaign.id, { planDocument: planDoc });
 
       console.log('Upload successful!');
-      if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadError('');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error uploading file. Please try again.';
@@ -241,10 +246,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={() => {
-                    console.log('Replace button clicked, ref:', fileInputRef.current);
-                    fileInputRef.current?.click();
-                  }}
+                  onClick={handleUploadClick}
                   disabled={isUploading}
                   style={{
                     padding: '6px 10px',
@@ -337,10 +339,7 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
             <p className="text-sm text-text-primary" style={{ marginBottom: '8px', fontWeight: 500 }}>No plan document uploaded yet</p>
             <p className="text-xs text-text-secondary" style={{ marginBottom: '12px' }}>Upload a markdown (.md) file to share with your team</p>
             <button
-              onClick={() => {
-                console.log('Upload button clicked, ref:', fileInputRef.current);
-                fileInputRef.current?.click();
-              }}
+              onClick={handleUploadClick}
               disabled={isUploading}
               style={{
                 padding: '8px 16px',
@@ -364,13 +363,6 @@ export function PlanTab({ campaign, campaignTasks, onSelectTask, onUpdateCampaig
           </p>
         )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".md"
-          onChange={handleFileSelect}
-          style={{ display: 'none' }}
-        />
       </div>
 
       {plan && (
