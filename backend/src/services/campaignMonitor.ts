@@ -107,14 +107,14 @@ function extractMetrics(metrics: CmCampaignMetrics | null, recipients: number | 
   bounces: number | null;
   unsubscribes: number | null;
 } {
-  if (!metrics || !recipients || recipients === 0) {
+  if (!metrics) {
     return { opens: null, clicks: null, openRate: null, clickRate: null, bounces: null, unsubscribes: null };
   }
 
   const opens = metrics.UniqueOpens ?? metrics.TotalOpens ?? null;
   const clicks = metrics.UniqueClickCount ?? metrics.TotalClickCount ?? null;
-  const openRate = opens ? (opens / recipients) * 100 : null;
-  const clickRate = clicks ? (clicks / recipients) * 100 : null;
+  const openRate = opens && recipients && recipients > 0 ? (opens / recipients) * 100 : null;
+  const clickRate = clicks && recipients && recipients > 0 ? (clicks / recipients) * 100 : null;
 
   return {
     opens: typeof opens === 'number' ? opens : null,
@@ -250,13 +250,16 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
         let summary: CmCampaignSummary | null = null;
         let metrics: CmCampaignMetrics | null = null;
         try {
-          [summary, metrics] = await Promise.all([
-            getCampaignSummary(apiKey, campaign.CampaignID),
-            getCampaignMetrics(apiKey, campaign.CampaignID),
-          ]);
+          summary = await getCampaignSummary(apiKey, campaign.CampaignID);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`summary/metrics for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
+          console.warn(`[campaign-monitor] failed to get summary for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
+        }
+        try {
+          metrics = await getCampaignMetrics(apiKey, campaign.CampaignID);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[campaign-monitor] failed to get metrics for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
         }
 
         const recipients = campaign.TotalRecipients ?? summary?.Recipients ?? null;
