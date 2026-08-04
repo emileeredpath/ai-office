@@ -205,6 +205,8 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
   // Build campaign name map for linking sends to AI Office campaigns
   const aiCampaigns = db.prepare('SELECT id, name FROM campaigns').all() as Array<{ id: string; name: string }>;
   const campaignMap = buildCampaignMap(aiCampaigns);
+  console.log('[campaign-monitor] AI Office campaigns:', aiCampaigns.map(c => `"${c.name}" (${c.id})`).join(', '));
+  console.log('[campaign-monitor] Campaign map keys:', Array.from(campaignMap.keys()).slice(0, 20).join(', '));
 
   let clients: CmClient[];
   try {
@@ -279,8 +281,12 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
           for (const word of cmWords) {
             if (campaignMap.has(word)) {
               aiCampaignId = campaignMap.get(word) || null;
+              console.log(`[campaign-monitor] Matched "${campaign.Name}" to campaign ${aiCampaignId} via word "${word}"`);
               break;
             }
+          }
+          if (!aiCampaignId) {
+            console.log(`[campaign-monitor] No match for "${campaign.Name}" — words: ${cmWords.join(', ')}`);
           }
         }
 
