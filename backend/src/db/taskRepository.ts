@@ -28,6 +28,12 @@ interface TaskRow {
   cost: number | null;
   currency: string | null;
   external_id: string | null;
+  opens: number | null;
+  clicks: number | null;
+  open_rate: number | null;
+  click_rate: number | null;
+  bounces: number | null;
+  unsubscribes: number | null;
 }
 
 function rowToRecord(row: TaskRow): TaskRecord {
@@ -58,6 +64,12 @@ function rowToRecord(row: TaskRow): TaskRecord {
     cost: row.cost,
     currency: row.currency,
     externalId: row.external_id,
+    opens: row.opens,
+    clicks: row.clicks,
+    openRate: row.open_rate,
+    clickRate: row.click_rate,
+    bounces: row.bounces,
+    unsubscribes: row.unsubscribes,
   };
 }
 
@@ -91,11 +103,11 @@ export function insertTask(task: TaskRecord): void {
       id, title, notes, brand, status, priority, deadline, start_date, campaign_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
       blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to,
-      type, recipients, subject, cost, currency, external_id
+      type, recipients, subject, cost, currency, external_id, opens, clicks, open_rate, click_rate, bounces, unsubscribes
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
       @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo,
-      @type, @recipients, @subject, @cost, @currency, @externalId)`
+      @type, @recipients, @subject, @cost, @currency, @externalId, @opens, @clicks, @openRate, @clickRate, @bounces, @unsubscribes)`
   ).run({
     id: task.id,
     title: task.title,
@@ -123,6 +135,12 @@ export function insertTask(task: TaskRecord): void {
     cost: task.cost,
     currency: task.currency,
     externalId: task.externalId ?? null,
+    opens: task.opens ?? null,
+    clicks: task.clicks ?? null,
+    openRate: task.openRate ?? null,
+    clickRate: task.clickRate ?? null,
+    bounces: task.bounces ?? null,
+    unsubscribes: task.unsubscribes ?? null,
   });
 }
 
@@ -153,7 +171,8 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
       completed_at = @completedAt, previous_status = @previousStatus, history = @history,
       approval_required = @approvalRequired, approver = @approver, blocker_reason = @blockerReason,
       last_brief_generated = @lastBriefGenerated, type = @type, recipients = @recipients, subject = @subject,
-      cost = @cost, currency = @currency, external_id = @externalId
+      cost = @cost, currency = @currency, external_id = @externalId, opens = @opens, clicks = @clicks,
+      open_rate = @openRate, click_rate = @clickRate, bounces = @bounces, unsubscribes = @unsubscribes
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -178,6 +197,12 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     cost: merged.cost,
     currency: merged.currency,
     externalId: merged.externalId,
+    opens: merged.opens,
+    clicks: merged.clicks,
+    openRate: merged.openRate,
+    clickRate: merged.clickRate,
+    bounces: merged.bounces,
+    unsubscribes: merged.unsubscribes,
   });
 
   return getTaskById(id);

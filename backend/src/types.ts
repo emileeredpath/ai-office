@@ -59,6 +59,13 @@ export interface TaskRecord {
   // `source`, e.g. source='campaign-monitor' + externalId=CM's campaign ID)
   // so re-running a sync updates the existing row instead of duplicating it.
   externalId: string | null;
+  // Email engagement metrics from Campaign Monitor (populated by sync)
+  opens: number | null;
+  clicks: number | null;
+  openRate: number | null;
+  clickRate: number | null;
+  bounces: number | null;
+  unsubscribes: number | null;
 }
 
 export interface ActionSource {

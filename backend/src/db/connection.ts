@@ -190,4 +190,12 @@ addColumnIfMissing('campaigns', 'cofund_rate', 'REAL');
 addColumnIfMissing('campaigns', 'claim_status', 'TEXT');
 addColumnIfMissing('campaigns', 'schedule', 'TEXT');
 
+// Email send metrics from Campaign Monitor — see the Campaign Monitor API Integration brief.
+addColumnIfMissing('tasks', 'opens', 'INTEGER');
+addColumnIfMissing('tasks', 'clicks', 'INTEGER');
+addColumnIfMissing('tasks', 'open_rate', 'REAL');
+addColumnIfMissing('tasks', 'click_rate', 'REAL');
+addColumnIfMissing('tasks', 'bounces', 'INTEGER');
+addColumnIfMissing('tasks', 'unsubscribes', 'INTEGER');
+
 export default db;

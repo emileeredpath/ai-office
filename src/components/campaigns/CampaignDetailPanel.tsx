@@ -451,6 +451,8 @@ export function CampaignDetailPanel() {
                       <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Recipients</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Open %</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Click %</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Bounces</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Unsubscribes</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold text-text-secondary">Cost (£)</th>
                     </tr>
                   </thead>
@@ -460,8 +462,10 @@ export function CampaignDetailPanel() {
                         <td className="px-3 py-2 text-text-primary">{task.title}</td>
                         <td className="px-3 py-2 text-text-secondary">{task.deadline ? formatDateShort(task.deadline) : '—'}</td>
                         <td className="px-3 py-2 text-right text-text-primary">{task.recipients ? task.recipients.toLocaleString() : '—'}</td>
-                        <td className="px-3 py-2 text-right text-text-secondary">{campaign.results?.emailOpenRate != null ? `${campaign.results.emailOpenRate.toFixed(1)}%` : '—'}</td>
-                        <td className="px-3 py-2 text-right text-text-secondary">{campaign.results?.emailClickRate != null ? `${campaign.results.emailClickRate.toFixed(1)}%` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{task.openRate != null ? `${task.openRate.toFixed(1)}%` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{task.clickRate != null ? `${task.clickRate.toFixed(1)}%` : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{task.bounces != null ? task.bounces.toLocaleString() : '—'}</td>
+                        <td className="px-3 py-2 text-right text-text-secondary">{task.unsubscribes != null ? task.unsubscribes.toLocaleString() : '—'}</td>
                         <td className="px-3 py-2 text-right text-text-primary">{task.cost != null ? `£${task.cost.toFixed(2)}` : '—'}</td>
                       </tr>
                     ))}

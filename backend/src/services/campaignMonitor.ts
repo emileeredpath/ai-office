@@ -48,6 +48,16 @@ interface CmCampaignSummary {
   Spend?: number;
 }
 
+interface CmCampaignMetrics {
+  UniqueOpens?: number;
+  TotalOpens?: number;
+  UniqueClickCount?: number;
+  TotalClickCount?: number;
+  Bounces?: number;
+  Unsubscribes?: number;
+  Recipients?: number;
+}
+
 export interface SyncResult {
   success: boolean;
   message: string;
@@ -79,11 +89,42 @@ const listCampaignsForClient = (apiKey: string, clientId: string) =>
   cmFetch<CmCampaignListItem[]>(`/clients/${clientId}/campaigns.json`, apiKey);
 const getCampaignSummary = (apiKey: string, campaignId: string) =>
   cmFetch<CmCampaignSummary>(`/campaigns/${campaignId}/summary.json`, apiKey);
+const getCampaignMetrics = (apiKey: string, campaignId: string) =>
+  cmFetch<CmCampaignMetrics>(`/campaigns/${campaignId}/opens.json`, apiKey)
+    .then((data) => ({ ...data, campaignId }))
+    .catch(() => ({ campaignId })); // graceful fallback if metrics endpoint fails
 
 function extractCost(summary: CmCampaignSummary | null): number | null {
   if (!summary) return null;
   const value = summary.Cost ?? summary.TotalCost ?? summary.Spend;
   return typeof value === 'number' ? value : null;
+}
+
+function extractMetrics(metrics: CmCampaignMetrics | null, recipients: number | null): {
+  opens: number | null;
+  clicks: number | null;
+  openRate: number | null;
+  clickRate: number | null;
+  bounces: number | null;
+  unsubscribes: number | null;
+} {
+  if (!metrics || !recipients || recipients === 0) {
+    return { opens: null, clicks: null, openRate: null, clickRate: null, bounces: null, unsubscribes: null };
+  }
+
+  const opens = metrics.UniqueOpens ?? metrics.TotalOpens ?? null;
+  const clicks = metrics.UniqueClickCount ?? metrics.TotalClickCount ?? null;
+  const openRate = opens ? (opens / recipients) * 100 : null;
+  const clickRate = clicks ? (clicks / recipients) * 100 : null;
+
+  return {
+    opens: typeof opens === 'number' ? opens : null,
+    clicks: typeof clicks === 'number' ? clicks : null,
+    openRate: typeof openRate === 'number' ? openRate : null,
+    clickRate: typeof clickRate === 'number' ? clickRate : null,
+    bounces: metrics.Bounces ?? null,
+    unsubscribes: metrics.Unsubscribes ?? null,
+  };
 }
 
 // Parse logic per the brief: IDARO is a product line (not a brand entity);
@@ -94,6 +135,28 @@ const ENTITY_CODES: Record<string, Brand> = {
   CC: 'capcom',
   IRCL: 'ircl',
 };
+
+// Campaign name matching: maps Campaign Monitor campaign name fragments to AI Office campaign IDs.
+// Update this as campaigns are created. Format: "campaign_monitor_fragment" → "ai_office_campaign_id"
+function buildCampaignMap(aiCampaigns: Array<{ id: string; name: string }>): Map<string, string> {
+  const map = new Map<string, string>();
+
+  // Auto-match by campaign name similarity (lowercase, remove special chars)
+  aiCampaigns.forEach((campaign) => {
+    const normalized = campaign.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    map.set(normalized, campaign.id);
+  });
+
+  // Also try fragment matching for Campaign Monitor names like "Service and Repair"
+  aiCampaigns.forEach((campaign) => {
+    const words = campaign.name.toLowerCase().split(/[\s&-]+/).filter((w) => w.length > 3);
+    words.forEach((word) => {
+      if (!map.has(word)) map.set(word, campaign.id);
+    });
+  });
+
+  return map;
+}
 
 export function parseEntity(campaignName: string): { brand: Brand; matched: boolean } {
   const name = campaignName.trim();
@@ -140,6 +203,10 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - sinceDays);
 
+  // Build campaign name map for linking sends to AI Office campaigns
+  const aiCampaigns = db.prepare('SELECT id, name FROM campaigns').all() as Array<{ id: string; name: string }>;
+  const campaignMap = buildCampaignMap(aiCampaigns);
+
   let clients: CmClient[];
   try {
     clients = await listClients(apiKey);
@@ -182,16 +249,25 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
         }
 
         let summary: CmCampaignSummary | null = null;
+        let metrics: CmCampaignMetrics | null = null;
         try {
-          summary = await getCampaignSummary(apiKey, campaign.CampaignID);
+          [summary, metrics] = await Promise.all([
+            getCampaignSummary(apiKey, campaign.CampaignID),
+            getCampaignMetrics(apiKey, campaign.CampaignID),
+          ]);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`summary for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
+          errors.push(`summary/metrics for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
         }
 
         const recipients = campaign.TotalRecipients ?? summary?.Recipients ?? null;
         const cost = extractCost(summary);
+        const { opens, clicks, openRate, clickRate, bounces, unsubscribes } = extractMetrics(metrics, recipients);
         const sentIso = sentDate.toISOString();
+
+        // Match campaign to AI Office campaign by name
+        const normalizedCmName = campaign.Name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const aiCampaignId = campaignMap.get(normalizedCmName) || null;
 
         const existing = findTaskByExternalId(SOURCE, campaign.CampaignID);
         if (existing) {
@@ -202,6 +278,13 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             cost,
             currency: cost != null ? existing.currency ?? 'GBP' : existing.currency,
             subject: campaign.Subject ?? existing.subject,
+            opens,
+            clicks,
+            openRate,
+            clickRate,
+            bounces,
+            unsubscribes,
+            campaignId: aiCampaignId,
           });
           updated += 1;
         } else {
@@ -215,7 +298,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             priority: 'medium',
             deadline: sentIso,
             startDate: sentIso,
-            campaignId: null,
+            campaignId: aiCampaignId,
             createdAt: now,
             completedAt: sentIso,
             previousStatus: null,
@@ -233,6 +316,12 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             cost,
             currency: cost != null ? 'GBP' : null,
             externalId: campaign.CampaignID,
+            opens,
+            clicks,
+            openRate,
+            clickRate,
+            bounces,
+            unsubscribes,
           };
           insertTask(task);
           created += 1;
