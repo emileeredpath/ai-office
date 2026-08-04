@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Mail, Check } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
+import { MonthTimeline } from '@/components/MonthTimeline';
 import { Task } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import {
@@ -235,6 +236,16 @@ export function CalendarScreen() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Month Timeline */}
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-text-primary mb-6">
+            {getMonthName(currentDate.getMonth())} Timeline & Milestones
+          </h2>
+          <div className="card p-6">
+            <MonthTimeline currentDate={currentDate} />
           </div>
         </div>
       </div>
