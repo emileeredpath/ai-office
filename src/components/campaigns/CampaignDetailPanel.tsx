@@ -336,99 +336,134 @@ export function CampaignDetailPanel() {
 
         {/* TAB: Schedule */}
         {activeTab === 'schedule' && (
-          <div className="space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid var(--color-border)' }}>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Element</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Status</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-text-secondary">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td className="px-3 py-2">
-                        <input
-                          type="date"
-                          value={item.date}
-                          onChange={(e) => {
-                            const updated = [...schedule];
-                            updated[idx].date = e.target.value;
-                            setSchedule(updated);
-                          }}
-                          onBlur={() => {
-                            const withIds = ensureScheduleIds(schedule);
-                            updateCampaign(campaign.id, { schedule: withIds });
-                            showToast('✓ Schedule updated');
-                          }}
-                          className="input text-sm"
-                          style={{ width: '100%' }}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={item.element}
-                          onChange={(e) => {
-                            const updated = [...schedule];
-                            updated[idx].element = e.target.value;
-                            setSchedule(updated);
-                          }}
-                          onBlur={() => {
-                            const withIds = ensureScheduleIds(schedule);
-                            updateCampaign(campaign.id, { schedule: withIds });
-                            showToast('✓ Schedule updated');
-                          }}
-                          className="input text-sm"
-                          style={{ width: '100%' }}
-                          placeholder="Element name"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={item.status}
-                          onChange={(e) => {
-                            const updated = [...schedule];
-                            updated[idx].status = e.target.value as any;
-                            setSchedule(updated);
-                          }}
-                          onBlur={() => {
-                            const withIds = ensureScheduleIds(schedule);
-                            updateCampaign(campaign.id, { schedule: withIds });
-                            showToast('✓ Schedule updated');
-                          }}
-                          className="input text-sm"
-                          style={{ width: '100%' }}
-                        >
-                          <option value="planning">Planning</option>
-                          <option value="scheduled">Scheduled</option>
-                          <option value="live">Live</option>
-                          <option value="complete">Complete</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => {
-                            const updated = schedule.filter((_, i) => i !== idx);
-                            setSchedule(updated);
-                            updateCampaign(campaign.id, { schedule: updated });
-                            showToast('✓ Element removed');
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="space-y-6">
+            {schedule.length > 0 ? (
+              <div className="relative">
+                <div className="space-y-4">
+                  {[...schedule].sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((item, idx) => {
+                    const originalIdx = schedule.findIndex(s => s.id === item.id);
+                    const statusColors = {
+                      planning: '#94a3b8',
+                      scheduled: '#3b82f6',
+                      live: '#10b981',
+                      complete: '#6366f1',
+                    };
+                    const statusBgColors = {
+                      planning: '#f1f5f9',
+                      scheduled: '#eff6ff',
+                      live: '#f0fdf4',
+                      complete: '#eef2ff',
+                    };
+                    return (
+                      <div key={item.id} className="flex gap-4 pb-4 border-l-2" style={{ borderColor: statusColors[item.status as keyof typeof statusColors] || '#ccc' }}>
+                        <div className="flex-shrink-0 mt-1">
+                          <div
+                            className="w-3 h-3 rounded-full border-2 -ml-2"
+                            style={{
+                              backgroundColor: statusColors[item.status as keyof typeof statusColors] || '#ccc',
+                              borderColor: 'var(--color-background)',
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className="p-4 rounded-lg border"
+                            style={{
+                              backgroundColor: statusBgColors[item.status as keyof typeof statusBgColors] || '#f3f4f6',
+                              borderColor: statusColors[item.status as keyof typeof statusColors] || '#ccc',
+                            }}
+                          >
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <label className="text-xs font-semibold text-text-secondary block mb-1">Date</label>
+                                <input
+                                  type="date"
+                                  value={item.date}
+                                  onChange={(e) => {
+                                    const updated = [...schedule];
+                                    updated[originalIdx].date = e.target.value;
+                                    setSchedule(updated);
+                                  }}
+                                  onBlur={() => {
+                                    const withIds = ensureScheduleIds(schedule);
+                                    updateCampaign(campaign.id, { schedule: withIds });
+                                    showToast('✓ Schedule updated');
+                                  }}
+                                  className="input text-sm w-full"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <label className="text-xs font-semibold text-text-secondary block mb-1">Milestone</label>
+                                <input
+                                  type="text"
+                                  value={item.element}
+                                  onChange={(e) => {
+                                    const updated = [...schedule];
+                                    updated[originalIdx].element = e.target.value;
+                                    setSchedule(updated);
+                                  }}
+                                  onBlur={() => {
+                                    const withIds = ensureScheduleIds(schedule);
+                                    updateCampaign(campaign.id, { schedule: withIds });
+                                    showToast('✓ Schedule updated');
+                                  }}
+                                  className="input text-sm w-full"
+                                  placeholder="e.g. Email launch, Social campaign, Review & adjust"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-3">
+                              <div>
+                                <label className="text-xs font-semibold text-text-secondary block mb-1">Status</label>
+                                <select
+                                  value={item.status}
+                                  onChange={(e) => {
+                                    const updated = [...schedule];
+                                    updated[originalIdx].status = e.target.value as any;
+                                    setSchedule(updated);
+                                  }}
+                                  onBlur={() => {
+                                    const withIds = ensureScheduleIds(schedule);
+                                    updateCampaign(campaign.id, { schedule: withIds });
+                                    showToast('✓ Schedule updated');
+                                  }}
+                                  className="input text-sm w-full"
+                                >
+                                  <option value="planning">Planning</option>
+                                  <option value="scheduled">Scheduled</option>
+                                  <option value="live">Live</option>
+                                  <option value="complete">Complete</option>
+                                </select>
+                              </div>
+                              <div className="flex items-end">
+                                <button
+                                  onClick={() => {
+                                    const updated = schedule.filter((_, i) => i !== originalIdx);
+                                    setSchedule(updated);
+                                    updateCampaign(campaign.id, { schedule: updated });
+                                    showToast('✓ Milestone removed');
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1"
+                                >
+                                  <Trash2 size={14} />
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-text-secondary mb-4">No milestones yet. Add campaign milestones to build your timeline.</p>
+              </div>
+            )}
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 border-t pt-4">
               <button
                 onClick={() => {
                   const updated = [...schedule, { id: `schedule-${nanoid(10)}`, date: '', element: '', status: 'planning' as const }];
@@ -437,7 +472,7 @@ export function CampaignDetailPanel() {
                 className="btn btn-secondary text-sm flex items-center gap-2"
               >
                 <Plus size={16} />
-                Add element
+                Add milestone
               </button>
               <button
                 onClick={handleExportSchedule}
