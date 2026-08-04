@@ -211,6 +211,22 @@ export function DashboardScreen() {
     }, {} as Record<string, { recipients: number; cost: number }>)
   ).map(([brand, totals]) => ({ brand: brand as Brand, ...totals }));
 
+  // Email engagement metrics for this month
+  const monthOpens = sendsThisMonth.reduce((sum, t) => sum + (t.opens || 0), 0);
+  const monthClicks = sendsThisMonth.reduce((sum, t) => sum + (t.clicks || 0), 0);
+  const monthBounces = sendsThisMonth.reduce((sum, t) => sum + (t.bounces || 0), 0);
+  const monthUnsubscribes = sendsThisMonth.reduce((sum, t) => sum + (t.unsubscribes || 0), 0);
+  const avgOpenRate = monthRecipients > 0
+    ? sendsThisMonth
+        .filter(t => t.recipients && t.recipients > 0)
+        .reduce((sum, t) => sum + (t.openRate || 0), 0) / Math.max(sendsThisMonth.filter(t => t.openRate != null).length, 1)
+    : null;
+  const avgClickRate = monthRecipients > 0
+    ? sendsThisMonth
+        .filter(t => t.recipients && t.recipients > 0)
+        .reduce((sum, t) => sum + (t.clickRate || 0), 0) / Math.max(sendsThisMonth.filter(t => t.clickRate != null).length, 1)
+    : null;
+
   // Pipeline kanban
   const campaignsByStatus = PIPELINE_COLUMNS.reduce((acc, status) => {
     acc[status] = campaigns.filter((c) => c.status === status);
@@ -436,6 +452,12 @@ export function DashboardScreen() {
             <MetricCard label="Total recipients" value={monthRecipients.toLocaleString()} />
             <MetricCard label="Total spend" value={`£${monthSpend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
             <MetricCard label="Cost per recipient" value={costPerRecipient != null ? `£${costPerRecipient.toFixed(3)}` : '—'} />
+            <MetricCard label="Total opens" value={monthOpens.toLocaleString()} />
+            <MetricCard label="Total clicks" value={monthClicks.toLocaleString()} />
+            <MetricCard label="Avg open rate" value={avgOpenRate != null ? `${avgOpenRate.toFixed(1)}%` : '—'} />
+            <MetricCard label="Avg click rate" value={avgClickRate != null ? `${avgClickRate.toFixed(1)}%` : '—'} />
+            <MetricCard label="Total bounces" value={monthBounces.toLocaleString()} />
+            <MetricCard label="Unsubscribes" value={monthUnsubscribes.toLocaleString()} />
           </div>
         </section>
 
