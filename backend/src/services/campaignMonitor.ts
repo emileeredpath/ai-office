@@ -91,7 +91,11 @@ const getCampaignSummary = (apiKey: string, campaignId: string) =>
   cmFetch<CmCampaignSummary>(`/campaigns/${campaignId}/summary.json`, apiKey);
 const getCampaignMetrics = (apiKey: string, campaignId: string): Promise<CmCampaignMetrics | null> =>
   cmFetch<CmCampaignMetrics>(`/campaigns/${campaignId}/opens.json`, apiKey)
-    .catch(() => null); // graceful fallback if metrics endpoint fails
+    .catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[campaign-monitor] metrics endpoint failed for ${campaignId}: ${msg}`);
+      return null;
+    });
 
 function extractCost(summary: CmCampaignSummary | null): number | null {
   if (!summary) return null;
@@ -267,6 +271,11 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
         const recipients = campaign.TotalRecipients ?? summary?.Recipients ?? null;
         const cost = extractCost(summary);
         const { opens, clicks, openRate, clickRate, bounces, unsubscribes } = extractMetrics(metrics, recipients);
+
+        if (!opens && !clicks && metrics) {
+          console.warn(`[campaign-monitor] "${campaign.Name}" has metrics object but no opens/clicks extracted. Metrics keys:`, Object.keys(metrics));
+        }
+
         const sentIso = sentDate.toISOString();
 
         // Match campaign to AI Office campaign by name
