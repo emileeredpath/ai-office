@@ -68,6 +68,12 @@ export interface Task {
   subject: string | null;
   cost: number | null;
   currency: string | null;
+  opens: number | null;
+  clicks: number | null;
+  openRate: number | null;
+  clickRate: number | null;
+  bounces: number | null;
+  unsubscribes: number | null;
 }
 
 export interface CampaignResults {
