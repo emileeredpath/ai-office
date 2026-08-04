@@ -127,10 +127,14 @@ export function MonthTimeline({ currentDate }: { currentDate: Date }) {
                         <div className="flex-1 min-w-0">
                           <div style={{ color: 'var(--text-primary)' }} className="font-medium">
                             {item.title}
+                            {item.campaignName && (
+                              <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', marginLeft: '0.5rem' }}>
+                                ({item.campaignName})
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                            {item.campaignName && <span>{item.campaignName}</span>}
-                            {item.isSend && item.recipients && <span>· {item.recipients.toLocaleString()} recipients</span>}
+                            {item.isSend && item.recipients && <span>{item.recipients.toLocaleString()} recipients</span>}
                             {item.isSend && item.cost != null && <span>· £{item.cost.toFixed(2)}</span>}
                           </div>
                         </div>

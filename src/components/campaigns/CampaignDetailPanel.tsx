@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, FileText } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateShort } from '@/utils/dateUtils';
 import { Task } from '@/types/index';
@@ -37,6 +37,7 @@ export function CampaignDetailPanel() {
   const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [toastIdCounter, setToastIdCounter] = useState(0);
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   // Overview tab fields
   const [budget, setBudget] = useState(campaign?.budget?.toString() || '');
@@ -440,6 +441,15 @@ export function CampaignDetailPanel() {
                   >
                     Export as CSV
                   </button>
+                  {campaign?.planDocument && (
+                    <button
+                      onClick={() => setShowPlanModal(true)}
+                      className="btn btn-secondary text-sm flex items-center gap-2"
+                    >
+                      <FileText size={16} />
+                      View Full Plan
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -674,6 +684,56 @@ export function CampaignDetailPanel() {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Modal */}
+      {showPlanModal && campaign?.planDocument && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowPlanModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-background)',
+              borderRadius: '8px',
+              maxWidth: '800px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              padding: '2rem',
+              width: '90%',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-text-primary">{campaign.name} — Master Plan</h2>
+              <button
+                onClick={() => setShowPlanModal(false)}
+                className="text-text-secondary hover:text-text-primary"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="text-sm text-text-secondary mb-4">
+              {campaign.planDocument.filename}
+            </div>
+            <div
+              className="prose prose-invert max-w-none"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontFamily: 'inherit' }}>
+                {campaign.planDocument.content}
+              </pre>
             </div>
           </div>
         </div>
