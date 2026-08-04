@@ -52,6 +52,12 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       subject: null,
       cost: null,
       currency: null,
+      opens: null,
+      clicks: null,
+      openRate: null,
+      clickRate: null,
+      bounces: null,
+      unsubscribes: null,
     };
 
     setIsSaving(true);
