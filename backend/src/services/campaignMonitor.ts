@@ -41,21 +41,16 @@ interface CmCampaignListItem {
 
 interface CmCampaignSummary {
   Recipients?: number;
+  TotalOpened?: number;
+  UniqueOpened?: number;
+  Clicks?: number;
+  Unsubscribed?: number;
+  Bounced?: number;
   // Plausible cost-bearing fields on pay-as-you-go accounts — none of these
   // are guaranteed by CM's documented schema; see the file header note.
   Cost?: number;
   TotalCost?: number;
   Spend?: number;
-}
-
-interface CmCampaignMetrics {
-  UniqueOpens?: number;
-  TotalOpens?: number;
-  UniqueClickCount?: number;
-  TotalClickCount?: number;
-  Bounces?: number;
-  Unsubscribes?: number;
-  Recipients?: number;
 }
 
 export interface SyncResult {
@@ -96,7 +91,7 @@ function extractCost(summary: CmCampaignSummary | null): number | null {
   return typeof value === 'number' ? value : null;
 }
 
-function extractMetrics(metrics: CmCampaignMetrics | null, recipients: number | null): {
+function extractMetrics(summary: CmCampaignSummary | null, recipients: number | null): {
   opens: number | null;
   clicks: number | null;
   openRate: number | null;
@@ -104,22 +99,23 @@ function extractMetrics(metrics: CmCampaignMetrics | null, recipients: number | 
   bounces: number | null;
   unsubscribes: number | null;
 } {
-  if (!metrics) {
+  if (!summary) {
     return { opens: null, clicks: null, openRate: null, clickRate: null, bounces: null, unsubscribes: null };
   }
 
-  const opens = metrics.UniqueOpens ?? metrics.TotalOpens ?? null;
-  const clicks = metrics.UniqueClickCount ?? metrics.TotalClickCount ?? null;
-  const openRate = opens && recipients && recipients > 0 ? (opens / recipients) * 100 : null;
-  const clickRate = clicks && recipients && recipients > 0 ? (clicks / recipients) * 100 : null;
+  const opens = summary.TotalOpened ?? summary.UniqueOpened ?? null;
+  const clicks = summary.Clicks ?? null;
+  const finalRecipients = recipients ?? summary.Recipients ?? null;
+  const openRate = opens && finalRecipients && finalRecipients > 0 ? (opens / finalRecipients) * 100 : null;
+  const clickRate = clicks && finalRecipients && finalRecipients > 0 ? (clicks / finalRecipients) * 100 : null;
 
   return {
     opens: typeof opens === 'number' ? opens : null,
     clicks: typeof clicks === 'number' ? clicks : null,
     openRate: typeof openRate === 'number' ? openRate : null,
     clickRate: typeof clickRate === 'number' ? clickRate : null,
-    bounces: metrics.Bounces ?? null,
-    unsubscribes: metrics.Unsubscribes ?? null,
+    bounces: summary.Bounced ?? null,
+    unsubscribes: summary.Unsubscribed ?? null,
   };
 }
 
@@ -253,13 +249,10 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
           const msg = err instanceof Error ? err.message : String(err);
           console.warn(`[campaign-monitor] failed to get summary for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
         }
-        // Metrics (opens/clicks/etc) are not exposed by Campaign Monitor's documented API.
-        // If engagement metrics are needed, they should be fetched from GA4 or entered manually.
-        const metrics: CmCampaignMetrics | null = null;
 
         const recipients = campaign.TotalRecipients ?? summary?.Recipients ?? null;
         const cost = extractCost(summary);
-        const { opens, clicks, openRate, clickRate, bounces, unsubscribes } = extractMetrics(metrics, recipients);
+        const { opens, clicks, openRate, clickRate, bounces, unsubscribes } = extractMetrics(summary, recipients);
         const sentIso = sentDate.toISOString();
 
         // Match campaign to AI Office campaign by name
