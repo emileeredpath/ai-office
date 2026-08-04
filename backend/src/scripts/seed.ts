@@ -122,6 +122,24 @@ const seedCampaigns = [
     engagement: 0,
     colour: '#F97031',
   },
+  {
+    id: 'campaign--P43-q05Nu',
+    name: 'Axon Body Mini BodyCam Campaign',
+    brand: 'mtech' as const,
+    entities: ['brentwood' as const, 'radio-links' as const, 'capcom' as const, 'ircl' as const],
+    primaryIndustry: 'Security',
+    secondaryIndustry: 'Facilities Management',
+    theme: 'Product launch campaign',
+    status: 'planning' as const,
+    startDate: '2026-08-01',
+    endDate: '2026-09-30',
+    budget: null,
+    spend: 0,
+    conversions: 0,
+    leads: 0,
+    engagement: 0,
+    colour: '#7b6fb0',
+  },
 ];
 
 const seedTasks: TaskRecord[] = [
@@ -169,6 +187,12 @@ const seedTasks: TaskRecord[] = [
   // IDARO's send is deliberately not linked to campaign-4 — it's tracked as
   // a standalone item, per the brief.
   task({ id: 'task-41', title: 'Service and Repair Email — IDARO', brand: 'idaro', status: 'complete', deadline: '2026-07-29', startDate: '2026-07-29', createdAt: '2026-07-29', completedAt: '2026-07-29', notes: 'SENT 29 Jul 2026 — 51 recipients — £5.09 (converted from $6.77 @ ~£0.7524/USD)', type: 'email-send', recipients: 51, subject: 'Service & Repair — IDARO', cost: 5.09, currency: 'GBP' }),
+  // Axon Body Mini BodyCam Campaign tasks
+  task({ id: 'task-whbVHjbCq4', title: 'Send Axon BodyCam Google Ads brief to Climbing Trees', brand: 'mtech', status: 'complete', priority: 'high', deadline: '2026-07-31', startDate: '2026-07-25', campaignId: 'campaign--P43-q05Nu', createdAt: '2026-07-25', completedAt: '2026-07-31' }),
+  task({ id: 'task-UO5sYyhOcm', title: 'Axon BodyCam - Capcom landing page optimization', brand: 'capcom', status: 'not-started', priority: 'medium', deadline: '2026-08-14', campaignId: 'campaign--P43-q05Nu', createdAt: '2026-08-04' }),
+  task({ id: 'task-AVCj_ma5a7', title: 'Axon BodyCam - Radio Links landing page optimization', brand: 'radio-links', status: 'not-started', priority: 'medium', deadline: '2026-08-14', campaignId: 'campaign--P43-q05Nu', createdAt: '2026-08-04' }),
+  task({ id: 'task-EU5sYyhOcm', title: 'Axon BodyCam - Brentwood landing page optimization', brand: 'brentwood', status: 'not-started', priority: 'medium', deadline: '2026-08-14', campaignId: 'campaign--P43-q05Nu', createdAt: '2026-08-04' }),
+  task({ id: 'task--PsDnsOuDU', title: 'Axon BodyCam - Keyword research & landing page review (Climbing Trees)', brand: 'brentwood', status: 'not-started', priority: 'medium', deadline: '2026-08-15', campaignId: 'campaign--P43-q05Nu', createdAt: '2026-08-04' }),
 ];
 
 export function runSeed() {
