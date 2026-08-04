@@ -55,6 +55,7 @@ export interface Task {
   deadline: Date | null;
   startDate: Date | null;
   campaignId: string | null;
+  scheduleId: string | null; // Linked to CampaignSchedule for cascade updates
   createdAt: Date;
   completedAt: Date | null;
   previousStatus: TaskStatus | null;
@@ -100,6 +101,14 @@ export interface ScheduleElement {
   status: CampaignScheduleStatus;
 }
 
+export interface CampaignSchedule {
+  id: string;
+  date: string;
+  element: string;
+  status: CampaignScheduleStatus;
+  taskId?: string | null; // Linked task for cascade updates
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -134,8 +143,8 @@ export interface Campaign {
   cofundRate?: number | null;
   claimStatus?: ClaimStatus | null;
 
-  // Schedule milestones
-  schedule?: ScheduleElement[];
+  // Schedule milestones (supports both legacy ScheduleElement and new CampaignSchedule with IDs)
+  schedule?: (ScheduleElement | CampaignSchedule)[];
 }
 
 export interface BriefGeneratorState {

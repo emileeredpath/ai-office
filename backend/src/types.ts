@@ -33,6 +33,7 @@ export interface TaskRecord {
   deadline: string | null;
   startDate: string | null;
   campaignId: string | null;
+  scheduleId: string | null;
   createdAt: string;
   completedAt: string | null;
   previousStatus: TaskStatus | null;

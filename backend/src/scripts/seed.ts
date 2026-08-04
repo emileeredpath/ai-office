@@ -16,6 +16,7 @@ function task(overrides: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' |
     deadline: null,
     startDate: null,
     campaignId: null,
+    scheduleId: null,
     createdAt: new Date().toISOString(),
     completedAt: null,
     previousStatus: null,

@@ -11,6 +11,7 @@ interface TaskRow {
   deadline: string | null;
   start_date: string | null;
   campaign_id: string | null;
+  schedule_id: string | null;
   created_at: string;
   completed_at: string | null;
   previous_status: string | null;
@@ -47,6 +48,7 @@ function rowToRecord(row: TaskRow): TaskRecord {
     deadline: row.deadline,
     startDate: row.start_date,
     campaignId: row.campaign_id,
+    scheduleId: row.schedule_id,
     createdAt: row.created_at,
     completedAt: row.completed_at,
     previousStatus: row.previous_status as TaskRecord['previousStatus'],
@@ -100,11 +102,11 @@ export function findTasksByTitle(title: string): TaskRecord[] {
 export function insertTask(task: TaskRecord): void {
   db.prepare(
     `INSERT INTO tasks (
-      id, title, notes, brand, status, priority, deadline, start_date, campaign_id,
+      id, title, notes, brand, status, priority, deadline, start_date, campaign_id, schedule_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
       blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to,
       type, recipients, subject, cost, currency, external_id, opens, clicks, open_rate, click_rate, bounces, unsubscribes
-    ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId,
+    ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId, @scheduleId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
       @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo,
       @type, @recipients, @subject, @cost, @currency, @externalId, @opens, @clicks, @openRate, @clickRate, @bounces, @unsubscribes)`
@@ -118,6 +120,7 @@ export function insertTask(task: TaskRecord): void {
     deadline: task.deadline,
     startDate: task.startDate,
     campaignId: task.campaignId,
+    scheduleId: task.scheduleId ?? null,
     createdAt: task.createdAt,
     completedAt: task.completedAt,
     previousStatus: task.previousStatus,
@@ -167,7 +170,7 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
   db.prepare(
     `UPDATE tasks SET
       title = @title, notes = @notes, brand = @brand, status = @status, priority = @priority,
-      deadline = @deadline, start_date = @startDate, campaign_id = @campaignId,
+      deadline = @deadline, start_date = @startDate, campaign_id = @campaignId, schedule_id = @scheduleId,
       completed_at = @completedAt, previous_status = @previousStatus, history = @history,
       approval_required = @approvalRequired, approver = @approver, blocker_reason = @blockerReason,
       last_brief_generated = @lastBriefGenerated, type = @type, recipients = @recipients, subject = @subject,
@@ -184,6 +187,7 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     deadline: merged.deadline,
     startDate: merged.startDate,
     campaignId: merged.campaignId,
+    scheduleId: merged.scheduleId ?? null,
     completedAt: merged.completedAt,
     previousStatus: merged.previousStatus,
     history: JSON.stringify(merged.history),

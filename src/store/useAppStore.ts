@@ -73,6 +73,7 @@ const hydrateTask = (task: any): Task => ({
   subject: task.subject ?? null,
   cost: task.cost ?? null,
   currency: task.currency ?? null,
+  scheduleId: task.scheduleId ?? null,
 });
 
 const hydrateCampaign = (campaign: any): Campaign => ({
@@ -174,6 +175,27 @@ export const useAppStore = create<AppState>((set, get) => {
           return;
         }
         await get().syncTasksFromApi();
+
+        // Cascade: if deadline changed, update linked schedule item date
+        if (updates.deadline !== undefined) {
+          const task = get().tasks.find((t) => t.id === id);
+          if (task && task.scheduleId && task.campaignId) {
+            const campaign = get().campaigns.find((c) => c.id === task.campaignId);
+            if (campaign && campaign.schedule) {
+              const scheduleItem = campaign.schedule.find((s: any) => s.id === task.scheduleId);
+              if (scheduleItem) {
+                const newDate = updates.deadline
+                  ? updates.deadline.toISOString().split('T')[0]
+                  : scheduleItem.date;
+                const updatedSchedule = campaign.schedule.map((s: any) =>
+                  s.id === task.scheduleId ? { ...s, date: newDate } : s
+                );
+                // Update campaign with new schedule (without triggering cascade back)
+                await get().updateCampaign(campaign.id, { schedule: updatedSchedule });
+              }
+            }
+          }
+        }
       } catch (err) {
         alert(friendlyErrorMessage(err));
       }
@@ -287,6 +309,28 @@ export const useAppStore = create<AppState>((set, get) => {
         console.log('API update complete, syncing campaigns...');
         await get().syncCampaignsFromApi();
         console.log('Sync complete');
+
+        // Cascade: if schedule changed, update linked tasks' deadlines
+        if (updates.schedule !== undefined) {
+          const campaign = get().campaigns.find((c) => c.id === id);
+          const oldSchedule = campaign?.schedule || [];
+          const newSchedule = updates.schedule || [];
+
+          // Find which schedule items changed dates
+          for (const newItem of newSchedule) {
+            const oldItem = oldSchedule.find((s: any) => s.id === (newItem as any).id);
+            if (oldItem && oldItem.date !== (newItem as any).date) {
+              // Schedule item date changed, find and update linked tasks
+              const linkedTasks = get().tasks.filter(
+                (t) => t.campaignId === id && t.scheduleId === (newItem as any).id
+              );
+              for (const task of linkedTasks) {
+                const newDeadline = new Date((newItem as any).date);
+                await get().updateTask(task.id, { deadline: newDeadline });
+              }
+            }
+          }
+        }
       } catch (err) {
         console.error('Error updating campaign:', err);
         alert(friendlyErrorMessage(err));

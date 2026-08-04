@@ -208,6 +208,7 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     deadline: input.deadline ?? null,
     startDate: null,
     campaignId: input.campaign_id ?? null,
+    scheduleId: null,
     createdAt: now,
     completedAt: null,
     previousStatus: null,

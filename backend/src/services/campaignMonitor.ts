@@ -306,6 +306,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             deadline: sentIso,
             startDate: sentIso,
             campaignId: aiCampaignId,
+            scheduleId: null,
             createdAt: now,
             completedAt: sentIso,
             previousStatus: null,

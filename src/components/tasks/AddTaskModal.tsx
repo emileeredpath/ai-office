@@ -39,6 +39,7 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       deadline: formData.deadline ? new Date(formData.deadline) : null,
       startDate: null,
       campaignId: formData.campaignId || null,
+      scheduleId: null,
       createdAt: new Date(),
       completedAt: null,
       previousStatus: null,

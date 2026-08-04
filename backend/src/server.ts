@@ -83,6 +83,7 @@ app.use('/api/campaign-monitor/seed-test-data', async (req: Request, res: Respon
         deadline: send.date,
         startDate: send.date,
         campaignId: null,
+        scheduleId: null,
         createdAt: now,
         completedAt: sentDate,
         previousStatus: null,

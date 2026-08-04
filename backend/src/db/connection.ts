@@ -198,4 +198,8 @@ addColumnIfMissing('tasks', 'click_rate', 'REAL');
 addColumnIfMissing('tasks', 'bounces', 'INTEGER');
 addColumnIfMissing('tasks', 'unsubscribes', 'INTEGER');
 
+// Schedule linking for task-to-campaign cascade updates — see Phase 1 Implementation Brief.
+addColumnIfMissing('tasks', 'schedule_id', 'TEXT');
+db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_schedule_id ON tasks(schedule_id)');
+
 export default db;

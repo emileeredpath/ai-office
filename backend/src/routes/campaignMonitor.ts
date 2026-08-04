@@ -48,6 +48,7 @@ router.post('/seed-test-data', async (_req: Request, res: Response) => {
         deadline: send.date,
         startDate: send.date,
         campaignId: null,
+        scheduleId: null,
         createdAt: now,
         completedAt: sentDate,
         previousStatus: null,

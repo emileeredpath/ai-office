@@ -3,6 +3,7 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateShort } from '@/utils/dateUtils';
 import { Task } from '@/types/index';
+import { nanoid } from 'nanoid';
 import '@/styles/campaignDetailPanel.css';
 
 type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding';
@@ -51,7 +52,14 @@ export function CampaignDetailPanel() {
   const [claimStatus, setClaimStatus] = useState(campaign?.claimStatus || '');
 
   // Schedule tab fields
-  const [schedule, setSchedule] = useState(campaign?.schedule || []);
+  const ensureScheduleIds = (items: any[]) => {
+    return items.map((item) => ({
+      ...item,
+      id: item.id || `schedule-${nanoid(10)}`,
+    }));
+  };
+
+  const [schedule, setSchedule] = useState(() => ensureScheduleIds(campaign?.schedule || []));
 
   useEffect(() => {
     if (campaign) {
@@ -64,7 +72,7 @@ export function CampaignDetailPanel() {
       setScheme(campaign.scheme || '');
       setCofundRate(campaign.cofundRate?.toString() || '');
       setClaimStatus(campaign.claimStatus || '');
-      setSchedule(campaign.schedule || []);
+      setSchedule(ensureScheduleIds(campaign.schedule || []));
       setActiveTab('overview');
     }
   }, [selectedCampaignId]);
@@ -352,7 +360,8 @@ export function CampaignDetailPanel() {
                             setSchedule(updated);
                           }}
                           onBlur={() => {
-                            updateCampaign(campaign.id, { schedule });
+                            const withIds = ensureScheduleIds(schedule);
+                            updateCampaign(campaign.id, { schedule: withIds });
                             showToast('✓ Schedule updated');
                           }}
                           className="input text-sm"
@@ -369,7 +378,8 @@ export function CampaignDetailPanel() {
                             setSchedule(updated);
                           }}
                           onBlur={() => {
-                            updateCampaign(campaign.id, { schedule });
+                            const withIds = ensureScheduleIds(schedule);
+                            updateCampaign(campaign.id, { schedule: withIds });
                             showToast('✓ Schedule updated');
                           }}
                           className="input text-sm"
@@ -386,7 +396,8 @@ export function CampaignDetailPanel() {
                             setSchedule(updated);
                           }}
                           onBlur={() => {
-                            updateCampaign(campaign.id, { schedule });
+                            const withIds = ensureScheduleIds(schedule);
+                            updateCampaign(campaign.id, { schedule: withIds });
                             showToast('✓ Schedule updated');
                           }}
                           className="input text-sm"
@@ -420,7 +431,7 @@ export function CampaignDetailPanel() {
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  const updated = [...schedule, { date: '', element: '', status: 'planning' as const }];
+                  const updated = [...schedule, { id: `schedule-${nanoid(10)}`, date: '', element: '', status: 'planning' as const }];
                   setSchedule(updated);
                 }}
                 className="btn btn-secondary text-sm flex items-center gap-2"
