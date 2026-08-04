@@ -265,8 +265,21 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
         const sentIso = sentDate.toISOString();
 
         // Match campaign to AI Office campaign by name
+        // Try exact normalized match first, then try individual word matches
+        let aiCampaignId: string | null = null;
         const normalizedCmName = campaign.Name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const aiCampaignId = campaignMap.get(normalizedCmName) || null;
+        aiCampaignId = campaignMap.get(normalizedCmName) || null;
+
+        if (!aiCampaignId) {
+          // Try matching by individual words (for multi-word campaigns)
+          const cmWords = campaign.Name.toLowerCase().split(/[\s&-]+/).filter((w) => w.length > 3);
+          for (const word of cmWords) {
+            if (campaignMap.has(word)) {
+              aiCampaignId = campaignMap.get(word) || null;
+              break;
+            }
+          }
+        }
 
         const existing = findTaskByExternalId(SOURCE, campaign.CampaignID);
         if (existing) {
