@@ -89,13 +89,6 @@ const listCampaignsForClient = (apiKey: string, clientId: string) =>
   cmFetch<CmCampaignListItem[]>(`/clients/${clientId}/campaigns.json`, apiKey);
 const getCampaignSummary = (apiKey: string, campaignId: string) =>
   cmFetch<CmCampaignSummary>(`/campaigns/${campaignId}/summary.json`, apiKey);
-const getCampaignMetrics = (apiKey: string, campaignId: string): Promise<CmCampaignMetrics | null> =>
-  cmFetch<CmCampaignMetrics>(`/campaigns/${campaignId}/opens.json`, apiKey)
-    .catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[campaign-monitor] metrics endpoint failed for ${campaignId}: ${msg}`);
-      return null;
-    });
 
 function extractCost(summary: CmCampaignSummary | null): number | null {
   if (!summary) return null;
@@ -254,28 +247,19 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
         }
 
         let summary: CmCampaignSummary | null = null;
-        let metrics: CmCampaignMetrics | null = null;
         try {
           summary = await getCampaignSummary(apiKey, campaign.CampaignID);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn(`[campaign-monitor] failed to get summary for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
         }
-        try {
-          metrics = await getCampaignMetrics(apiKey, campaign.CampaignID);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[campaign-monitor] failed to get metrics for ${campaign.CampaignID} (${campaign.Name}): ${msg}`);
-        }
+        // Metrics (opens/clicks/etc) are not exposed by Campaign Monitor's documented API.
+        // If engagement metrics are needed, they should be fetched from GA4 or entered manually.
+        const metrics: CmCampaignMetrics | null = null;
 
         const recipients = campaign.TotalRecipients ?? summary?.Recipients ?? null;
         const cost = extractCost(summary);
         const { opens, clicks, openRate, clickRate, bounces, unsubscribes } = extractMetrics(metrics, recipients);
-
-        if (!opens && !clicks && metrics) {
-          console.warn(`[campaign-monitor] "${campaign.Name}" has metrics object but no opens/clicks extracted. Metrics keys:`, Object.keys(metrics));
-        }
-
         const sentIso = sentDate.toISOString();
 
         // Match campaign to AI Office campaign by name
