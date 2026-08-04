@@ -83,9 +83,11 @@ export function MonthTimeline({ currentDate }: { currentDate: Date }) {
     const sortedDates = Array.from(eventsMap.keys()).sort();
     return sortedDates.map((dateStr) => {
       const date = new Date(dateStr);
-      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayName = date.toLocaleDateString('en-GB', { weekday: 'short' });
+      const [year, month, day] = dateStr.split('-');
+      const displayDate = `${day}/${month}/${year}`;
       return {
-        date: dateStr,
+        date: displayDate,
         day: dayName,
         items: eventsMap.get(dateStr)!,
       };
@@ -103,13 +105,10 @@ export function MonthTimeline({ currentDate }: { currentDate: Date }) {
   return (
     <div className="space-y-4">
       {timelineEvents.map((event, idx) => {
-        const [year, month, day] = event.date.split('-');
-        const displayDate = `${month}/${day}`;
-
         return (
           <div key={event.date} className="flex gap-4">
-            <div className="flex-shrink-0 w-16">
-              <div className="text-sm font-semibold text-text-primary">{displayDate}</div>
+            <div className="flex-shrink-0 w-20">
+              <div className="text-sm font-semibold text-text-primary">{event.date}</div>
               <div className="text-xs text-text-secondary">{event.day}</div>
             </div>
             <div className="flex-1 border-l-2 border-text-secondary/20 pl-4 pb-4">
