@@ -100,6 +100,12 @@ app.use('/api/campaign-monitor/seed-test-data', async (req: Request, res: Respon
         cost: send.cost,
         currency: 'GBP',
         externalId: null,
+        opens: null,
+        clicks: null,
+        openRate: null,
+        clickRate: null,
+        bounces: null,
+        unsubscribes: null,
       };
       insertTask(task);
       created += 1;

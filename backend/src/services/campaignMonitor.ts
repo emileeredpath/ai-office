@@ -89,10 +89,9 @@ const listCampaignsForClient = (apiKey: string, clientId: string) =>
   cmFetch<CmCampaignListItem[]>(`/clients/${clientId}/campaigns.json`, apiKey);
 const getCampaignSummary = (apiKey: string, campaignId: string) =>
   cmFetch<CmCampaignSummary>(`/campaigns/${campaignId}/summary.json`, apiKey);
-const getCampaignMetrics = (apiKey: string, campaignId: string) =>
+const getCampaignMetrics = (apiKey: string, campaignId: string): Promise<CmCampaignMetrics | null> =>
   cmFetch<CmCampaignMetrics>(`/campaigns/${campaignId}/opens.json`, apiKey)
-    .then((data) => ({ ...data, campaignId }))
-    .catch(() => ({ campaignId })); // graceful fallback if metrics endpoint fails
+    .catch(() => null); // graceful fallback if metrics endpoint fails
 
 function extractCost(summary: CmCampaignSummary | null): number | null {
   if (!summary) return null;

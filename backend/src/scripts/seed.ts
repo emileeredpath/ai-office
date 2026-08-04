@@ -33,6 +33,12 @@ function task(overrides: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' |
     cost: null,
     currency: null,
     externalId: null,
+    opens: null,
+    clicks: null,
+    openRate: null,
+    clickRate: null,
+    bounces: null,
+    unsubscribes: null,
     ...overrides,
   };
 }

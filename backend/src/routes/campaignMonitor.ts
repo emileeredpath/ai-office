@@ -64,6 +64,12 @@ router.post('/seed-test-data', async (_req: Request, res: Response) => {
         cost: send.cost,
         currency: 'GBP',
         externalId: null,
+        opens: null,
+        clicks: null,
+        openRate: null,
+        clickRate: null,
+        bounces: null,
+        unsubscribes: null,
       };
       insertTask(task);
       created += 1;

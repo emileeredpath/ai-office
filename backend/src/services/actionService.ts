@@ -225,6 +225,12 @@ function doCreateTask(payload: unknown, source: ActionSource | undefined, reques
     cost: input.cost ?? null,
     currency: input.currency ?? (input.cost != null ? 'GBP' : null),
     externalId: null,
+    opens: null,
+    clicks: null,
+    openRate: null,
+    clickRate: null,
+    bounces: null,
+    unsubscribes: null,
   };
 
   insertTask(task);
