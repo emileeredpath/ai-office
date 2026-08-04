@@ -346,7 +346,6 @@ export function CampaignDetailPanel() {
                     <thead>
                       <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid var(--color-border)' }}>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Date</th>
-                        <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Day</th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Milestone</th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Status</th>
                         <th className="px-3 py-3 text-center text-xs font-semibold text-text-secondary">Action</th>
@@ -356,9 +355,7 @@ export function CampaignDetailPanel() {
                       {[...schedule].sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((item) => {
                         const originalIdx = schedule.findIndex(s => s.id === item.id);
                         const date = new Date(item.date);
-                        const dayName = date.toLocaleDateString('en-GB', { weekday: 'short' });
-                        const [year, month, day] = item.date.split('-');
-                        const displayDate = `${day}/${month}/${year}`;
+                        const displayDate = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
                         const statusColors = {
                           planning: '#94a3b8',
                           scheduled: '#3b82f6',
@@ -368,7 +365,6 @@ export function CampaignDetailPanel() {
                         return (
                           <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                             <td className="px-3 py-3 text-text-primary font-medium">{displayDate}</td>
-                            <td className="px-3 py-3 text-text-secondary text-xs">{dayName}</td>
                             <td className="px-3 py-3">
                               <input
                                 type="text"
