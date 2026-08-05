@@ -3,6 +3,7 @@ import { getBrandTraffic, getWave1Performance } from '../services/ga4.js';
 import { getWave1CallMetrics } from '../services/infinity.js';
 import { upsertWave1Metric, getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 
+// Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
 
 router.get('/ga4', async (_req: Request, res: Response) => {
