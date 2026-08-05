@@ -126,26 +126,15 @@ export function CampaignDetailPanel() {
   }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
 
   // Fetch Wave 1 data when switching to Wave 1 tabs
+  const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
+  const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+
   useEffect(() => {
     if (['wave1-performance', 'ga4', 'calls'].includes(activeTab)) {
-      const fetchData = async () => {
-        try {
-          const perf = await fetchWave1Performance(campaign?.id);
-          const calls = await fetchWave1Calls();
-          const merged = {
-            ...perf,
-            infinity: calls.metrics,
-          };
-          const store = useAppStore.getState();
-          // Update store directly since we're just reading
-          useAppStore.setState({ wave1Performance: merged });
-        } catch (err) {
-          console.error('Wave 1 data fetch error:', err);
-        }
-      };
-      fetchData();
+      syncWave1Performance();
+      syncWave1Calls();
     }
-  }, [activeTab, campaign?.id]);
+  }, [activeTab, syncWave1Performance, syncWave1Calls]);
 
   if (!campaign) return null;
 
