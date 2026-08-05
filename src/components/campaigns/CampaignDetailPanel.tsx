@@ -45,6 +45,15 @@ export function CampaignDetailPanel() {
   const [spend, setSpend] = useState(campaign?.spend?.toString() || '');
   const [valueGenerated, setValueGenerated] = useState(campaign?.valueGenerated?.toString() || '');
   const [leads, setLeads] = useState(campaign?.leads?.toString() || '');
+
+  // Tracking fields
+  const [utmSource, setUtmSource] = useState(campaign?.utmSource || '');
+  const [utmMedium, setUtmMedium] = useState(campaign?.utmMedium || '');
+  const [utmCampaign, setUtmCampaign] = useState(campaign?.utmCampaign || '');
+  const [utmContent, setUtmContent] = useState(campaign?.utmContent || '');
+  const [trackingTemplate, setTrackingTemplate] = useState(campaign?.trackingTemplate || '');
+
+  // Schedule tab fields - notes stays here for Campaign Notes section
   const [notes, setNotes] = useState(campaign?.notes || '');
 
   // Funding tab fields
@@ -69,6 +78,11 @@ export function CampaignDetailPanel() {
       setSpend(campaign.spend?.toString() || '');
       setValueGenerated(campaign.valueGenerated?.toString() || '');
       setLeads(campaign.leads?.toString() || '');
+      setUtmSource(campaign.utmSource || '');
+      setUtmMedium(campaign.utmMedium || '');
+      setUtmCampaign(campaign.utmCampaign || '');
+      setUtmContent(campaign.utmContent || '');
+      setTrackingTemplate(campaign.trackingTemplate || '');
       setNotes(campaign.notes || '');
       setVendor(campaign.vendor || '');
       setScheme(campaign.scheme || '');
@@ -86,6 +100,11 @@ export function CampaignDetailPanel() {
       setSpend(campaign.spend?.toString() || '');
       setValueGenerated(campaign.valueGenerated?.toString() || '');
       setLeads(campaign.leads?.toString() || '');
+      setUtmSource(campaign.utmSource || '');
+      setUtmMedium(campaign.utmMedium || '');
+      setUtmCampaign(campaign.utmCampaign || '');
+      setUtmContent(campaign.utmContent || '');
+      setTrackingTemplate(campaign.trackingTemplate || '');
       setNotes(campaign.notes || '');
       setVendor(campaign.vendor || '');
       setScheme(campaign.scheme || '');
@@ -93,7 +112,7 @@ export function CampaignDetailPanel() {
       setClaimStatus(campaign.claimStatus || '');
       setSchedule(campaign.schedule || []);
     }
-  }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
+  }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.utmSource, campaign?.utmMedium, campaign?.utmCampaign, campaign?.utmContent, campaign?.trackingTemplate, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
 
   if (!campaign) return null;
 
@@ -316,22 +335,100 @@ export function CampaignDetailPanel() {
               </div>
             </div>
 
-            {/* Notes */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">Notes</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                onBlur={() => {
-                  if (notes !== campaign.notes) {
-                    updateCampaign(campaign.id, { notes });
-                    showToast('✓ Notes saved');
-                  }
-                }}
-                className="input w-full"
-                rows={4}
-                placeholder="Add any notes..."
-              />
+            {/* Tracking & UTMs Section */}
+            <div className="border-t pt-6">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Tracking & UTMs</h3>
+              <div className="space-y-4">
+                {/* UTM Source */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Source</label>
+                  <input
+                    type="text"
+                    value={utmSource}
+                    onChange={(e) => setUtmSource(e.target.value)}
+                    onBlur={() => {
+                      if (utmSource !== campaign.utmSource) {
+                        updateCampaign(campaign.id, { utmSource: utmSource || null });
+                        showToast('✓ UTM Source saved');
+                      }
+                    }}
+                    className="input w-full"
+                    placeholder="e.g., google, linkedin, email"
+                  />
+                </div>
+
+                {/* UTM Medium */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Medium</label>
+                  <input
+                    type="text"
+                    value={utmMedium}
+                    onChange={(e) => setUtmMedium(e.target.value)}
+                    onBlur={() => {
+                      if (utmMedium !== campaign.utmMedium) {
+                        updateCampaign(campaign.id, { utmMedium: utmMedium || null });
+                        showToast('✓ UTM Medium saved');
+                      }
+                    }}
+                    className="input w-full"
+                    placeholder="e.g., cpc, organic, email"
+                  />
+                </div>
+
+                {/* UTM Campaign */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Campaign</label>
+                  <input
+                    type="text"
+                    value={utmCampaign}
+                    onChange={(e) => setUtmCampaign(e.target.value)}
+                    onBlur={() => {
+                      if (utmCampaign !== campaign.utmCampaign) {
+                        updateCampaign(campaign.id, { utmCampaign: utmCampaign || null });
+                        showToast('✓ UTM Campaign saved');
+                      }
+                    }}
+                    className="input w-full"
+                    placeholder="Campaign name"
+                  />
+                </div>
+
+                {/* UTM Content */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Content (optional)</label>
+                  <input
+                    type="text"
+                    value={utmContent}
+                    onChange={(e) => setUtmContent(e.target.value)}
+                    onBlur={() => {
+                      if (utmContent !== campaign.utmContent) {
+                        updateCampaign(campaign.id, { utmContent: utmContent || null });
+                        showToast('✓ UTM Content saved');
+                      }
+                    }}
+                    className="input w-full"
+                    placeholder="Ad variant or content ID"
+                  />
+                </div>
+
+                {/* Tracking Template */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">Tracking Template (optional)</label>
+                  <textarea
+                    value={trackingTemplate}
+                    onChange={(e) => setTrackingTemplate(e.target.value)}
+                    onBlur={() => {
+                      if (trackingTemplate !== campaign.trackingTemplate) {
+                        updateCampaign(campaign.id, { trackingTemplate: trackingTemplate || null });
+                        showToast('✓ Tracking Template saved');
+                      }
+                    }}
+                    className="input w-full"
+                    rows={3}
+                    placeholder="e.g., UTM URL template or tracking code snippet"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}

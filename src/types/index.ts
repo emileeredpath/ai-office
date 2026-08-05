@@ -143,6 +143,13 @@ export interface Campaign {
   cofundRate?: number | null;
   claimStatus?: ClaimStatus | null;
 
+  // Tracking & UTM fields
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmContent?: string | null;
+  trackingTemplate?: string | null;
+
   // Schedule milestones (supports both legacy ScheduleElement and new CampaignSchedule with IDs)
   schedule?: (ScheduleElement | CampaignSchedule)[];
 }
