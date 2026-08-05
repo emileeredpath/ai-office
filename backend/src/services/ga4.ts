@@ -131,6 +131,192 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+export interface Wave1PerformanceMetrics {
+  clicks: number;
+  pageViews: number;
+  formSubmissions: number;
+  conversionRate: number;
+  byBrand: Record<
+    string,
+    {
+      clicks: number;
+      pageViews: number;
+      formSubmissions: number;
+      conversionRate: number;
+    }
+  >;
+}
+
+export interface Wave1Result {
+  configured: boolean;
+  metrics: Wave1PerformanceMetrics | null;
+  errors: string[];
+  lastSynced: string;
+}
+
+async function runWave1Report(
+  propertyId: string,
+  token: string,
+  startDate: string,
+  endDate: string
+): Promise<{
+  clicks: number;
+  pageViews: number;
+  formSubmissions: number;
+  conversionRate: number;
+  byBrand: Record<string, { clicks: number; pageViews: number; formSubmissions: number; conversionRate: number }>;
+}> {
+  // Query GA4 for Wave 1 campaign data, broken down by utm_content (brand-specific landing page)
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [
+        { name: 'customEvent:utm_content' },
+        { name: 'pagePath' },
+      ],
+      metrics: [
+        { name: 'sessions' },
+        { name: 'pageViews' },
+        { name: 'eventCount' },
+        { name: 'conversions' },
+      ],
+      dimensionFilter: {
+        andGroup: {
+          expressions: [
+            {
+              filter: {
+                fieldName: 'customEvent:utm_campaign',
+                value: 'q3_education_wave1_repair',
+              },
+            },
+          ],
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(
+      `GA4 Wave 1 runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`
+    );
+  }
+
+  const json = (await res.json()) as {
+    rows?: Array<{
+      dimensions: string[];
+      metricValues: Array<{ value: string }>;
+    }>;
+  };
+
+  const rows = json.rows || [];
+  const byBrand: Record<string, { clicks: number; pageViews: number; formSubmissions: number; conversionRate: number }> = {};
+
+  let totalClicks = 0;
+  let totalPageViews = 0;
+  let totalFormSubmissions = 0;
+  let totalConversions = 0;
+
+  rows.forEach((row) => {
+    const utmContent = row.dimensions[0] || 'unknown';
+    const sessions = Number(row.metricValues[0]?.value ?? 0);
+    const pageViews = Number(row.metricValues[1]?.value ?? 0);
+    const formSubmissions = Number(row.metricValues[2]?.value ?? 0);
+    const conversions = Number(row.metricValues[3]?.value ?? 0);
+
+    // Extract brand from utm_content (e.g., "brentwood_repair_page" → "brentwood")
+    const brand = extractBrandFromUtmContent(utmContent);
+
+    if (!byBrand[brand]) {
+      byBrand[brand] = { clicks: 0, pageViews: 0, formSubmissions: 0, conversionRate: 0 };
+    }
+
+    byBrand[brand].clicks += sessions;
+    byBrand[brand].pageViews += pageViews;
+    byBrand[brand].formSubmissions += formSubmissions;
+
+    totalClicks += sessions;
+    totalPageViews += pageViews;
+    totalFormSubmissions += formSubmissions;
+    totalConversions += conversions;
+  });
+
+  // Calculate conversion rates
+  const overallConversionRate = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0;
+  Object.keys(byBrand).forEach((brand) => {
+    byBrand[brand].conversionRate =
+      byBrand[brand].clicks > 0 ? (byBrand[brand].formSubmissions / byBrand[brand].clicks) * 100 : 0;
+  });
+
+  return {
+    clicks: totalClicks,
+    pageViews: totalPageViews,
+    formSubmissions: totalFormSubmissions,
+    conversionRate: overallConversionRate,
+    byBrand,
+  };
+}
+
+function extractBrandFromUtmContent(utmContent: string): string {
+  // Extract brand from utm_content like "brentwood_repair_page" → "brentwood"
+  const match = utmContent.match(/^([^_]+)/);
+  return match ? match[1] : 'unknown';
+}
+
+export async function getWave1Performance(): Promise<Wave1Result> {
+  const errors: string[] = [];
+  const configuredBrands = (Object.keys(PROPERTY_ID_ENV) as Brand[]).filter(
+    (brand) => !!process.env[PROPERTY_ID_ENV[brand] as string]
+  );
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || configuredBrands.length === 0) {
+    return {
+      configured: false,
+      metrics: null,
+      errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
+      lastSynced: new Date().toISOString(),
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to get access token:', msg);
+    return { configured: true, metrics: null, errors: [msg], lastSynced: new Date().toISOString() };
+  }
+
+  // Wave 1: Aug 12 - Aug 31, 2026
+  const startDate = '2026-08-12';
+  const endDate = '2026-08-31';
+
+  // Use the first configured property (MTech) as the primary source for Wave 1 data
+  const primaryBrand = configuredBrands[0];
+  const propertyId = process.env[PROPERTY_ID_ENV[primaryBrand] as string] as string;
+
+  try {
+    const wave1Data = await runWave1Report(propertyId, token, startDate, endDate);
+    return {
+      configured: true,
+      metrics: wave1Data,
+      errors: [],
+      lastSynced: new Date().toISOString(),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to fetch Wave 1 performance:', msg);
+    return {
+      configured: true,
+      metrics: null,
+      errors: [msg],
+      lastSynced: new Date().toISOString(),
+    };
+  }
+}
+
 export async function getBrandTraffic(): Promise<Ga4Result> {
   const errors: string[] = [];
   const configuredBrands = (Object.keys(PROPERTY_ID_ENV) as Brand[]).filter(

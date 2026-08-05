@@ -5,9 +5,10 @@ import { formatDateShort } from '@/utils/dateUtils';
 import { Task, TrackingLink, Brand } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { nanoid } from 'nanoid';
+import { fetchWave1Performance, fetchWave1Calls } from '@/services/wave1Api';
 import '@/styles/campaignDetailPanel.css';
 
-type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding' | 'tracking-links';
+type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding' | 'tracking-links' | 'wave1-performance' | 'ga4' | 'calls';
 
 interface ConfirmModal {
   field: string;
@@ -78,6 +79,9 @@ export function CampaignDetailPanel() {
 
   const [schedule, setSchedule] = useState(() => ensureScheduleIds(campaign?.schedule || []));
 
+  // Wave 1 Performance data
+  const wave1Performance = useAppStore((s) => s.wave1Performance);
+
   useEffect(() => {
     if (campaign) {
       setBudget(campaign.budget?.toString() || '');
@@ -120,6 +124,17 @@ export function CampaignDetailPanel() {
       setSchedule(campaign.schedule || []);
     }
   }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
+
+  // Fetch Wave 1 data when switching to Wave 1 tabs
+  const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
+  const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+
+  useEffect(() => {
+    if (['wave1-performance', 'ga4', 'calls'].includes(activeTab)) {
+      syncWave1Performance();
+      syncWave1Calls();
+    }
+  }, [activeTab, syncWave1Performance, syncWave1Calls]);
 
   if (!campaign) return null;
 
@@ -232,12 +247,12 @@ export function CampaignDetailPanel() {
         <h1 className="campaign-detail-title">{campaign.name}</h1>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-border">
-          {(['overview', 'schedule', 'sends', 'funding', 'tracking-links'] as PanelTab[]).map((tab) => (
+        <div className="flex gap-1 mb-6 border-b border-border overflow-x-auto">
+          {(['overview', 'schedule', 'sends', 'funding', 'tracking-links', 'wave1-performance', 'ga4', 'calls'] as PanelTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className="text-sm font-medium"
+              className="text-sm font-medium whitespace-nowrap"
               style={{
                 padding: '0.5rem 0.25rem',
                 marginRight: '1.25rem',
@@ -246,7 +261,14 @@ export function CampaignDetailPanel() {
                 borderBottom: activeTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent',
               }}
             >
-              {tab === 'overview' ? 'Overview' : tab === 'schedule' ? 'Schedule' : tab === 'sends' ? 'Sends' : tab === 'funding' ? 'Funding' : 'Tracking Links'}
+              {tab === 'overview' ? 'Overview' :
+               tab === 'schedule' ? 'Schedule' :
+               tab === 'sends' ? 'Sends' :
+               tab === 'funding' ? 'Funding' :
+               tab === 'tracking-links' ? 'Tracking Links' :
+               tab === 'wave1-performance' ? 'Wave 1 Summary' :
+               tab === 'ga4' ? 'GA4 Performance' :
+               'Call Tracking'}
             </button>
           ))}
         </div>
@@ -1055,6 +1077,148 @@ export function CampaignDetailPanel() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: Wave 1 Summary */}
+      {activeTab === 'wave1-performance' && (
+        <div className="space-y-4">
+          {wave1Performance && wave1Performance.configured ? (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="card p-4">
+                  <div className="text-sm text-text-secondary mb-1">Total Clicks</div>
+                  <div className="text-2xl font-bold">{wave1Performance.ga4?.clicks ?? 0}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-sm text-text-secondary mb-1">Form Submissions</div>
+                  <div className="text-2xl font-bold">{wave1Performance.ga4?.formSubmissions ?? 0}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-sm text-text-secondary mb-1">Total Calls</div>
+                  <div className="text-2xl font-bold">{wave1Performance.infinity?.totalCalls ?? 0}</div>
+                </div>
+                <div className="card p-4">
+                  <div className="text-sm text-text-secondary mb-1">Conversion Rate</div>
+                  <div className="text-2xl font-bold">{wave1Performance.ga4?.conversionRate?.toFixed(1) ?? 0}%</div>
+                </div>
+              </div>
+
+              {/* Call Metrics */}
+              {wave1Performance.infinity && (
+                <div className="card p-4">
+                  <h3 className="font-semibold mb-2">Call Metrics</h3>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <div className="text-text-secondary">Answered</div>
+                      <div className="text-lg font-bold text-success">{wave1Performance.infinity.answeredCalls}</div>
+                    </div>
+                    <div>
+                      <div className="text-text-secondary">Missed</div>
+                      <div className="text-lg font-bold text-red-500">{wave1Performance.infinity.missedCalls}</div>
+                    </div>
+                    <div>
+                      <div className="text-text-secondary">Avg Duration</div>
+                      <div className="text-lg font-bold">{wave1Performance.infinity.avgDuration}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {wave1Performance.lastSynced && (
+                <p className="text-xs text-text-secondary">Last synced: {new Date(wave1Performance.lastSynced).toLocaleString()}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-text-secondary">Wave 1 data not configured. Check that GA4 and Infinity API keys are set.</p>
+          )}
+        </div>
+      )}
+
+      {/* TAB: GA4 Performance */}
+      {activeTab === 'ga4' && (
+        <div className="space-y-4">
+          {wave1Performance?.ga4 ? (
+            <>
+              <div className="card p-4">
+                <h3 className="font-semibold mb-4">Performance by Brand</h3>
+                <table className="table w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Brand</th>
+                      <th className="text-right">Clicks</th>
+                      <th className="text-right">Page Views</th>
+                      <th className="text-right">Form Subs</th>
+                      <th className="text-right">Conv. Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(wave1Performance.ga4.byBrand || {}).map(([brand, metrics]) => (
+                      <tr key={brand}>
+                        <td className="font-medium capitalize">{brand}</td>
+                        <td className="text-right">{metrics.clicks}</td>
+                        <td className="text-right">{metrics.pageViews}</td>
+                        <td className="text-right">{metrics.formSubmissions}</td>
+                        <td className="text-right">{metrics.conversionRate.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-text-secondary">GA4 data not available.</p>
+          )}
+        </div>
+      )}
+
+      {/* TAB: Call Tracking */}
+      {activeTab === 'calls' && (
+        <div className="space-y-4">
+          {wave1Performance?.infinity?.calls && wave1Performance.infinity.calls.length > 0 ? (
+            <>
+              <div className="card p-4">
+                <h3 className="font-semibold mb-4">Recent Calls</h3>
+                <table className="table w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Duration</th>
+                      <th>Caller</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {wave1Performance.infinity.calls.slice(0, 50).map((call) => (
+                      <tr key={call.id}>
+                        <td>{call.date}</td>
+                        <td>{call.time}</td>
+                        <td>{call.duration}</td>
+                        <td className="text-text-secondary text-xs">{call.callerNumber}</td>
+                        <td>
+                          <span
+                            className="badge"
+                            style={{
+                              background: call.answered ? '#10b981' : '#ef4444',
+                              color: 'white',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {call.answered ? 'Answered' : 'Missed'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-text-secondary">Showing latest 50 calls</p>
+            </>
+          ) : (
+            <p className="text-text-secondary">No call data available.</p>
+          )}
         </div>
       )}
 

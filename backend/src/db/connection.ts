@@ -146,6 +146,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_dashboard_context_date ON dashboard_context(date);
   CREATE INDEX IF NOT EXISTS idx_daily_dashboard_date ON daily_dashboard_snapshot(date);
   CREATE INDEX IF NOT EXISTS idx_quick_capture_created ON quick_capture_items(created_at);
+
+  CREATE TABLE IF NOT EXISTS wave_1_performance_metrics (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    metric_type TEXT NOT NULL,
+    metric_date TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    utm_content TEXT,
+    clicks INTEGER NOT NULL DEFAULT 0,
+    page_views INTEGER NOT NULL DEFAULT 0,
+    form_submissions INTEGER NOT NULL DEFAULT 0,
+    conversion_rate REAL NOT NULL DEFAULT 0,
+    calls_total INTEGER NOT NULL DEFAULT 0,
+    calls_answered INTEGER NOT NULL DEFAULT 0,
+    calls_missed INTEGER NOT NULL DEFAULT 0,
+    avg_call_duration TEXT,
+    last_synced TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(campaign_id, metric_type, metric_date, brand, utm_content)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_wave1_campaign_date ON wave_1_performance_metrics(campaign_id, metric_date);
+  CREATE INDEX IF NOT EXISTS idx_wave1_metric_type ON wave_1_performance_metrics(metric_type);
 `);
 
 // Additive migrations for databases created before a column existed. SQLite
