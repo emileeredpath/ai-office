@@ -238,6 +238,52 @@ export function runSeed() {
   console.log(`Seeded ${seedCampaigns.length} campaigns and ${seedTasks.length} tasks.`);
 }
 
+// Populate schedule items for campaigns (runs even if database already seeded)
+export function ensureScheduleItems() {
+  const campaigns = getAllCampaigns();
+
+  for (const campaign of campaigns) {
+    // Check if campaign already has schedule items
+    if (campaign.schedule && campaign.schedule.length > 0) {
+      continue;
+    }
+
+    // Add schedule items based on campaign
+    let scheduleItems: any[] = [];
+
+    if (campaign.id === 'campaign-0') {
+      // Q3 Education Campaign
+      scheduleItems = [
+        { id: 'sched-001', date: '2026-08-05', element: 'Strategy finalized', status: 'planning' },
+        { id: 'sched-002', date: '2026-08-07', element: 'PPC brief to Climbing Trees', status: 'planning' },
+        { id: 'sched-003', date: '2026-08-10', element: 'Email templates due, social teasers live', status: 'planning' },
+        { id: 'sched-004', date: '2026-08-12', element: '**WAVE 1 LAUNCH** — Email + PPC + social', status: 'planning' },
+        { id: 'sched-005', date: '2026-08-15', element: 'All 8 landing pages LIVE + tracking', status: 'planning' },
+        { id: 'sched-006', date: '2026-08-20', element: '**WAVE 2 LAUNCH** — Email + PPC shift + social', status: 'planning' },
+        { id: 'sched-007', date: '2026-08-31', element: '**FINAL REVIEW** vs 50-goal', status: 'planning' },
+      ];
+    } else if (campaign.id === 'campaign--P43-q05Nu') {
+      // Axon Body Mini BodyCam Campaign
+      scheduleItems = [
+        { id: 'sched-axon-001', date: '2026-07-31', element: 'Google Ads brief sent to Climbing Trees', status: 'complete' },
+        { id: 'sched-axon-002', date: '2026-08-14', element: 'Landing page optimizations due', status: 'in-progress' },
+        { id: 'sched-axon-003', date: '2026-08-15', element: 'Keyword research & review complete', status: 'planning' },
+        { id: 'sched-axon-004', date: '2026-08-30', element: 'Campaign launch', status: 'planning' },
+      ];
+    }
+
+    if (scheduleItems.length > 0) {
+      // Update campaign with schedule items
+      const db = require('./connection.js').default;
+      db.prepare(
+        'UPDATE campaigns SET schedule = ? WHERE id = ?'
+      ).run(JSON.stringify(scheduleItems), campaign.id);
+      console.log(`Added ${scheduleItems.length} schedule items to campaign ${campaign.id}`);
+    }
+  }
+}
+
 // Runs on import — both `npm run seed` (standalone) and server.ts (on every
 // boot) trigger this; it's a no-op once the database has any real data.
 runSeed();
+ensureScheduleItems();

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, FileText } from 'lucide-react';
+import { X, Plus, Trash2, FileText, Copy, Edit2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateShort } from '@/utils/dateUtils';
-import { Task } from '@/types/index';
+import { Task, TrackingLink, Brand } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { nanoid } from 'nanoid';
 import '@/styles/campaignDetailPanel.css';
 
-type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding';
+type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding' | 'tracking-links';
 
 interface ConfirmModal {
   field: string;
@@ -46,13 +46,6 @@ export function CampaignDetailPanel() {
   const [valueGenerated, setValueGenerated] = useState(campaign?.valueGenerated?.toString() || '');
   const [leads, setLeads] = useState(campaign?.leads?.toString() || '');
 
-  // Tracking fields
-  const [utmSource, setUtmSource] = useState(campaign?.utmSource || '');
-  const [utmMedium, setUtmMedium] = useState(campaign?.utmMedium || '');
-  const [utmCampaign, setUtmCampaign] = useState(campaign?.utmCampaign || '');
-  const [utmContent, setUtmContent] = useState(campaign?.utmContent || '');
-  const [trackingTemplate, setTrackingTemplate] = useState(campaign?.trackingTemplate || '');
-
   // Schedule tab fields - notes stays here for Campaign Notes section
   const [notes, setNotes] = useState(campaign?.notes || '');
 
@@ -61,6 +54,19 @@ export function CampaignDetailPanel() {
   const [scheme, setScheme] = useState(campaign?.scheme || '');
   const [cofundRate, setCofundRate] = useState(campaign?.cofundRate?.toString() || '');
   const [claimStatus, setClaimStatus] = useState(campaign?.claimStatus || '');
+
+  // Tracking Links tab form state
+  const [trackingLinkForm, setTrackingLinkForm] = useState({
+    entity: '' as Brand | '',
+    name: '',
+    channel: '',
+    landingPage: '',
+    utmSource: '',
+    utmMedium: '',
+    utmCampaign: '',
+    utmContent: '',
+  });
+  const [editingTrackingLink, setEditingTrackingLink] = useState<string | null>(null);
 
   // Schedule tab fields
   const ensureScheduleIds = (items: any[]) => {
@@ -78,17 +84,23 @@ export function CampaignDetailPanel() {
       setSpend(campaign.spend?.toString() || '');
       setValueGenerated(campaign.valueGenerated?.toString() || '');
       setLeads(campaign.leads?.toString() || '');
-      setUtmSource(campaign.utmSource || '');
-      setUtmMedium(campaign.utmMedium || '');
-      setUtmCampaign(campaign.utmCampaign || '');
-      setUtmContent(campaign.utmContent || '');
-      setTrackingTemplate(campaign.trackingTemplate || '');
       setNotes(campaign.notes || '');
       setVendor(campaign.vendor || '');
       setScheme(campaign.scheme || '');
       setCofundRate(campaign.cofundRate?.toString() || '');
       setClaimStatus(campaign.claimStatus || '');
       setSchedule(ensureScheduleIds(campaign.schedule || []));
+      setTrackingLinkForm({
+        entity: '' as Brand | '',
+        name: '',
+        channel: '',
+        landingPage: '',
+        utmSource: '',
+        utmMedium: '',
+        utmCampaign: '',
+        utmContent: '',
+      });
+      setEditingTrackingLink(null);
       setActiveTab('overview');
     }
   }, [selectedCampaignId]);
@@ -100,11 +112,6 @@ export function CampaignDetailPanel() {
       setSpend(campaign.spend?.toString() || '');
       setValueGenerated(campaign.valueGenerated?.toString() || '');
       setLeads(campaign.leads?.toString() || '');
-      setUtmSource(campaign.utmSource || '');
-      setUtmMedium(campaign.utmMedium || '');
-      setUtmCampaign(campaign.utmCampaign || '');
-      setUtmContent(campaign.utmContent || '');
-      setTrackingTemplate(campaign.trackingTemplate || '');
       setNotes(campaign.notes || '');
       setVendor(campaign.vendor || '');
       setScheme(campaign.scheme || '');
@@ -112,7 +119,7 @@ export function CampaignDetailPanel() {
       setClaimStatus(campaign.claimStatus || '');
       setSchedule(campaign.schedule || []);
     }
-  }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.utmSource, campaign?.utmMedium, campaign?.utmCampaign, campaign?.utmContent, campaign?.trackingTemplate, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
+  }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
 
   if (!campaign) return null;
 
@@ -226,7 +233,7 @@ export function CampaignDetailPanel() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-border">
-          {(['overview', 'schedule', 'sends', 'funding'] as PanelTab[]).map((tab) => (
+          {(['overview', 'schedule', 'sends', 'funding', 'tracking-links'] as PanelTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -239,7 +246,7 @@ export function CampaignDetailPanel() {
                 borderBottom: activeTab === tab ? '2px solid var(--color-accent)' : '2px solid transparent',
               }}
             >
-              {tab === 'overview' ? 'Overview' : tab === 'schedule' ? 'Schedule' : tab === 'sends' ? 'Sends' : 'Funding'}
+              {tab === 'overview' ? 'Overview' : tab === 'schedule' ? 'Schedule' : tab === 'sends' ? 'Sends' : tab === 'funding' ? 'Funding' : 'Tracking Links'}
             </button>
           ))}
         </div>
@@ -332,102 +339,6 @@ export function CampaignDetailPanel() {
               <label className="block text-sm font-medium text-text-primary mb-2">ROI</label>
               <div className="px-3 py-2 rounded border border-border font-semibold" style={{ color: '#1e3a8a' }}>
                 {roi >= 0 ? '+' : ''}{roi}% (calculated, read-only)
-              </div>
-            </div>
-
-            {/* Tracking & UTMs Section */}
-            <div className="border-t pt-6">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Tracking & UTMs</h3>
-              <div className="space-y-4">
-                {/* UTM Source */}
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Source</label>
-                  <input
-                    type="text"
-                    value={utmSource}
-                    onChange={(e) => setUtmSource(e.target.value)}
-                    onBlur={() => {
-                      if (utmSource !== campaign.utmSource) {
-                        updateCampaign(campaign.id, { utmSource: utmSource || null });
-                        showToast('✓ UTM Source saved');
-                      }
-                    }}
-                    className="input w-full"
-                    placeholder="e.g., google, linkedin, email"
-                  />
-                </div>
-
-                {/* UTM Medium */}
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Medium</label>
-                  <input
-                    type="text"
-                    value={utmMedium}
-                    onChange={(e) => setUtmMedium(e.target.value)}
-                    onBlur={() => {
-                      if (utmMedium !== campaign.utmMedium) {
-                        updateCampaign(campaign.id, { utmMedium: utmMedium || null });
-                        showToast('✓ UTM Medium saved');
-                      }
-                    }}
-                    className="input w-full"
-                    placeholder="e.g., cpc, organic, email"
-                  />
-                </div>
-
-                {/* UTM Campaign */}
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Campaign</label>
-                  <input
-                    type="text"
-                    value={utmCampaign}
-                    onChange={(e) => setUtmCampaign(e.target.value)}
-                    onBlur={() => {
-                      if (utmCampaign !== campaign.utmCampaign) {
-                        updateCampaign(campaign.id, { utmCampaign: utmCampaign || null });
-                        showToast('✓ UTM Campaign saved');
-                      }
-                    }}
-                    className="input w-full"
-                    placeholder="Campaign name"
-                  />
-                </div>
-
-                {/* UTM Content */}
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">UTM Content (optional)</label>
-                  <input
-                    type="text"
-                    value={utmContent}
-                    onChange={(e) => setUtmContent(e.target.value)}
-                    onBlur={() => {
-                      if (utmContent !== campaign.utmContent) {
-                        updateCampaign(campaign.id, { utmContent: utmContent || null });
-                        showToast('✓ UTM Content saved');
-                      }
-                    }}
-                    className="input w-full"
-                    placeholder="Ad variant or content ID"
-                  />
-                </div>
-
-                {/* Tracking Template */}
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Tracking Template (optional)</label>
-                  <textarea
-                    value={trackingTemplate}
-                    onChange={(e) => setTrackingTemplate(e.target.value)}
-                    onBlur={() => {
-                      if (trackingTemplate !== campaign.trackingTemplate) {
-                        updateCampaign(campaign.id, { trackingTemplate: trackingTemplate || null });
-                        showToast('✓ Tracking Template saved');
-                      }
-                    }}
-                    className="input w-full"
-                    rows={3}
-                    placeholder="e.g., UTM URL template or tracking code snippet"
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -756,6 +667,341 @@ export function CampaignDetailPanel() {
                 £{recoverable.toLocaleString()} (read-only, eligible × co-fund %)
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB: Tracking Links */}
+        {activeTab === 'tracking-links' && (
+          <div className="space-y-8">
+            {/* Add/Edit Tracking Link Form */}
+            <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+              <h3 className="text-sm font-semibold text-text-primary mb-4">
+                {editingTrackingLink ? 'Edit Tracking Link' : 'Add New Tracking Link'}
+              </h3>
+
+              <div className="space-y-4">
+                {/* Entity Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">Entity</label>
+                  <select
+                    value={trackingLinkForm.entity}
+                    onChange={(e) => {
+                      setTrackingLinkForm({
+                        ...trackingLinkForm,
+                        entity: e.target.value as Brand,
+                      });
+                    }}
+                    className="input w-full"
+                  >
+                    <option value="">Select entity</option>
+                    {campaign.entities?.map((entity) => (
+                      <option key={entity} value={entity}>
+                        {BRAND_LABEL[entity]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">Link Name</label>
+                  <input
+                    type="text"
+                    value={trackingLinkForm.name}
+                    onChange={(e) => {
+                      setTrackingLinkForm({
+                        ...trackingLinkForm,
+                        name: e.target.value,
+                      });
+                    }}
+                    className="input w-full"
+                    placeholder="e.g., Homepage Hero CTA"
+                  />
+                </div>
+
+                {/* Channel */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">Channel</label>
+                  <input
+                    type="text"
+                    value={trackingLinkForm.channel}
+                    onChange={(e) => {
+                      setTrackingLinkForm({
+                        ...trackingLinkForm,
+                        channel: e.target.value,
+                      });
+                    }}
+                    className="input w-full"
+                    placeholder="e.g., email, social, display"
+                  />
+                </div>
+
+                {/* Landing Page */}
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">Landing Page URL</label>
+                  <input
+                    type="text"
+                    value={trackingLinkForm.landingPage}
+                    onChange={(e) => {
+                      setTrackingLinkForm({
+                        ...trackingLinkForm,
+                        landingPage: e.target.value,
+                      });
+                    }}
+                    className="input w-full"
+                    placeholder="e.g., https://example.com/products"
+                  />
+                </div>
+
+                {/* UTM Parameters */}
+                <div className="space-y-4 pt-2">
+                  <h4 className="text-xs font-semibold text-text-secondary">UTM Parameters</h4>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">Source</label>
+                      <input
+                        type="text"
+                        value={trackingLinkForm.utmSource}
+                        onChange={(e) => {
+                          setTrackingLinkForm({
+                            ...trackingLinkForm,
+                            utmSource: e.target.value,
+                          });
+                        }}
+                        className="input w-full"
+                        placeholder="e.g., google, linkedin"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">Medium</label>
+                      <input
+                        type="text"
+                        value={trackingLinkForm.utmMedium}
+                        onChange={(e) => {
+                          setTrackingLinkForm({
+                            ...trackingLinkForm,
+                            utmMedium: e.target.value,
+                          });
+                        }}
+                        className="input w-full"
+                        placeholder="e.g., cpc, email, organic"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">Campaign</label>
+                      <input
+                        type="text"
+                        value={trackingLinkForm.utmCampaign}
+                        onChange={(e) => {
+                          setTrackingLinkForm({
+                            ...trackingLinkForm,
+                            utmCampaign: e.target.value,
+                          });
+                        }}
+                        className="input w-full"
+                        placeholder="Campaign name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">Content (optional)</label>
+                      <input
+                        type="text"
+                        value={trackingLinkForm.utmContent}
+                        onChange={(e) => {
+                          setTrackingLinkForm({
+                            ...trackingLinkForm,
+                            utmContent: e.target.value,
+                          });
+                        }}
+                        className="input w-full"
+                        placeholder="Ad variant or content ID"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={() => {
+                      if (!trackingLinkForm.entity || !trackingLinkForm.name || !trackingLinkForm.landingPage) {
+                        showToast('Entity, Link Name, and Landing Page are required');
+                        return;
+                      }
+
+                      const newTrackingLink: TrackingLink = {
+                        id: editingTrackingLink || `tracking-${nanoid(10)}`,
+                        entity: trackingLinkForm.entity as Brand,
+                        name: trackingLinkForm.name,
+                        channel: trackingLinkForm.channel,
+                        landingPage: trackingLinkForm.landingPage,
+                        utmSource: trackingLinkForm.utmSource,
+                        utmMedium: trackingLinkForm.utmMedium,
+                        utmCampaign: trackingLinkForm.utmCampaign,
+                        utmContent: trackingLinkForm.utmContent || undefined,
+                      };
+
+                      const existingLinks = campaign.trackingLinks || [];
+                      let updatedLinks: TrackingLink[];
+
+                      if (editingTrackingLink) {
+                        updatedLinks = existingLinks.map((link) =>
+                          link.id === editingTrackingLink ? newTrackingLink : link
+                        );
+                      } else {
+                        updatedLinks = [...existingLinks, newTrackingLink];
+                      }
+
+                      updateCampaign(campaign.id, { trackingLinks: updatedLinks });
+                      setTrackingLinkForm({
+                        entity: '' as Brand | '',
+                        name: '',
+                        channel: '',
+                        landingPage: '',
+                        utmSource: '',
+                        utmMedium: '',
+                        utmCampaign: '',
+                        utmContent: '',
+                      });
+                      setEditingTrackingLink(null);
+                      showToast(editingTrackingLink ? '✓ Tracking link updated' : '✓ Tracking link added');
+                    }}
+                    className="btn btn-primary flex-1"
+                  >
+                    {editingTrackingLink ? 'Update Link' : 'Add Link'}
+                  </button>
+                  {editingTrackingLink && (
+                    <button
+                      onClick={() => {
+                        setTrackingLinkForm({
+                          entity: '' as Brand | '',
+                          name: '',
+                          channel: '',
+                          landingPage: '',
+                          utmSource: '',
+                          utmMedium: '',
+                          utmCampaign: '',
+                          utmContent: '',
+                        });
+                        setEditingTrackingLink(null);
+                      }}
+                      className="btn btn-secondary flex-1"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Full Link Preview */}
+            {trackingLinkForm.landingPage && trackingLinkForm.utmSource && trackingLinkForm.utmMedium && trackingLinkForm.utmCampaign && (
+              <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+                <h3 className="text-sm font-semibold text-text-primary mb-4">Full Link Preview</h3>
+                <div className="space-y-3">
+                  {(() => {
+                    const params = new URLSearchParams({
+                      utm_source: trackingLinkForm.utmSource,
+                      utm_medium: trackingLinkForm.utmMedium,
+                      utm_campaign: trackingLinkForm.utmCampaign,
+                      ...(trackingLinkForm.utmContent && { utm_content: trackingLinkForm.utmContent }),
+                    });
+                    const fullUrl = `${trackingLinkForm.landingPage}${trackingLinkForm.landingPage.includes('?') ? '&' : '?'}${params.toString()}`;
+                    return (
+                      <>
+                        <div className="p-3 rounded" style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', wordBreak: 'break-all' }}>
+                          <p className="text-xs font-mono text-text-primary">{fullUrl}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(fullUrl);
+                            showToast('✓ Copied to clipboard');
+                          }}
+                          className="btn btn-secondary w-full flex items-center justify-center gap-2"
+                        >
+                          <Copy size={14} />
+                          Copy Full URL
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Tracking Links Table */}
+            {(campaign.trackingLinks || []).length > 0 ? (
+              <div className="border rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+                <h3 className="text-sm font-semibold text-text-primary mb-4">All Tracking Links</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid var(--color-border)' }}>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Entity</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Name</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Channel</th>
+                        <th className="px-3 py-3 text-left text-xs font-semibold text-text-secondary">Landing Page</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-text-secondary">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {campaign.trackingLinks?.map((link, idx) => (
+                        <tr key={link.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--color-surface)' }}>
+                          <td className="px-3 py-3">
+                            <span style={{ color: BRAND_COLOR[link.entity], fontWeight: 600 }}>
+                              {BRAND_LABEL[link.entity]}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-text-primary font-medium">{link.name}</td>
+                          <td className="px-3 py-3 text-text-secondary">{link.channel}</td>
+                          <td className="px-3 py-3 text-text-secondary text-xs" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{link.landingPage}</td>
+                          <td className="px-3 py-3 text-center flex gap-2 justify-center">
+                            <button
+                              onClick={() => {
+                                setTrackingLinkForm({
+                                  entity: link.entity,
+                                  name: link.name,
+                                  channel: link.channel,
+                                  landingPage: link.landingPage,
+                                  utmSource: link.utmSource,
+                                  utmMedium: link.utmMedium,
+                                  utmCampaign: link.utmCampaign,
+                                  utmContent: link.utmContent || '',
+                                });
+                                setEditingTrackingLink(link.id);
+                              }}
+                              className="text-blue-500 hover:text-blue-700"
+                              title="Edit"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const updated = (campaign.trackingLinks || []).filter((l) => l.id !== link.id);
+                                updateCampaign(campaign.id, { trackingLinks: updated });
+                                showToast('✓ Tracking link deleted');
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
+                <p className="text-sm">No tracking links yet. Add your first one above.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
