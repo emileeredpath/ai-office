@@ -3,6 +3,7 @@ import { X, Plus, Trash2, FileText } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateShort } from '@/utils/dateUtils';
 import { Task } from '@/types/index';
+import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { nanoid } from 'nanoid';
 import '@/styles/campaignDetailPanel.css';
 
@@ -226,7 +227,45 @@ export function CampaignDetailPanel() {
 
         {/* TAB: Overview */}
         {activeTab === 'overview' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Linked Tasks */}
+            {campaignTasks.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-3">Linked Tasks</h3>
+                <div className="space-y-2">
+                  {campaignTasks.map((task) => {
+                    const color = BRAND_COLOR[task.brand];
+                    return (
+                      <div
+                        key={task.id}
+                        className="px-3 py-2 rounded border text-sm"
+                        style={{
+                          backgroundColor: `${color}10`,
+                          borderColor: color,
+                        }}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span style={{ color, fontWeight: 600, minWidth: '60px' }}>
+                            {BRAND_LABEL[task.brand]}
+                          </span>
+                          <div className="flex-1">
+                            <div style={{ color: 'var(--text-primary)' }} className="font-medium">
+                              {task.title}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              {task.deadline && <span>{formatDateShort(task.deadline)}</span>}
+                              {task.status && <span>· {task.status}</span>}
+                              {task.priority && <span>· {task.priority}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Recipients (read-only) */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">Recipients</label>
