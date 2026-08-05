@@ -109,6 +109,20 @@ export interface CampaignSchedule {
   taskId?: string | null; // Linked task for cascade updates
 }
 
+export interface TrackingLink {
+  id: string;
+  entity: Brand;
+  name: string;
+  channel: string;
+  landingPage: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  utmContent?: string | null;
+  status?: string;
+  clicks?: number;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -142,6 +156,9 @@ export interface Campaign {
   scheme?: string | null;
   cofundRate?: number | null;
   claimStatus?: ClaimStatus | null;
+
+  // Tracking links (per-entity tracking)
+  trackingLinks?: TrackingLink[];
 
   // Schedule milestones (supports both legacy ScheduleElement and new CampaignSchedule with IDs)
   schedule?: (ScheduleElement | CampaignSchedule)[];
