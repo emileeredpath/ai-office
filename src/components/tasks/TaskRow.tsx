@@ -91,7 +91,7 @@ export function TaskRow({ task }: TaskRowProps) {
           {task.priority === 'low' && <span className="badge" style={{ background: '#9ca3af', color: 'white' }}>Low</span>}
         </div>
       </td>
-      <td className="text-sm" style={{ color: isOverdue ? '#EF4444' : 'var(--color-text-secondary)' }}>
+      <td className="text-sm hide-on-mobile" style={{ color: isOverdue ? '#EF4444' : 'var(--color-text-secondary)' }}>
         {task.deadline ? formatDate(task.deadline) : '—'}
       </td>
     </tr>

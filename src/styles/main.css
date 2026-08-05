@@ -662,3 +662,107 @@ h3 {
 .opacity-60 {
   opacity: 0.6;
 }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  /* Ensure buttons have minimum touch target size (44px) */
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Stack grids to single column on tablet */
+  .grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Reduce padding on smaller screens */
+  .p-8 {
+    padding: 1rem;
+  }
+
+  .p-6 {
+    padding: 1rem;
+  }
+
+  /* Table horizontal scroll on mobile */
+  .table {
+    font-size: 13px;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Hide date column on very small screens */
+  .hide-on-mobile {
+    display: none;
+  }
+
+  /* Stack everything to single column */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Smaller text on mobile */
+  .text-3xl {
+    font-size: 24px;
+  }
+
+  .text-lg {
+    font-size: 16px;
+  }
+
+  /* Tighter spacing */
+  .gap-2 {
+    gap: 0.25rem;
+  }
+
+  .gap-3 {
+    gap: 0.5rem;
+  }
+
+  .gap-4 {
+    gap: 0.75rem;
+  }
+
+  .mb-4 {
+    margin-bottom: 0.75rem;
+  }
+
+  .mb-6 {
+    margin-bottom: 1rem;
+  }
+
+  .p-8 {
+    padding: 0.75rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  /* Ensure buttons are still touch-friendly */
+  .btn {
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+  }
+
+  .btn-secondary {
+    padding: 0.65rem 0.75rem;
+  }
+}
