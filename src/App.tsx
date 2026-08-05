@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, TrendingUp, Settings } from 'lucide-react';
+import { Home, CheckSquare, FolderOpen, Calendar, BarChart3, TrendingUp, Phone, Settings } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
 import { CampaignDetailPanel } from '@/components/campaigns/CampaignDetailPanel';
@@ -10,12 +10,13 @@ import { CalendarScreen } from '@/screens/CalendarScreen';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { MetricsScreen } from '@/screens/MetricsScreen';
 import { PpcScreen } from '@/screens/PpcScreen';
+import { InfinityTrackingScreen } from '@/screens/InfinityTrackingScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'ppc' | 'metrics' | 'settings';
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'ppc' | 'infinity' | 'metrics' | 'settings';
 
 const NAVIGATION_ITEMS = [
   { id: 'home' as Screen, icon: Home, label: 'Home' },
@@ -24,6 +25,7 @@ const NAVIGATION_ITEMS = [
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Dashboard' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
   { id: 'ppc' as Screen, icon: TrendingUp, label: 'PPC' },
+  { id: 'infinity' as Screen, icon: Phone, label: 'Infinity Tracking' },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
 ];
 
@@ -53,6 +55,8 @@ export default function App() {
         return <CalendarScreen />;
       case 'ppc':
         return <PpcScreen />;
+      case 'infinity':
+        return <InfinityTrackingScreen />;
       case 'metrics':
         return <MetricsScreen />;
       case 'settings':
