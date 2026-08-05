@@ -5,10 +5,10 @@ import { Brand } from '@/types/index';
 // keep both in sync when the brand palette changes.
 export const BRAND_COLOR: Record<Brand, string> = {
   mtech: '#1D2A3A',
-  brentwood: '#3A82C6',
-  'radio-links': '#23772D',
-  capcom: '#524495',
-  ircl: '#251F4B',
+  brentwood: '#2E9ECC',
+  'radio-links': '#4a9d4a',
+  capcom: '#7b6fb0',
+  ircl: '#5b6472',
   idaro: '#39FF14',
 };
 
