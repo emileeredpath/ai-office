@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateShort } from '@/utils/dateUtils';
 import { Task } from '@/types/index';
-import { nanoid } from 'nanoid';
+import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import '@/styles/campaignDetailPanel.css';
 
 type PanelTab = 'overview' | 'schedule' | 'sends' | 'funding';
@@ -51,15 +51,6 @@ export function CampaignDetailPanel() {
   const [cofundRate, setCofundRate] = useState(campaign?.cofundRate?.toString() || '');
   const [claimStatus, setClaimStatus] = useState(campaign?.claimStatus || '');
 
-  // Schedule tab fields
-  const ensureScheduleIds = (items: any[]) => {
-    return items.map((item) => ({
-      ...item,
-      id: item.id || `schedule-${nanoid(10)}`,
-    }));
-  };
-
-  const [schedule, setSchedule] = useState(() => ensureScheduleIds(campaign?.schedule || []));
 
   useEffect(() => {
     if (campaign) {
@@ -72,7 +63,6 @@ export function CampaignDetailPanel() {
       setScheme(campaign.scheme || '');
       setCofundRate(campaign.cofundRate?.toString() || '');
       setClaimStatus(campaign.claimStatus || '');
-      setSchedule(ensureScheduleIds(campaign.schedule || []));
       setActiveTab('overview');
     }
   }, [selectedCampaignId]);
@@ -89,7 +79,6 @@ export function CampaignDetailPanel() {
       setScheme(campaign.scheme || '');
       setCofundRate(campaign.cofundRate?.toString() || '');
       setClaimStatus(campaign.claimStatus || '');
-      setSchedule(campaign.schedule || []);
     }
   }, [campaign?.budget, campaign?.spend, campaign?.valueGenerated, campaign?.leads, campaign?.notes, campaign?.vendor, campaign?.scheme, campaign?.cofundRate, campaign?.claimStatus, campaign?.id]);
 
@@ -126,35 +115,6 @@ export function CampaignDetailPanel() {
 
   const recipients = campaign.recipients || emailSends.reduce((sum, t) => sum + (t.recipients || 0), 0);
 
-  const handleExportSchedule = () => {
-    if (!schedule || schedule.length === 0) {
-      showToast('No schedule elements to export');
-      return;
-    }
-
-    // Build CSV
-    let csv = 'Campaign,Go Live,Element,Status\n';
-    schedule.forEach(({ date, element, status }) => {
-      // Escape quotes in element names
-      const escapedElement = element.replace(/"/g, '""');
-      csv += `"${campaign.name}","${date}","${escapedElement}","${status}"\n`;
-    });
-
-    // Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${campaign.name.replace(/\s+/g, '-')}-Schedule-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    showToast('✓ Schedule exported as CSV');
-  };
 
   // Funding calculations
   const eligibleSpend = campaign.budget || 0;
@@ -225,7 +185,45 @@ export function CampaignDetailPanel() {
 
         {/* TAB: Overview */}
         {activeTab === 'overview' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Linked Tasks */}
+            {campaignTasks.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-3">Linked Tasks</h3>
+                <div className="space-y-2">
+                  {campaignTasks.map((task) => {
+                    const color = BRAND_COLOR[task.brand];
+                    return (
+                      <div
+                        key={task.id}
+                        className="px-3 py-2 rounded border text-sm"
+                        style={{
+                          backgroundColor: `${color}10`,
+                          borderColor: color,
+                        }}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span style={{ color, fontWeight: 600, minWidth: '60px' }}>
+                            {BRAND_LABEL[task.brand]}
+                          </span>
+                          <div className="flex-1">
+                            <div style={{ color: 'var(--text-primary)' }} className="font-medium">
+                              {task.title}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              {task.deadline && <span>{formatDateShort(task.deadline)}</span>}
+                              {task.status && <span>· {task.status}</span>}
+                              {task.priority && <span>· {task.priority}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Recipients (read-only) */}
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">Recipients</label>
@@ -337,115 +335,55 @@ export function CampaignDetailPanel() {
         {/* TAB: Schedule */}
         {activeTab === 'schedule' && (
           <div className="space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid var(--color-border)' }}>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Element</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-text-secondary">Status</th>
-                    <th className="px-3 py-2 text-center text-xs font-semibold text-text-secondary">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td className="px-3 py-2">
-                        <input
-                          type="date"
-                          value={item.date}
-                          onChange={(e) => {
-                            const updated = [...schedule];
-                            updated[idx].date = e.target.value;
-                            setSchedule(updated);
-                          }}
-                          onBlur={() => {
-                            const withIds = ensureScheduleIds(schedule);
-                            updateCampaign(campaign.id, { schedule: withIds });
-                            showToast('✓ Schedule updated');
-                          }}
-                          className="input text-sm"
-                          style={{ width: '100%' }}
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={item.element}
-                          onChange={(e) => {
-                            const updated = [...schedule];
-                            updated[idx].element = e.target.value;
-                            setSchedule(updated);
-                          }}
-                          onBlur={() => {
-                            const withIds = ensureScheduleIds(schedule);
-                            updateCampaign(campaign.id, { schedule: withIds });
-                            showToast('✓ Schedule updated');
-                          }}
-                          className="input text-sm"
-                          style={{ width: '100%' }}
-                          placeholder="Element name"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={item.status}
-                          onChange={(e) => {
-                            const updated = [...schedule];
-                            updated[idx].status = e.target.value as any;
-                            setSchedule(updated);
-                          }}
-                          onBlur={() => {
-                            const withIds = ensureScheduleIds(schedule);
-                            updateCampaign(campaign.id, { schedule: withIds });
-                            showToast('✓ Schedule updated');
-                          }}
-                          className="input text-sm"
-                          style={{ width: '100%' }}
-                        >
-                          <option value="planning">Planning</option>
-                          <option value="scheduled">Scheduled</option>
-                          <option value="live">Live</option>
-                          <option value="complete">Complete</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => {
-                            const updated = schedule.filter((_, i) => i !== idx);
-                            setSchedule(updated);
-                            updateCampaign(campaign.id, { schedule: updated });
-                            showToast('✓ Element removed');
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {campaign.schedule && campaign.schedule.length > 0 ? (
+              <div className="space-y-3">
+                {campaign.schedule.map((item, idx) => {
+                  const date = new Date(item.date);
+                  const displayDate = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' });
+                  const statusColor = {
+                    planning: '#94a3b8',
+                    scheduled: '#3b82f6',
+                    live: '#10b981',
+                    complete: '#8b5cf6',
+                  }[item.status] || '#94a3b8';
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const updated = [...schedule, { id: `schedule-${nanoid(10)}`, date: '', element: '', status: 'planning' as const }];
-                  setSchedule(updated);
-                }}
-                className="btn btn-secondary text-sm flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Add element
-              </button>
-              <button
-                onClick={handleExportSchedule}
-                className="btn btn-secondary text-sm"
-              >
-                Export as CSV
-              </button>
-            </div>
+                  return (
+                    <div
+                      key={idx}
+                      className="px-4 py-3 rounded border"
+                      style={{
+                        backgroundColor: `${statusColor}10`,
+                        borderLeft: `4px solid ${statusColor}`,
+                        borderColor: `${statusColor}30`,
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-24">
+                          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {displayDate}
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-text-primary mb-1">{item.element}</div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span
+                              className="px-2 py-0.5 rounded text-white text-xs font-medium"
+                              style={{ backgroundColor: statusColor }}
+                            >
+                              {item.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-text-secondary">
+                <p>No schedule items defined</p>
+              </div>
+            )}
           </div>
         )}
 
