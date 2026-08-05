@@ -15,6 +15,44 @@ import {
   deleteCampaignInApi,
 } from '@/services/campaignsApi';
 
+export interface Wave1CallData {
+  id: string;
+  date: string;
+  time: string;
+  duration: string;
+  answered: boolean;
+  callerNumber: string;
+  campaign: string;
+  recordingUrl?: string;
+}
+
+export interface Wave1BrandMetrics {
+  clicks: number;
+  pageViews: number;
+  formSubmissions: number;
+  conversionRate: number;
+}
+
+export interface Wave1PerformanceData {
+  configured: boolean;
+  ga4?: {
+    clicks: number;
+    pageViews: number;
+    formSubmissions: number;
+    conversionRate: number;
+    byBrand: Record<string, Wave1BrandMetrics>;
+  };
+  infinity?: {
+    totalCalls: number;
+    answeredCalls: number;
+    missedCalls: number;
+    avgDuration: string;
+    calls: Wave1CallData[];
+  };
+  errors: string[];
+  lastSynced?: string;
+}
+
 interface AppState {
   tasks: Task[];
   campaigns: Campaign[];
@@ -22,6 +60,10 @@ interface AppState {
   selectedCampaignId: string | null;
   apiConnected: boolean;
   apiSyncing: boolean;
+
+  // Wave 1 Performance data
+  wave1Performance: Wave1PerformanceData | null;
+  wave1Syncing: boolean;
 
   // All reads and writes go straight through to the shared backend — the
   // same database Claude's MCP tools use — so there is nothing "local only"
@@ -41,6 +83,10 @@ interface AppState {
   getCampaignById: (id: string) => Campaign | undefined;
   selectCampaign: (id: string | null) => void;
   syncCampaignsFromApi: () => Promise<void>;
+
+  // Wave 1 data
+  syncWave1Performance: () => Promise<void>;
+  syncWave1Calls: () => Promise<void>;
 
   // Derived data
   getTasksForToday: () => Task[];
@@ -108,6 +154,8 @@ export const useAppStore = create<AppState>((set, get) => {
     selectedCampaignId: null,
     apiConnected: false,
     apiSyncing: false,
+    wave1Performance: null,
+    wave1Syncing: false,
 
     addTask: async (task: Task) => {
       const requestId = `add-${task.id}-${Date.now()}`;
@@ -417,6 +465,42 @@ export const useAppStore = create<AppState>((set, get) => {
 
     getActiveCampaigns: () => {
       return get().campaigns.filter((c) => c.status === 'active');
+    },
+
+    syncWave1Performance: async () => {
+      set({ wave1Syncing: true });
+      try {
+        const response = await fetch('/api/analytics/wave1/performance');
+        if (!response.ok) {
+          console.error('Wave 1 performance sync failed:', response.status);
+          return;
+        }
+        const data = await response.json();
+        set({ wave1Performance: data, wave1Syncing: false });
+      } catch (err) {
+        console.error('Wave 1 performance sync error:', err);
+        set({ wave1Syncing: false });
+      }
+    },
+
+    syncWave1Calls: async () => {
+      set({ wave1Syncing: true });
+      try {
+        const response = await fetch('/api/analytics/wave1/calls');
+        if (!response.ok) {
+          console.error('Wave 1 calls sync failed:', response.status);
+          return;
+        }
+        const data = await response.json();
+        // Merge call data with existing performance data
+        set((state) => ({
+          wave1Performance: state.wave1Performance ? { ...state.wave1Performance, infinity: data.metrics } : data,
+          wave1Syncing: false,
+        }));
+      } catch (err) {
+        console.error('Wave 1 calls sync error:', err);
+        set({ wave1Syncing: false });
+      }
     },
   };
 
