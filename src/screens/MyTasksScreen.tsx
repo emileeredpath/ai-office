@@ -5,6 +5,7 @@ import { TaskRow } from '@/components/tasks/TaskRow';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
 import { Brand, TaskStatus } from '@/types/index';
 import { useAuth } from '@/contexts/AuthContext';
+import { BRAND_COLOR } from '@/utils/brandColors';
 
 type FilterBrand = Brand | 'all';
 type FilterStatus = TaskStatus | 'all';
@@ -19,10 +20,8 @@ export function MyTasksScreen() {
   const [filterBrand, setFilterBrand] = useState<FilterBrand>('all');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterPriority, setFilterPriority] = useState<FilterPriority>('all');
-  const [groupBy, setGroupBy] = useState<'status' | 'brand' | 'campaign' | 'priority'>('status');
-  // Collapsed by default — groups expand on click so a long list (e.g. 24
-  // "Not Started" tasks) doesn't dump everything on screen at once.
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['uncategorized']));
+
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -32,101 +31,80 @@ export function MyTasksScreen() {
     });
   };
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((task) => {
+  // Calculate summary counts
+  const summaryStats = useMemo(() => {
+    const allTasks = tasks.filter((task) => {
       if (filterBrand !== 'all' && task.brand !== filterBrand) return false;
       if (filterStatus !== 'all' && task.status !== filterStatus) return false;
       if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
       return true;
     });
+
+    const now = new Date();
+    const inProgress = allTasks.filter((t) => t.status === 'in-progress').length;
+    const notStarted = allTasks.filter((t) => t.status === 'not-started').length;
+    const completed = allTasks.filter((t) => t.status === 'complete').length;
+    const overdue = allTasks.filter((t) => t.deadline && new Date(t.deadline) < now && t.status !== 'complete').length;
+
+    return { inProgress, notStarted, completed, overdue };
   }, [tasks, filterBrand, filterStatus, filterPriority]);
 
   const groupedTasks = useMemo(() => {
+    const filtered = tasks.filter((task) => {
+      if (filterBrand !== 'all' && task.brand !== filterBrand) return false;
+      if (filterStatus !== 'all' && task.status !== filterStatus) return false;
+      if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
+      return true;
+    });
+
     const groups: Record<string, typeof tasks> = {};
 
-    filteredTasks.forEach((task) => {
-      let key: string;
-
-      if (groupBy === 'status') {
-        key = task.status;
-      } else if (groupBy === 'brand') {
-        key = task.brand;
-      } else if (groupBy === 'priority') {
-        key = task.priority;
-      } else {
-        key = task.campaignId || 'uncategorized';
-      }
-
+    filtered.forEach((task) => {
+      const key = task.campaignId || 'uncategorized';
       if (!groups[key]) groups[key] = [];
       groups[key].push(task);
     });
 
     return groups;
-  }, [filteredTasks, groupBy]);
+  }, [tasks, filterBrand, filterStatus, filterPriority]);
 
-  // When grouping by status, order sections deliberately — in-progress work
-  // up top where it's actionable, completed tasks pushed to the bottom —
-  // rather than whatever order statuses happened to first appear in the data.
-  const STATUS_GROUP_ORDER: TaskStatus[] = [
-    'in-progress',
-    'waiting-approval',
-    'waiting-john',
-    'waiting-customer',
-    'approved-ready',
-    'not-started',
-    'backlog',
-    'blocked',
-    'complete',
-  ];
-
+  // Sort: "No Campaign" first, then active campaigns, then completed campaigns
   const sortedGroupEntries = useMemo(() => {
     const entries = Object.entries(groupedTasks);
-    if (groupBy !== 'status') return entries;
-    return entries.sort(
-      ([a], [b]) => STATUS_GROUP_ORDER.indexOf(a as TaskStatus) - STATUS_GROUP_ORDER.indexOf(b as TaskStatus)
-    );
-  }, [groupedTasks, groupBy]);
+    return entries.sort(([keyA], [keyB]) => {
+      if (keyA === 'uncategorized') return -1;
+      if (keyB === 'uncategorized') return 1;
 
-  const statusLabels: Record<string, string> = {
-    'backlog': 'Backlog',
-    'not-started': 'Not Started',
-    'in-progress': 'In Progress',
-    'waiting-approval': 'Waiting Approval',
-    'waiting-john': 'Waiting for John',
-    'waiting-customer': 'Waiting Customer',
-    'approved-ready': 'Approved Ready',
-    'blocked': 'Blocked',
-    'complete': 'Complete',
-  };
+      const campaignA = campaigns.find((c) => c.id === keyA);
+      const campaignB = campaigns.find((c) => c.id === keyB);
 
-  const brandLabels: Record<string, string> = {
-    'mtech': 'MTech',
-    'brentwood': 'Brentwood',
-    'radio-links': 'Radio Links',
-    'capcom': 'Capcom',
-    'ircl': 'IRCL',
-    'idaro': 'IDARO',
-  };
+      if (campaignA?.status === 'completed' && campaignB?.status !== 'completed') return 1;
+      if (campaignA?.status !== 'completed' && campaignB?.status === 'completed') return -1;
 
-  const priorityLabels: Record<string, string> = {
-    'high': 'High Priority',
-    'medium': 'Medium Priority',
-    'low': 'Low Priority',
-  };
+      return 0;
+    });
+  }, [groupedTasks, campaigns]);
 
   const getGroupLabel = (key: string): string => {
-    if (groupBy === 'status') return statusLabels[key] || key;
-    if (groupBy === 'brand') return brandLabels[key] || key;
-    if (groupBy === 'priority') return priorityLabels[key] || key;
     if (key === 'uncategorized') return 'No Campaign';
     return campaigns.find((c) => c.id === key)?.name || key;
+  };
+
+  const getGroupBrand = (key: string): Brand | null => {
+    if (key === 'uncategorized') return null;
+    return campaigns.find((c) => c.id === key)?.brand || null;
+  };
+
+  const isCampaignCompleted = (key: string): boolean => {
+    if (key === 'uncategorized') return false;
+    return campaigns.find((c) => c.id === key)?.status === 'completed';
   };
 
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-text-primary">My Tasks</h1>
           {isEditor && (
             <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
@@ -136,8 +114,33 @@ export function MyTasksScreen() {
           )}
         </div>
 
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-4 mb-4">
+          <div className="card p-4" style={{ textAlign: 'center' }}>
+            <div className="text-2xl font-bold text-text-primary">{summaryStats.inProgress}</div>
+            <div className="text-xs text-text-secondary">In Progress</div>
+          </div>
+          <div className="card p-4" style={{ textAlign: 'center' }}>
+            <div className="text-2xl font-bold text-text-primary">{summaryStats.notStarted}</div>
+            <div className="text-xs text-text-secondary">Not Started</div>
+          </div>
+          <div className="card p-4" style={{ textAlign: 'center' }}>
+            <div className="text-2xl font-bold text-text-primary">{summaryStats.completed}</div>
+            <div className="text-xs text-text-secondary">Completed</div>
+          </div>
+          <div className="card p-4" style={{ textAlign: 'center' }}>
+            <div className="text-2xl font-bold" style={{ color: summaryStats.overdue > 0 ? '#ef4444' : 'var(--text-primary)' }}>
+              {summaryStats.overdue}
+            </div>
+            <div className="text-xs text-text-secondary">Overdue</div>
+          </div>
+        </div>
+
+        {/* Orange Divider */}
+        <div style={{ height: '3px', backgroundColor: '#ff9d3d', marginBottom: '2rem' }} />
+
         {/* Filters */}
-        <div className="card mb-8">
+        <div className="card mb-6">
           <div className="flex gap-3 flex-wrap">
             <select
               value={filterBrand}
@@ -180,30 +183,25 @@ export function MyTasksScreen() {
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
-
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as any)}
-              className="input flex-1 min-w-[150px]"
-            >
-              <option value="status">Group by status</option>
-              <option value="brand">Group by brand</option>
-              <option value="campaign">Group by campaign</option>
-              <option value="priority">Group by priority</option>
-            </select>
           </div>
         </div>
 
-        {/* Task Groups — collapsed by default, click to expand */}
+        {/* Campaign Groups */}
         <div className="space-y-3">
           {sortedGroupEntries.map(([groupKey, groupTasks]) => {
             const isExpanded = expandedGroups.has(groupKey);
+            const isCompleted = isCampaignCompleted(groupKey);
+            const brand = getGroupBrand(groupKey);
+            const brandColor = brand ? BRAND_COLOR[brand] : '#666';
+
             return (
-              <div key={groupKey} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div key={groupKey} className="card" style={{ padding: 0, overflow: 'hidden', borderLeft: `4px solid ${brandColor}` }}>
                 <button
                   onClick={() => toggleGroup(groupKey)}
-                  className="w-full flex items-center gap-2 text-left"
-                  style={{ padding: '1rem 1.25rem' }}
+                  className="w-full flex items-center gap-2 text-left transition-colors"
+                  style={{ padding: '1rem 1.25rem', backgroundColor: isCompleted ? 'var(--color-surface)' : 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isCompleted ? 'var(--color-surface)' : 'transparent'}
                 >
                   {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                   <h2 className="text-base font-semibold text-text-primary" style={{ margin: 0 }}>
