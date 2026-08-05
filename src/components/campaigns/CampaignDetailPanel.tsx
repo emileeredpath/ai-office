@@ -339,6 +339,44 @@ export function CampaignDetailPanel() {
         {/* TAB: Schedule */}
         {activeTab === 'schedule' && (
           <div className="space-y-8">
+            {/* Linked Tasks Section - at top */}
+            {campaignTasks.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-3">Linked Tasks</h3>
+                <div className="space-y-2">
+                  {campaignTasks.map((task) => {
+                    const color = BRAND_COLOR[task.brand];
+                    return (
+                      <div
+                        key={task.id}
+                        className="px-3 py-2 rounded border text-sm"
+                        style={{
+                          backgroundColor: `${color}10`,
+                          borderColor: color,
+                        }}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span style={{ color, fontWeight: 600, minWidth: '60px' }}>
+                            {BRAND_LABEL[task.brand]}
+                          </span>
+                          <div className="flex-1">
+                            <div style={{ color: 'var(--text-primary)' }} className="font-medium">
+                              {task.title}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              {task.deadline && <span>{formatDateShort(task.deadline)}</span>}
+                              {task.status && <span>· {task.status}</span>}
+                              {task.priority && <span>· {task.priority}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Timeline Table */}
             {schedule.length > 0 ? (
               <div>
@@ -453,21 +491,7 @@ export function CampaignDetailPanel() {
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-text-secondary mb-4">No milestones yet. Add campaign milestones to build your timeline.</p>
-                <button
-                  onClick={() => {
-                    const updated = [...schedule, { id: `schedule-${nanoid(10)}`, date: '', element: '', status: 'planning' as const }];
-                    setSchedule(updated);
-                  }}
-                  className="btn btn-secondary text-sm flex items-center gap-2 mx-auto"
-                >
-                  <Plus size={16} />
-                  Add milestone
-                </button>
-              </div>
-            )}
+            ) : null}
 
             {/* Campaign Notes Section */}
             <div className="border-t pt-8">
@@ -492,43 +516,6 @@ export function CampaignDetailPanel() {
               </div>
             </div>
 
-            {/* Linked Tasks Section */}
-            {campaignTasks.length > 0 && (
-              <div className="border-t pt-8">
-                <h3 className="text-sm font-semibold text-text-primary mb-4">Linked Tasks</h3>
-                <div className="space-y-2">
-                  {campaignTasks.map((task) => {
-                    const color = BRAND_COLOR[task.brand];
-                    return (
-                      <div
-                        key={task.id}
-                        className="px-3 py-2 rounded border text-sm"
-                        style={{
-                          backgroundColor: `${color}10`,
-                          borderColor: color,
-                        }}
-                      >
-                        <div className="flex items-start gap-2">
-                          <span style={{ color, fontWeight: 600, minWidth: '60px' }}>
-                            {BRAND_LABEL[task.brand]}
-                          </span>
-                          <div className="flex-1">
-                            <div style={{ color: 'var(--text-primary)' }} className="font-medium">
-                              {task.title}
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                              {task.deadline && <span>{formatDateShort(task.deadline)}</span>}
-                              {task.status && <span>· {task.status}</span>}
-                              {task.priority && <span>· {task.priority}</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
