@@ -102,7 +102,7 @@ export function getMetricsByCampaignAndDate(
     ORDER BY metric_date DESC
   `);
 
-  return stmt.all(campaignId, startDate, endDate) as Wave1PerformanceMetric[];
+  return stmt.all(campaignId, startDate, endDate) as unknown as Wave1PerformanceMetric[];
 }
 
 export function getMetricsByBrand(
