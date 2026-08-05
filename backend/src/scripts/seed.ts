@@ -6,6 +6,7 @@
 // Claude.
 import { getAllCampaigns, insertCampaign, recalculateCampaignSpend } from '../db/campaignRepository.js';
 import { getAllTasks, insertTask } from '../db/taskRepository.js';
+import db from '../db/connection.js';
 import type { TaskRecord } from '../types.js';
 
 function task(overrides: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' | 'brand'>): TaskRecord {
@@ -274,7 +275,6 @@ export function ensureScheduleItems() {
 
     if (scheduleItems.length > 0) {
       // Update campaign with schedule items
-      const db = require('./connection.js').default;
       db.prepare(
         'UPDATE campaigns SET schedule = ? WHERE id = ?'
       ).run(JSON.stringify(scheduleItems), campaign.id);
