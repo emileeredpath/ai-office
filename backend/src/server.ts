@@ -190,3 +190,4 @@ if (process.env.CAMPAIGN_MONITOR_SYNC_ENABLED === 'true') {
     console.error(`[campaign-monitor] CAMPAIGN_MONITOR_SYNC_SCHEDULE "${schedule}" is not a valid cron expression — sync not scheduled.`);
   }
 }
+// Deploy trigger: 1786003164
