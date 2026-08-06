@@ -1,5 +1,19 @@
 export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro';
 
+export interface TrackingLink {
+  id: string;
+  entity: Brand;
+  name: string;
+  channel: string;
+  landingPage: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  utmContent?: string | null;
+  status?: string;
+  clicks?: number;
+}
+
 export type TaskType = 'task' | 'email-send';
 
 export type TaskStatus =

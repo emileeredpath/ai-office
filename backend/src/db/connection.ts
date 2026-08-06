@@ -226,4 +226,7 @@ addColumnIfMissing('tasks', 'unsubscribes', 'INTEGER');
 addColumnIfMissing('tasks', 'schedule_id', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_schedule_id ON tasks(schedule_id)');
 
+// Per-entity UTM tracking links — see the Tracking Links tab brief.
+addColumnIfMissing('campaigns', 'tracking_links', "TEXT NOT NULL DEFAULT '[]'");
+
 export default db;

@@ -281,6 +281,34 @@ export function createAiOfficeMcpServer(): McpServer {
     }
   );
 
+  server.registerTool(
+    'ai_office_add_tracking_link',
+    {
+      title: 'Add a UTM tracking link to a campaign',
+      description:
+        'Add one UTM tracking link to a campaign\'s Tracking Links tab. Always appends — never overwrites or removes existing links, so it\'s safe to call repeatedly (e.g. once per link when bulk-importing UTMs pulled out of campaign notes). No confirmation required.',
+      inputSchema: {
+        campaign_id: z.string().min(1),
+        entity: z.enum(BRANDS).describe('Which brand entity this link is for'),
+        name: z.string().optional().describe('Optional label, e.g. "Brentwood Repair Landing Page"'),
+        channel: z.string().min(1).describe('e.g. Email, PPC, Social, Website'),
+        landingPage: z.string().min(1).describe('Destination URL, without UTM query params'),
+        utmSource: z.string().min(1),
+        utmMedium: z.string().min(1),
+        utmCampaign: z.string().min(1),
+        utmContent: z.string().optional(),
+      },
+    },
+    async (input) => {
+      const result = executeAction({
+        action: 'add_tracking_link',
+        payload: input,
+        source: { type: 'claude' },
+      });
+      return toToolResult(result);
+    }
+  );
+
   // MarketingOS Tools
   server.registerTool(
     'marketingos_get_objectives',

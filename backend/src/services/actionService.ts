@@ -13,7 +13,7 @@ import {
   updateCampaignRow,
   recalculateCampaignSpend,
 } from '../db/campaignRepository.js';
-import type { ActionRequest, ActionResult, ActionSource, TaskRecord, TaskHistoryEntry } from '../types.js';
+import type { ActionRequest, ActionResult, ActionSource, TaskRecord, TaskHistoryEntry, TrackingLink } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Allowlist: only these action names can ever be executed. Anything else is
@@ -26,6 +26,7 @@ const ALLOWED_ACTIONS = new Set([
   'search_workspace',
   'get_workspace_context',
   'update_campaign',
+  'add_tracking_link',
 ]);
 
 // Actions that mutate data and are not safe to silently retry/auto-apply
@@ -105,6 +106,18 @@ const updateCampaignSchema = z.object({
   entities: z.array(z.enum(BRANDS)).optional(),
   colour: z.string().max(20).optional(),
   notes: z.string().max(10000).optional(),
+});
+
+const addTrackingLinkSchema = z.object({
+  campaign_id: z.string().min(1, 'campaign_id is required'),
+  entity: z.enum(BRANDS),
+  name: z.string().trim().max(200).optional(),
+  channel: z.string().trim().min(1, 'channel is required').max(100),
+  landingPage: z.string().trim().min(1, 'landingPage is required').max(2000),
+  utmSource: z.string().trim().min(1, 'utmSource is required').max(200),
+  utmMedium: z.string().trim().min(1, 'utmMedium is required').max(200),
+  utmCampaign: z.string().trim().min(1, 'utmCampaign is required').max(200),
+  utmContent: z.string().trim().max(200).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -496,6 +509,51 @@ function doUpdateCampaign(payload: unknown, source: ActionSource | undefined, re
   };
 }
 
+function doAddTrackingLink(payload: unknown, source: ActionSource | undefined, requestId: string | undefined): ActionResult {
+  const parsed = addTrackingLinkSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'add_tracking_link', message: 'Invalid tracking link data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const input = parsed.data;
+  const existing = getCampaignById(input.campaign_id);
+  if (!existing) {
+    return { success: false, action: 'add_tracking_link', message: `No campaign found with id ${input.campaign_id}.` };
+  }
+
+  const newLink: TrackingLink = {
+    id: `tracklink-${nanoid(10)}`,
+    entity: input.entity,
+    name: input.name ?? '',
+    channel: input.channel,
+    landingPage: input.landingPage,
+    utmSource: input.utmSource,
+    utmMedium: input.utmMedium,
+    utmCampaign: input.utmCampaign,
+    utmContent: input.utmContent ?? null,
+  };
+  const trackingLinks = [...(existing.trackingLinks ?? []), newLink];
+
+  const updated = updateCampaignRow(input.campaign_id, { trackingLinks })!;
+  writeAuditLog({
+    action: 'add_tracking_link',
+    resourceType: 'campaign',
+    resourceId: updated.id,
+    previousValue: { trackingLinks: existing.trackingLinks ?? [] },
+    newValue: { trackingLinks: updated.trackingLinks },
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return {
+    success: true,
+    action: 'add_tracking_link',
+    result: { campaign_id: updated.id, trackingLink: newLink, totalLinks: updated.trackingLinks?.length ?? 0 },
+    message: `Added ${input.entity} tracking link (${input.channel}) to "${updated.name}". ${updated.trackingLinks?.length ?? 0} link(s) total.`,
+  };
+}
+
 function doGetWorkspaceContext(): ActionResult {
   const tasks = getAllTasks();
   const today = new Date();
@@ -566,6 +624,9 @@ export function executeAction(request: ActionRequest): ActionResult {
       break;
     case 'update_campaign':
       result = doUpdateCampaign(payload, source, requestId, isConfirmed);
+      break;
+    case 'add_tracking_link':
+      result = doAddTrackingLink(payload, source, requestId);
       break;
     default:
       result = { success: false, action, message: 'Not implemented.' };

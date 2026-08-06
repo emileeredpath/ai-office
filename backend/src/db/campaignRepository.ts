@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import db from './connection.js';
-import type { Brand } from '../types.js';
+import type { Brand, TrackingLink } from '../types.js';
 
 export type CampaignStatus = 'planning' | 'active' | 'on-hold' | 'completed';
 
@@ -46,6 +46,7 @@ export interface CampaignRecord {
   cofundRate?: number | null;
   claimStatus?: string | null;
   schedule?: Array<{ date: string; element: string; status: string }>;
+  trackingLinks?: TrackingLink[];
 }
 
 interface CampaignRow {
@@ -79,6 +80,7 @@ interface CampaignRow {
   cofund_rate?: number | null;
   claim_status?: string | null;
   schedule?: string | null;
+  tracking_links?: string | null;
 }
 
 function rowToRecord(row: CampaignRow): CampaignRecord {
@@ -112,6 +114,7 @@ function rowToRecord(row: CampaignRow): CampaignRecord {
     cofundRate: row.cofund_rate,
     claimStatus: row.claim_status,
     schedule: row.schedule ? (JSON.parse(row.schedule) as Array<{ date: string; element: string; status: string }>) : undefined,
+    trackingLinks: row.tracking_links ? (JSON.parse(row.tracking_links) as TrackingLink[]) : [],
   };
 }
 
@@ -154,6 +157,7 @@ export interface NewCampaignInput {
   cofundRate?: number | null;
   claimStatus?: string | null;
   schedule?: Array<{ date: string; element: string; status: string }>;
+  trackingLinks?: TrackingLink[];
 }
 
 export function insertCampaign(input: NewCampaignInput): CampaignRecord {
@@ -165,11 +169,11 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
       id, name, brand, entities, primary_industry, secondary_industry, theme, status,
       start_date, end_date, budget, spend, conversions, leads, engagement, colour,
       reactive, notes, results, created_at, updated_at, industry, recipients, value_generated,
-      vendor, scheme, cofund_rate, claim_status, schedule
+      vendor, scheme, cofund_rate, claim_status, schedule, tracking_links
     ) VALUES (@id, @name, @brand, @entities, @primaryIndustry, @secondaryIndustry, @theme, @status,
       @startDate, @endDate, @budget, @spend, @conversions, @leads, @engagement, @colour,
       @reactive, @notes, @results, @createdAt, @updatedAt, @industry, @recipients, @valueGenerated,
-      @vendor, @scheme, @cofundRate, @claimStatus, @schedule)`
+      @vendor, @scheme, @cofundRate, @claimStatus, @schedule, @trackingLinks)`
   ).run({
     id,
     name: input.name,
@@ -200,6 +204,7 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
     cofundRate: input.cofundRate ?? null,
     claimStatus: input.claimStatus ?? null,
     schedule: input.schedule ? JSON.stringify(input.schedule) : null,
+    trackingLinks: JSON.stringify(input.trackingLinks ?? []),
   });
 
   return getCampaignById(id)!;
@@ -215,6 +220,7 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     entities: updates.entities ?? existing.entities,
     results: updates.results !== undefined ? updates.results : existing.results,
     schedule: updates.schedule !== undefined ? updates.schedule : existing.schedule,
+    trackingLinks: updates.trackingLinks !== undefined ? updates.trackingLinks : existing.trackingLinks,
     updatedAt: new Date().toISOString(),
   } as CampaignRecord;
 
@@ -226,7 +232,8 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
       conversions = @conversions, leads = @leads, engagement = @engagement, colour = @colour,
       reactive = @reactive, notes = @notes, results = @results, updated_at = @updatedAt,
       industry = @industry, recipients = @recipients, value_generated = @valueGenerated,
-      vendor = @vendor, scheme = @scheme, cofund_rate = @cofundRate, claim_status = @claimStatus, schedule = @schedule
+      vendor = @vendor, scheme = @scheme, cofund_rate = @cofundRate, claim_status = @claimStatus,
+      schedule = @schedule, tracking_links = @trackingLinks
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -257,6 +264,7 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     cofundRate: merged.cofundRate ?? null,
     claimStatus: merged.claimStatus ?? null,
     schedule: merged.schedule ? JSON.stringify(merged.schedule) : null,
+    trackingLinks: JSON.stringify(merged.trackingLinks ?? []),
   });
 
   return getCampaignById(id);

@@ -64,6 +64,20 @@ const createCampaignSchema = z.object({
     element: z.string(),
     status: z.enum(['planning', 'scheduled', 'live', 'complete']),
   })).optional(),
+  // Per-entity UTM tracking links
+  trackingLinks: z.array(z.object({
+    id: z.string(),
+    entity: z.enum(BRANDS),
+    name: z.string().max(200),
+    channel: z.string().max(100),
+    landingPage: z.string().max(2000),
+    utmSource: z.string().max(200),
+    utmMedium: z.string().max(200),
+    utmCampaign: z.string().max(200),
+    utmContent: z.string().max(200).nullable().optional(),
+    status: z.string().max(50).optional(),
+    clicks: z.number().optional(),
+  })).optional(),
 });
 
 const updateCampaignSchema = createCampaignSchema.partial();
