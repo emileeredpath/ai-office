@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { Brand } from '@/types/index';
 import { formatDateShort } from '@/utils/dateUtils';
+import { CampaignSummaryTable } from '@/components/dashboard/CampaignSummaryTable';
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
@@ -19,7 +20,14 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 export function DashboardScreen() {
   const campaigns = useAppStore((s) => s.campaigns);
+  const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
+  const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const { isEditor } = useAuth();
+
+  useEffect(() => {
+    syncWave1Performance();
+    syncWave1Calls();
+  }, [syncWave1Performance, syncWave1Calls]);
 
   const now = new Date();
   const greetingHour = now.getHours();
@@ -161,6 +169,9 @@ export function DashboardScreen() {
             )}
           </div>
         </div>
+
+        {/* Campaign Summary Table */}
+        <CampaignSummaryTable />
       </div>
     </div>
   );

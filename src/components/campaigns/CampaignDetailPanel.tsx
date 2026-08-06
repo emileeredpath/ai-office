@@ -266,7 +266,7 @@ export function CampaignDetailPanel() {
                tab === 'sends' ? 'Sends' :
                tab === 'funding' ? 'Funding' :
                tab === 'tracking-links' ? 'Tracking Links' :
-               tab === 'wave1-performance' ? 'Wave 1 Summary' :
+               tab === 'wave1-performance' ? 'Summary' :
                tab === 'ga4' ? 'GA4 Performance' :
                'Call Tracking'}
             </button>
@@ -1080,7 +1080,7 @@ export function CampaignDetailPanel() {
         </div>
       )}
 
-      {/* TAB: Wave 1 Summary */}
+      {/* TAB: Summary */}
       {activeTab === 'wave1-performance' && (
         <div className="space-y-4">
           {wave1Performance && wave1Performance.configured ? (

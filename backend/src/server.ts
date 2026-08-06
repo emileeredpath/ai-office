@@ -15,6 +15,7 @@ import authRouter from './routes/auth.js';
 import { requireSession } from './middleware/session.js';
 import { initMarketingTables } from './db/marketingRepository.js';
 import { syncCampaignMonitor } from './services/campaignMonitor.js';
+import { syncWave1Ga4, syncWave1Infinity } from './services/wave1Sync.js';
 import './scripts/seed.js';
 
 const app = express();
@@ -190,4 +191,23 @@ if (process.env.CAMPAIGN_MONITOR_SYNC_ENABLED === 'true') {
     console.error(`[campaign-monitor] CAMPAIGN_MONITOR_SYNC_SCHEDULE "${schedule}" is not a valid cron expression — sync not scheduled.`);
   }
 }
-// Deploy trigger: 1786003164
+
+// Wave 1 auto-sync — GA4 every 6h, Infinity every 2h, per the Wave 1 Data
+// Integration + Dashboard Campaign Summary briefs. Both services already
+// no-op safely when their API keys aren't configured, so these always run;
+// there's nothing to gate behind an env var.
+cron.schedule('0 */6 * * *', () => {
+  console.log('[wave1] scheduled GA4 sync starting...');
+  syncWave1Ga4()
+    .then((result) => console.log('[wave1] scheduled GA4 sync finished:', JSON.stringify({ configured: result.configured, errors: result.errors })))
+    .catch((err) => console.error('[wave1] scheduled GA4 sync threw:', err));
+});
+console.log('[wave1] GA4 auto-sync scheduled: every 6 hours');
+
+cron.schedule('0 */2 * * *', () => {
+  console.log('[wave1] scheduled Infinity sync starting...');
+  syncWave1Infinity()
+    .then((result) => console.log('[wave1] scheduled Infinity sync finished:', JSON.stringify({ configured: result.configured, errors: result.errors })))
+    .catch((err) => console.error('[wave1] scheduled Infinity sync threw:', err));
+});
+console.log('[wave1] Infinity auto-sync scheduled: every 2 hours');
