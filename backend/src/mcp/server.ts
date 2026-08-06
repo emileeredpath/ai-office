@@ -282,26 +282,58 @@ export function createAiOfficeMcpServer(): McpServer {
   );
 
   server.registerTool(
-    'ai_office_add_tracking_link',
+    'ai_office_create_tracking_link',
     {
-      title: 'Add a UTM tracking link to a campaign',
+      title: 'Create a UTM tracking link on a campaign',
       description:
-        'Add one UTM tracking link to a campaign\'s Tracking Links tab. Always appends — never overwrites or removes existing links, so it\'s safe to call repeatedly (e.g. once per link when bulk-importing UTMs pulled out of campaign notes). No confirmation required.',
+        'Create one UTM tracking link on a campaign\'s Tracking Links tab. Always creates directly (no confirmation step), but skips and reports rather than duplicating if a link with the same landing page URL and full UTM set already exists on that campaign. For loading more than one link at once, use ai_office_import_tracking_links instead.',
       inputSchema: {
         campaign_id: z.string().min(1),
         entity: z.enum(BRANDS).describe('Which brand entity this link is for'),
-        name: z.string().optional().describe('Optional label, e.g. "Brentwood Repair Landing Page"'),
+        link_name: z.string().min(1).describe('Label for the link, e.g. "Wave 1 Repair – Repair Page"'),
         channel: z.string().min(1).describe('e.g. Email, PPC, Social, Website'),
-        landingPage: z.string().min(1).describe('Destination URL, without UTM query params'),
-        utmSource: z.string().min(1),
-        utmMedium: z.string().min(1),
-        utmCampaign: z.string().min(1),
-        utmContent: z.string().optional(),
+        landing_page_url: z.string().min(1).describe('Destination URL — preserve any #anchor fragment exactly'),
+        utm_source: z.string().min(1),
+        utm_medium: z.string().min(1),
+        utm_campaign: z.string().min(1),
+        utm_content: z.string().optional(),
       },
     },
     async (input) => {
       const result = executeAction({
-        action: 'add_tracking_link',
+        action: 'create_tracking_link',
+        payload: input,
+        source: { type: 'claude' },
+      });
+      return toToolResult(result);
+    }
+  );
+
+  const trackingLinkItemShape = {
+    entity: z.enum(BRANDS).describe('Which brand entity this link is for'),
+    link_name: z.string().min(1).describe('Label for the link, e.g. "Wave 1 Repair – Repair Page"'),
+    channel: z.string().min(1).describe('e.g. Email, PPC, Social, Website'),
+    landing_page_url: z.string().min(1).describe('Destination URL — preserve any #anchor fragment exactly'),
+    utm_source: z.string().min(1),
+    utm_medium: z.string().min(1),
+    utm_campaign: z.string().min(1),
+    utm_content: z.string().optional(),
+  };
+
+  server.registerTool(
+    'ai_office_import_tracking_links',
+    {
+      title: 'Bulk-import UTM tracking links into a campaign',
+      description:
+        'Create many UTM tracking links on one campaign in a single call — e.g. loading a full CSV of tracking links. Reuses the same per-link validation and duplicate-skipping as ai_office_create_tracking_link, so re-running the same import is safe and adds nothing the second time. Returns a created/skipped count, not a per-link confirmation.',
+      inputSchema: {
+        campaign_id: z.string().min(1),
+        links: z.array(z.object(trackingLinkItemShape)).min(1).describe('One entry per tracking link — entity is set per-link since a campaign can span multiple brands'),
+      },
+    },
+    async (input) => {
+      const result = executeAction({
+        action: 'import_tracking_links',
         payload: input,
         source: { type: 'claude' },
       });

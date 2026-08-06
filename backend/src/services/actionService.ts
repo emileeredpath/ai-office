@@ -26,7 +26,8 @@ const ALLOWED_ACTIONS = new Set([
   'search_workspace',
   'get_workspace_context',
   'update_campaign',
-  'add_tracking_link',
+  'create_tracking_link',
+  'import_tracking_links',
 ]);
 
 // Actions that mutate data and are not safe to silently retry/auto-apply
@@ -108,17 +109,56 @@ const updateCampaignSchema = z.object({
   notes: z.string().max(10000).optional(),
 });
 
-const addTrackingLinkSchema = z.object({
-  campaign_id: z.string().min(1, 'campaign_id is required'),
+// Per-link shape used by both the single-create and bulk-import tools —
+// snake_case params to match the rest of the ai_office_* MCP surface
+// (campaign_id, source_conversation_id, etc.), mapped onto the camelCase
+// TrackingLink fields the store already uses internally.
+const trackingLinkItemSchema = z.object({
   entity: z.enum(BRANDS),
-  name: z.string().trim().max(200).optional(),
+  link_name: z.string().trim().min(1, 'link_name is required').max(200),
   channel: z.string().trim().min(1, 'channel is required').max(100),
-  landingPage: z.string().trim().min(1, 'landingPage is required').max(2000),
-  utmSource: z.string().trim().min(1, 'utmSource is required').max(200),
-  utmMedium: z.string().trim().min(1, 'utmMedium is required').max(200),
-  utmCampaign: z.string().trim().min(1, 'utmCampaign is required').max(200),
-  utmContent: z.string().trim().max(200).optional(),
+  landing_page_url: z.string().trim().min(1, 'landing_page_url is required').max(2000),
+  utm_source: z.string().trim().min(1, 'utm_source is required').max(200),
+  utm_medium: z.string().trim().min(1, 'utm_medium is required').max(200),
+  utm_campaign: z.string().trim().min(1, 'utm_campaign is required').max(200),
+  utm_content: z.string().trim().max(200).optional(),
 });
+
+const createTrackingLinkSchema = trackingLinkItemSchema.extend({
+  campaign_id: z.string().min(1, 'campaign_id is required'),
+});
+
+const importTrackingLinksSchema = z.object({
+  campaign_id: z.string().min(1, 'campaign_id is required'),
+  links: z.array(trackingLinkItemSchema).min(1, 'links must contain at least one item').max(200),
+});
+
+function toTrackingLink(item: z.infer<typeof trackingLinkItemSchema>): TrackingLink {
+  return {
+    id: `tracklink-${nanoid(10)}`,
+    entity: item.entity,
+    name: item.link_name,
+    channel: item.channel,
+    landingPage: item.landing_page_url,
+    utmSource: item.utm_source,
+    utmMedium: item.utm_medium,
+    utmCampaign: item.utm_campaign,
+    utmContent: item.utm_content ?? null,
+  };
+}
+
+// Same link if the destination + full UTM set match exactly (trimmed) —
+// mirrors create_task's duplicate handling, but auto-skips rather than
+// asking for confirmation since an exact match has no ambiguity to resolve.
+function isDuplicateLink(existing: TrackingLink, candidate: z.infer<typeof trackingLinkItemSchema>): boolean {
+  return (
+    existing.landingPage.trim() === candidate.landing_page_url.trim() &&
+    existing.utmSource.trim() === candidate.utm_source.trim() &&
+    existing.utmMedium.trim() === candidate.utm_medium.trim() &&
+    existing.utmCampaign.trim() === candidate.utm_campaign.trim() &&
+    (existing.utmContent ?? '').trim() === (candidate.utm_content ?? '').trim()
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Audit logging — every mutation gets a row, whether it succeeded, was
@@ -509,36 +549,35 @@ function doUpdateCampaign(payload: unknown, source: ActionSource | undefined, re
   };
 }
 
-function doAddTrackingLink(payload: unknown, source: ActionSource | undefined, requestId: string | undefined): ActionResult {
-  const parsed = addTrackingLinkSchema.safeParse(payload);
+function doCreateTrackingLink(payload: unknown, source: ActionSource | undefined, requestId: string | undefined): ActionResult {
+  const parsed = createTrackingLinkSchema.safeParse(payload);
   if (!parsed.success) {
-    return { success: false, action: 'add_tracking_link', message: 'Invalid tracking link data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+    return { success: false, action: 'create_tracking_link', message: 'Invalid tracking link data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
   }
   const input = parsed.data;
   const existing = getCampaignById(input.campaign_id);
   if (!existing) {
-    return { success: false, action: 'add_tracking_link', message: `No campaign found with id ${input.campaign_id}.` };
+    return { success: false, action: 'create_tracking_link', message: `No campaign found with id ${input.campaign_id}.` };
   }
 
-  const newLink: TrackingLink = {
-    id: `tracklink-${nanoid(10)}`,
-    entity: input.entity,
-    name: input.name ?? '',
-    channel: input.channel,
-    landingPage: input.landingPage,
-    utmSource: input.utmSource,
-    utmMedium: input.utmMedium,
-    utmCampaign: input.utmCampaign,
-    utmContent: input.utmContent ?? null,
-  };
-  const trackingLinks = [...(existing.trackingLinks ?? []), newLink];
+  const existingLinks = existing.trackingLinks ?? [];
+  const duplicate = existingLinks.find((link) => isDuplicateLink(link, input));
+  if (duplicate) {
+    return {
+      success: true,
+      action: 'create_tracking_link',
+      result: { campaign_id: existing.id, skipped: true, existingLinkId: duplicate.id },
+      message: `Skipped — a tracking link with this landing page and UTM set already exists on "${existing.name}" (id ${duplicate.id}).`,
+    };
+  }
 
-  const updated = updateCampaignRow(input.campaign_id, { trackingLinks })!;
+  const newLink = toTrackingLink(input);
+  const updated = updateCampaignRow(input.campaign_id, { trackingLinks: [...existingLinks, newLink] })!;
   writeAuditLog({
-    action: 'add_tracking_link',
+    action: 'create_tracking_link',
     resourceType: 'campaign',
     resourceId: updated.id,
-    previousValue: { trackingLinks: existing.trackingLinks ?? [] },
+    previousValue: { trackingLinks: existingLinks },
     newValue: { trackingLinks: updated.trackingLinks },
     source,
     requestId,
@@ -548,9 +587,66 @@ function doAddTrackingLink(payload: unknown, source: ActionSource | undefined, r
 
   return {
     success: true,
-    action: 'add_tracking_link',
+    action: 'create_tracking_link',
     result: { campaign_id: updated.id, trackingLink: newLink, totalLinks: updated.trackingLinks?.length ?? 0 },
     message: `Added ${input.entity} tracking link (${input.channel}) to "${updated.name}". ${updated.trackingLinks?.length ?? 0} link(s) total.`,
+  };
+}
+
+function doImportTrackingLinks(payload: unknown, source: ActionSource | undefined, requestId: string | undefined): ActionResult {
+  const parsed = importTrackingLinksSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'import_tracking_links', message: 'Invalid import data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const { campaign_id, links } = parsed.data;
+  const existing = getCampaignById(campaign_id);
+  if (!existing) {
+    return { success: false, action: 'import_tracking_links', message: `No campaign found with id ${campaign_id}.` };
+  }
+
+  const runningLinks = [...(existing.trackingLinks ?? [])];
+  const createdLinks: TrackingLink[] = [];
+  const skipped: Array<{ index: number; existingLinkId: string }> = [];
+
+  links.forEach((item, index) => {
+    const duplicate = runningLinks.find((link) => isDuplicateLink(link, item));
+    if (duplicate) {
+      skipped.push({ index, existingLinkId: duplicate.id });
+      return;
+    }
+    const newLink = toTrackingLink(item);
+    runningLinks.push(newLink);
+    createdLinks.push(newLink);
+  });
+
+  const updated = createdLinks.length > 0 ? updateCampaignRow(campaign_id, { trackingLinks: runningLinks })! : existing;
+
+  if (createdLinks.length > 0) {
+    writeAuditLog({
+      action: 'import_tracking_links',
+      resourceType: 'campaign',
+      resourceId: updated.id,
+      previousValue: { trackingLinkCount: existing.trackingLinks?.length ?? 0 },
+      newValue: { trackingLinkCount: updated.trackingLinks?.length ?? 0 },
+      source,
+      requestId,
+      confirmed: true,
+      automatic: false,
+    });
+  }
+
+  return {
+    success: true,
+    action: 'import_tracking_links',
+    result: {
+      campaign_id: updated.id,
+      created: createdLinks.length,
+      skipped: skipped.length,
+      totalLinks: updated.trackingLinks?.length ?? 0,
+      createdLinks,
+      skippedRows: skipped,
+    },
+    message: `Imported ${createdLinks.length} tracking link(s) into "${updated.name}", skipped ${skipped.length} duplicate(s). ${updated.trackingLinks?.length ?? 0} link(s) total.`,
   };
 }
 
@@ -625,8 +721,11 @@ export function executeAction(request: ActionRequest): ActionResult {
     case 'update_campaign':
       result = doUpdateCampaign(payload, source, requestId, isConfirmed);
       break;
-    case 'add_tracking_link':
-      result = doAddTrackingLink(payload, source, requestId);
+    case 'create_tracking_link':
+      result = doCreateTrackingLink(payload, source, requestId);
+      break;
+    case 'import_tracking_links':
+      result = doImportTrackingLinks(payload, source, requestId);
       break;
     default:
       result = { success: false, action, message: 'Not implemented.' };
