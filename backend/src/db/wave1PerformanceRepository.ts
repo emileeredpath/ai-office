@@ -124,7 +124,7 @@ export function getMetricsByBrand(
     ORDER BY metric_date DESC
   `);
 
-  return stmt.all(brand, startDate, endDate) as Wave1PerformanceMetric[];
+  return stmt.all(brand, startDate, endDate) as unknown as Wave1PerformanceMetric[];
 }
 
 export function getLatestMetricsByBrand(brand: Brand): Wave1PerformanceMetric[] {
@@ -143,5 +143,5 @@ export function getLatestMetricsByBrand(brand: Brand): Wave1PerformanceMetric[] 
     LIMIT 100
   `);
 
-  return stmt.all(brand) as Wave1PerformanceMetric[];
+  return stmt.all(brand) as unknown as Wave1PerformanceMetric[];
 }
