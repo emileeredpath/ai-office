@@ -13,7 +13,13 @@ import {
   updateCampaignRow,
   recalculateCampaignSpend,
 } from '../db/campaignRepository.js';
-import type { ActionRequest, ActionResult, ActionSource, TaskRecord, TaskHistoryEntry, TrackingLink } from '../types.js';
+import {
+  getAllFundingRecords,
+  getFundingRecordById,
+  insertFundingRecord,
+  updateFundingRecordRow,
+} from '../db/fundingRepository.js';
+import type { ActionRequest, ActionResult, ActionSource, TaskRecord, TaskHistoryEntry, TrackingLink, FundingRecord } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Allowlist: only these action names can ever be executed. Anything else is
@@ -28,11 +34,14 @@ const ALLOWED_ACTIONS = new Set([
   'update_campaign',
   'create_tracking_link',
   'import_tracking_links',
+  'create_funding_record',
+  'update_funding_record',
+  'list_funding_records',
 ]);
 
 // Actions that mutate data and are not safe to silently retry/auto-apply
 // without the caller (Claude, on the user's behalf) explicitly confirming.
-const HIGH_RISK_ACTIONS = new Set(['complete_task', 'update_task', 'update_campaign']);
+const HIGH_RISK_ACTIONS = new Set(['complete_task', 'update_task', 'update_campaign', 'update_funding_record']);
 
 const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
 const STATUSES = [
@@ -132,6 +141,76 @@ const importTrackingLinksSchema = z.object({
   campaign_id: z.string().min(1, 'campaign_id is required'),
   links: z.array(trackingLinkItemSchema).min(1, 'links must contain at least one item').max(200),
 });
+
+const REBATE_TYPES = ['marketing-rebate', 'loyalty-rebate', 'loyalty-bonus', 'other'] as const;
+const FUNDING_CLAIM_STATUSES = ['eligible', 'submitted', 'approved', 'paid', 'rejected'] as const;
+
+const bonusTierSchema = z.object({
+  id: z.string().optional(),
+  threshold: z.number(),
+  bonusRate: z.number().nullable().optional(),
+  bonusAmount: z.number().nullable().optional(),
+  description: z.string().max(500).optional(),
+});
+
+const createFundingRecordSchema = z.object({
+  brand: z.enum(BRANDS),
+  vendor: z.string().trim().min(1, 'vendor is required').max(200),
+  scheme_name: z.string().trim().min(1, 'scheme_name is required').max(200),
+  rebate_type: z.enum(REBATE_TYPES).optional(),
+  rebate_percent: z.number().min(0).max(100).nullable().optional(),
+  total_purchases: z.number().min(0).optional(),
+  amount_earned: z.number().min(0).optional(),
+  amount_claimed: z.number().min(0).optional(),
+  claim_status: z.enum(FUNDING_CLAIM_STATUSES).optional(),
+  claim_deadline: z.string().nullable().optional(),
+  credited_frequency: z.string().max(100).optional(),
+  target_spend: z.number().min(0).nullable().optional(),
+  bonus_tiers: z.array(bonusTierSchema).optional(),
+  notes: z.string().max(10000).optional(),
+});
+
+const updateFundingRecordSchema = createFundingRecordSchema.partial().extend({
+  funding_record_id: z.string().min(1, 'funding_record_id is required'),
+});
+
+function toFundingCreateInput(input: z.infer<typeof createFundingRecordSchema>) {
+  return {
+    brand: input.brand,
+    vendor: input.vendor,
+    schemeName: input.scheme_name,
+    rebateType: input.rebate_type,
+    rebatePercent: input.rebate_percent,
+    totalPurchases: input.total_purchases,
+    amountEarned: input.amount_earned,
+    amountClaimed: input.amount_claimed,
+    claimStatus: input.claim_status,
+    claimDeadline: input.claim_deadline,
+    creditedFrequency: input.credited_frequency,
+    targetSpend: input.target_spend,
+    bonusTiers: input.bonus_tiers?.map((t) => ({ ...t, id: t.id ?? `tier-${nanoid(8)}` })),
+    notes: input.notes,
+  };
+}
+
+function toFundingUpdateInput(input: Omit<z.infer<typeof updateFundingRecordSchema>, 'funding_record_id'>) {
+  const out: Record<string, unknown> = {};
+  if (input.brand !== undefined) out.brand = input.brand;
+  if (input.vendor !== undefined) out.vendor = input.vendor;
+  if (input.scheme_name !== undefined) out.schemeName = input.scheme_name;
+  if (input.rebate_type !== undefined) out.rebateType = input.rebate_type;
+  if (input.rebate_percent !== undefined) out.rebatePercent = input.rebate_percent;
+  if (input.total_purchases !== undefined) out.totalPurchases = input.total_purchases;
+  if (input.amount_earned !== undefined) out.amountEarned = input.amount_earned;
+  if (input.amount_claimed !== undefined) out.amountClaimed = input.amount_claimed;
+  if (input.claim_status !== undefined) out.claimStatus = input.claim_status;
+  if (input.claim_deadline !== undefined) out.claimDeadline = input.claim_deadline;
+  if (input.credited_frequency !== undefined) out.creditedFrequency = input.credited_frequency;
+  if (input.target_spend !== undefined) out.targetSpend = input.target_spend;
+  if (input.bonus_tiers !== undefined) out.bonusTiers = input.bonus_tiers.map((t) => ({ ...t, id: t.id ?? `tier-${nanoid(8)}` }));
+  if (input.notes !== undefined) out.notes = input.notes;
+  return out;
+}
 
 function toTrackingLink(item: z.infer<typeof trackingLinkItemSchema>): TrackingLink {
   return {
@@ -650,6 +729,85 @@ function doImportTrackingLinks(payload: unknown, source: ActionSource | undefine
   };
 }
 
+function doCreateFundingRecord(payload: unknown, source: ActionSource | undefined, requestId: string | undefined): ActionResult {
+  const parsed = createFundingRecordSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'create_funding_record', message: 'Invalid funding record data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+
+  const record = insertFundingRecord(toFundingCreateInput(parsed.data));
+  writeAuditLog({
+    action: 'create_funding_record',
+    resourceType: 'funding_record',
+    resourceId: record.id,
+    previousValue: null,
+    newValue: record,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return {
+    success: true,
+    action: 'create_funding_record',
+    result: record,
+    message: `Created funding record "${record.schemeName}" (${record.vendor}) for ${record.brand}.`,
+  };
+}
+
+function doUpdateFundingRecord(payload: unknown, source: ActionSource | undefined, requestId: string | undefined, confirmed: boolean): ActionResult {
+  const parsed = updateFundingRecordSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'update_funding_record', message: 'Invalid funding record data.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const { funding_record_id, ...rest } = parsed.data;
+  const existing = getFundingRecordById(funding_record_id);
+  if (!existing) {
+    return { success: false, action: 'update_funding_record', message: `No funding record found with id ${funding_record_id}.` };
+  }
+
+  if (!confirmed) {
+    return {
+      success: false,
+      action: 'update_funding_record',
+      requires_confirmation: true,
+      message: `About to update funding record "${existing.schemeName}" (${existing.vendor}). Confirm to apply.`,
+      preview: { funding_record_id: existing.id, current: existing, changes: rest },
+    };
+  }
+
+  const updated = updateFundingRecordRow(funding_record_id, toFundingUpdateInput(rest))!;
+  writeAuditLog({
+    action: 'update_funding_record',
+    resourceType: 'funding_record',
+    resourceId: updated.id,
+    previousValue: existing,
+    newValue: updated,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return {
+    success: true,
+    action: 'update_funding_record',
+    result: updated,
+    message: `Funding record "${updated.schemeName}" (${updated.vendor}) updated.`,
+  };
+}
+
+function doListFundingRecords(): ActionResult {
+  const records = getAllFundingRecords();
+  return {
+    success: true,
+    action: 'list_funding_records',
+    result: records,
+    message: `Found ${records.length} funding record(s).`,
+  };
+}
+
 function doGetWorkspaceContext(): ActionResult {
   const tasks = getAllTasks();
   const today = new Date();
@@ -726,6 +884,15 @@ export function executeAction(request: ActionRequest): ActionResult {
       break;
     case 'import_tracking_links':
       result = doImportTrackingLinks(payload, source, requestId);
+      break;
+    case 'create_funding_record':
+      result = doCreateFundingRecord(payload, source, requestId);
+      break;
+    case 'update_funding_record':
+      result = doUpdateFundingRecord(payload, source, requestId, isConfirmed);
+      break;
+    case 'list_funding_records':
+      result = doListFundingRecords();
       break;
     default:
       result = { success: false, action, message: 'Not implemented.' };

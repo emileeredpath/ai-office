@@ -14,6 +14,46 @@ export interface TrackingLink {
   clicks?: number;
 }
 
+// Supplier funding / rewards tracking (e.g. XEVA Rewards) — deliberately its
+// own entity, not modelled as a Campaign. Campaign already has a narrow
+// cofundRate/claimStatus pair scoped to that one campaign's co-funding; this
+// is a general ledger of rebate/reward schemes independent of any campaign.
+export type FundingRebateType = 'marketing-rebate' | 'loyalty-rebate' | 'loyalty-bonus' | 'other';
+export type FundingClaimStatus = 'eligible' | 'submitted' | 'approved' | 'paid' | 'rejected';
+
+export interface FundingBonusTier {
+  id: string;
+  threshold: number;
+  bonusRate?: number | null;
+  bonusAmount?: number | null;
+  description?: string;
+}
+
+export interface FundingRecord {
+  id: string;
+  brand: Brand;
+  vendor: string;
+  schemeName: string;
+  rebateType: FundingRebateType;
+  rebatePercent: number | null;
+  totalPurchases: number;
+  amountEarned: number;
+  amountClaimed: number;
+  // Derived (amountEarned - amountClaimed), computed on read — never stored,
+  // so it can't drift from the two figures it's built from.
+  balanceToClaim: number;
+  claimStatus: FundingClaimStatus;
+  claimDeadline: string | null;
+  creditedFrequency: string;
+  targetSpend: number | null;
+  // Derived (totalPurchases / targetSpend * 100) when targetSpend is set.
+  percentOfTarget: number | null;
+  bonusTiers: FundingBonusTier[];
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type TaskType = 'task' | 'email-send';
 
 export type TaskStatus =

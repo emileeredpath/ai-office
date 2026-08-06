@@ -341,6 +341,104 @@ export function createAiOfficeMcpServer(): McpServer {
     }
   );
 
+  // Funding & Rewards Tools — a standalone ledger of supplier funding/rebate
+  // schemes (e.g. XEVA Rewards), deliberately not modelled as campaigns.
+  const REBATE_TYPES = ['marketing-rebate', 'loyalty-rebate', 'loyalty-bonus', 'other'] as const;
+  const FUNDING_CLAIM_STATUSES = ['eligible', 'submitted', 'approved', 'paid', 'rejected'] as const;
+  const bonusTierShape = {
+    threshold: z.number().describe('Spend/purchase threshold that unlocks this tier'),
+    bonusRate: z.number().nullable().optional().describe('% bonus at this tier'),
+    bonusAmount: z.number().nullable().optional().describe('Flat bonus amount at this tier'),
+    description: z.string().optional(),
+  };
+
+  server.registerTool(
+    'ai_office_create_funding_record',
+    {
+      title: 'Create a supplier funding/rewards record',
+      description:
+        'Create a new funding/rewards record (e.g. an XEVA Rewards scheme) — tracks rebate accrual and claim status for a brand/vendor scheme, independent of any campaign. Creates directly, no confirmation required.',
+      inputSchema: {
+        brand: z.enum(BRANDS),
+        vendor: z.string().min(1).describe('e.g. "XEVA"'),
+        scheme_name: z.string().min(1).describe('e.g. "XEVA Rewards"'),
+        rebate_type: z.enum(REBATE_TYPES).optional().describe('Defaults to "other" if omitted'),
+        rebate_percent: z.number().min(0).max(100).optional(),
+        total_purchases: z.number().min(0).optional().describe('Total qualifying purchases in £'),
+        amount_earned: z.number().min(0).optional(),
+        amount_claimed: z.number().min(0).optional(),
+        claim_status: z.enum(FUNDING_CLAIM_STATUSES).optional().describe('Defaults to "eligible" if omitted'),
+        claim_deadline: z.string().optional().describe('ISO date'),
+        credited_frequency: z.string().optional().describe('e.g. "Quarterly", "Auto"'),
+        target_spend: z.number().min(0).optional().describe('Spend target this scheme is measured against'),
+        bonus_tiers: z.array(z.object(bonusTierShape)).optional(),
+        notes: z.string().optional(),
+      },
+    },
+    async (input) => {
+      const result = executeAction({
+        action: 'create_funding_record',
+        payload: input,
+        source: { type: 'claude' },
+      });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_update_funding_record',
+    {
+      title: 'Update a supplier funding/rewards record',
+      description:
+        'Update fields on an existing funding/rewards record. Higher-risk action: the first call (without confirmed: true) returns a preview instead of applying it — show that to the user, then re-call with confirmed: true once they agree.',
+      inputSchema: {
+        funding_record_id: z.string().min(1),
+        brand: z.enum(BRANDS).optional(),
+        vendor: z.string().optional(),
+        scheme_name: z.string().optional(),
+        rebate_type: z.enum(REBATE_TYPES).optional(),
+        rebate_percent: z.number().min(0).max(100).optional(),
+        total_purchases: z.number().min(0).optional(),
+        amount_earned: z.number().min(0).optional(),
+        amount_claimed: z.number().min(0).optional(),
+        claim_status: z.enum(FUNDING_CLAIM_STATUSES).optional(),
+        claim_deadline: z.string().optional(),
+        credited_frequency: z.string().optional(),
+        target_spend: z.number().min(0).optional(),
+        bonus_tiers: z.array(z.object(bonusTierShape)).optional(),
+        notes: z.string().optional(),
+        confirmed: z.boolean().optional().describe('Set true only after the user has approved the previewed change'),
+      },
+    },
+    async ({ confirmed, ...payload }) => {
+      const result = executeAction({
+        action: 'update_funding_record',
+        payload,
+        source: { type: 'claude' },
+        confirmed,
+      });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_list_funding_records',
+    {
+      title: 'List supplier funding/rewards records',
+      description:
+        'List all funding/rewards records (e.g. XEVA Rewards) with brand, vendor, scheme, rebate figures, and claim status. Read-only.',
+      inputSchema: {},
+    },
+    async () => {
+      const result = executeAction({
+        action: 'list_funding_records',
+        payload: {},
+        source: { type: 'claude' },
+      });
+      return toToolResult(result);
+    }
+  );
+
   // MarketingOS Tools
   server.registerTool(
     'marketingos_get_objectives',

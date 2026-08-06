@@ -27,6 +27,43 @@ export type Vendor = 'motorola' | 'hytera' | 'airsys' | 'telox';
 
 export type ClaimStatus = 'eligible' | 'pending' | 'approved' | 'rejected';
 
+// Supplier funding / rewards ledger (e.g. XEVA Rewards) — a standalone
+// entity, not a Campaign. Campaign's own vendor/scheme/cofundRate/
+// claimStatus fields are scoped to that single campaign's co-funding rate;
+// this is a general rebate/reward ledger independent of any campaign.
+export type FundingRebateType = 'marketing-rebate' | 'loyalty-rebate' | 'loyalty-bonus' | 'other';
+export type FundingClaimStatus = 'eligible' | 'submitted' | 'approved' | 'paid' | 'rejected';
+
+export interface FundingBonusTier {
+  id: string;
+  threshold: number;
+  bonusRate?: number | null;
+  bonusAmount?: number | null;
+  description?: string;
+}
+
+export interface FundingRecord {
+  id: string;
+  brand: Brand;
+  vendor: string;
+  schemeName: string;
+  rebateType: FundingRebateType;
+  rebatePercent: number | null;
+  totalPurchases: number;
+  amountEarned: number;
+  amountClaimed: number;
+  balanceToClaim: number;
+  claimStatus: FundingClaimStatus;
+  claimDeadline: string | null;
+  creditedFrequency: string;
+  targetSpend: number | null;
+  percentOfTarget: number | null;
+  bonusTiers: FundingBonusTier[];
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type AISkill =
   | 'Email Marketing Manager'
   | 'Website Manager'

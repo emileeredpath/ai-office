@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Task, Campaign, TaskHistoryEntry } from '@/types/index';
+import { Task, Campaign, TaskHistoryEntry, FundingRecord } from '@/types/index';
 import {
   fetchTasksFromApi,
   deleteTaskFromApi,
@@ -14,6 +14,11 @@ import {
   updateCampaignInApi,
   deleteCampaignInApi,
 } from '@/services/campaignsApi';
+import {
+  fetchFundingRecordsFromApi,
+  createFundingRecordInApi,
+  updateFundingRecordInApi,
+} from '@/services/fundingRecordsApi';
 
 export interface Wave1CallData {
   id: string;
@@ -65,6 +70,9 @@ interface AppState {
   wave1Performance: Wave1PerformanceData | null;
   wave1Syncing: boolean;
 
+  // Funding & Rewards records
+  fundingRecords: FundingRecord[];
+
   // All reads and writes go straight through to the shared backend — the
   // same database Claude's MCP tools use — so there is nothing "local only"
   // left in this store. localStorage is not used for real data any more.
@@ -87,6 +95,11 @@ interface AppState {
   // Wave 1 data
   syncWave1Performance: () => Promise<void>;
   syncWave1Calls: () => Promise<void>;
+
+  // Funding & Rewards
+  syncFundingRecordsFromApi: () => Promise<void>;
+  addFundingRecord: (record: Omit<FundingRecord, 'id' | 'balanceToClaim' | 'percentOfTarget' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateFundingRecord: (id: string, updates: Partial<FundingRecord>) => Promise<void>;
 
   // Derived data
   getTasksForToday: () => Task[];
@@ -156,6 +169,7 @@ export const useAppStore = create<AppState>((set, get) => {
     apiSyncing: false,
     wave1Performance: null,
     wave1Syncing: false,
+    fundingRecords: [],
 
     addTask: async (task: Task) => {
       const requestId = `add-${task.id}-${Date.now()}`;
@@ -500,6 +514,39 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('Wave 1 calls sync error:', err);
         set({ wave1Syncing: false });
+      }
+    },
+
+    syncFundingRecordsFromApi: async () => {
+      try {
+        const records = await fetchFundingRecordsFromApi();
+        set({ fundingRecords: records as FundingRecord[] });
+      } catch (err) {
+        console.error('Funding records sync error:', err);
+      }
+    },
+
+    addFundingRecord: async (record) => {
+      try {
+        await createFundingRecordInApi(record as Record<string, unknown>);
+        await get().syncFundingRecordsFromApi();
+      } catch (err) {
+        alert(friendlyErrorMessage(err));
+      }
+    },
+
+    updateFundingRecord: async (id: string, updates: Partial<FundingRecord>) => {
+      try {
+        const payload = { ...updates };
+        delete (payload as any).id;
+        delete (payload as any).balanceToClaim;
+        delete (payload as any).percentOfTarget;
+        delete (payload as any).createdAt;
+        delete (payload as any).updatedAt;
+        await updateFundingRecordInApi(id, payload as Record<string, unknown>);
+        await get().syncFundingRecordsFromApi();
+      } catch (err) {
+        alert(friendlyErrorMessage(err));
       }
     },
   };

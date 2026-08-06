@@ -7,6 +7,7 @@ import 'dotenv/config';
 import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import campaignsRouter from './routes/campaigns.js';
+import fundingRouter from './routes/funding.js';
 import campaignMonitorRouter from './routes/campaignMonitor.js';
 import analyticsRouter from './routes/analytics.js';
 import mcpRouter from './routes/mcp.js';
@@ -124,6 +125,7 @@ app.use('/api/campaign-monitor/seed-test-data', async (req: Request, res: Respon
 // John = view) — no session, no data, even if you hit the API directly.
 app.use('/api/tasks', requireSession, tasksRouter);
 app.use('/api/campaigns', requireSession, campaignsRouter);
+app.use('/api/funding', requireSession, fundingRouter);
 app.use('/api/campaign-monitor', requireSession, campaignMonitorRouter);
 app.use('/api/analytics', requireSession, analyticsRouter);
 app.use('/api/actions', requireSession, actionsRouter);

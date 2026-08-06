@@ -229,4 +229,34 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_schedule_id ON tasks(schedule_id)'
 // Per-entity UTM tracking links — see the Tracking Links tab brief.
 addColumnIfMissing('campaigns', 'tracking_links', "TEXT NOT NULL DEFAULT '[]'");
 
+// Supplier funding / rewards ledger (e.g. XEVA Rewards) — a standalone
+// entity, not a Campaign. balance_to_claim and percent_of_target are
+// deliberately not columns here — they're derived on read in
+// fundingRepository so they can never drift from amount_earned/
+// amount_claimed/total_purchases/target_spend.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS funding_records (
+    id TEXT PRIMARY KEY,
+    brand TEXT NOT NULL,
+    vendor TEXT NOT NULL,
+    scheme_name TEXT NOT NULL,
+    rebate_type TEXT NOT NULL DEFAULT 'other',
+    rebate_percent REAL,
+    total_purchases REAL NOT NULL DEFAULT 0,
+    amount_earned REAL NOT NULL DEFAULT 0,
+    amount_claimed REAL NOT NULL DEFAULT 0,
+    claim_status TEXT NOT NULL DEFAULT 'eligible',
+    claim_deadline TEXT,
+    credited_frequency TEXT NOT NULL DEFAULT '',
+    target_spend REAL,
+    bonus_tiers TEXT NOT NULL DEFAULT '[]',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_funding_records_brand ON funding_records(brand);
+  CREATE INDEX IF NOT EXISTS idx_funding_records_claim_status ON funding_records(claim_status);
+`);
+
 export default db;
