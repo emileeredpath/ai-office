@@ -35,6 +35,8 @@ interface TaskRow {
   click_rate: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  archived: number;
+  archived_at: string | null;
 }
 
 function rowToRecord(row: TaskRow): TaskRecord {
@@ -72,6 +74,8 @@ function rowToRecord(row: TaskRow): TaskRecord {
     clickRate: row.click_rate,
     bounces: row.bounces,
     unsubscribes: row.unsubscribes,
+    archived: !!row.archived,
+    archivedAt: row.archived_at,
   };
 }
 
@@ -82,8 +86,9 @@ export function findTaskByExternalId(source: string, externalId: string): TaskRe
   return row ? rowToRecord(row) : undefined;
 }
 
-export function getAllTasks(): TaskRecord[] {
-  const rows = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all() as unknown as TaskRow[];
+export function getAllTasks(includeArchived = false): TaskRecord[] {
+  const where = includeArchived ? '' : 'WHERE archived = 0';
+  const rows = db.prepare(`SELECT * FROM tasks ${where} ORDER BY created_at DESC`).all() as unknown as TaskRow[];
   return rows.map(rowToRecord);
 }
 
@@ -209,6 +214,20 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     unsubscribes: merged.unsubscribes,
   });
 
+  return getTaskById(id);
+}
+
+export function archiveTask(id: string): TaskRecord | undefined {
+  const existing = getTaskById(id);
+  if (!existing) return undefined;
+  db.prepare('UPDATE tasks SET archived = 1, archived_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  return getTaskById(id);
+}
+
+export function restoreTask(id: string): TaskRecord | undefined {
+  const existing = getTaskById(id);
+  if (!existing) return undefined;
+  db.prepare('UPDATE tasks SET archived = 0, archived_at = NULL WHERE id = ?').run(id);
   return getTaskById(id);
 }
 

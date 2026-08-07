@@ -98,7 +98,7 @@ interface AppState {
 
   // Funding & Rewards
   syncFundingRecordsFromApi: () => Promise<void>;
-  addFundingRecord: (record: Omit<FundingRecord, 'id' | 'balanceToClaim' | 'percentOfTarget' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addFundingRecord: (record: Omit<FundingRecord, 'id' | 'balanceToClaim' | 'percentOfTarget' | 'createdAt' | 'updatedAt' | 'archived' | 'archivedAt'>) => Promise<void>;
   updateFundingRecord: (id: string, updates: Partial<FundingRecord>) => Promise<void>;
 
   // Derived data

@@ -36,6 +36,7 @@ const createFundingRecordSchema = z.object({
   creditedFrequency: z.string().max(100).optional(),
   targetSpend: z.number().min(0).nullable().optional(),
   bonusTiers: z.array(bonusTierSchema).optional(),
+  period: z.string().max(100).optional(),
   notes: z.string().max(10000).optional(),
 });
 

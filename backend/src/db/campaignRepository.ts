@@ -47,6 +47,8 @@ export interface CampaignRecord {
   claimStatus?: string | null;
   schedule?: Array<{ date: string; element: string; status: string }>;
   trackingLinks?: TrackingLink[];
+  archived: boolean;
+  archivedAt: string | null;
 }
 
 interface CampaignRow {
@@ -81,6 +83,8 @@ interface CampaignRow {
   claim_status?: string | null;
   schedule?: string | null;
   tracking_links?: string | null;
+  archived?: number;
+  archived_at?: string | null;
 }
 
 function rowToRecord(row: CampaignRow): CampaignRecord {
@@ -115,11 +119,14 @@ function rowToRecord(row: CampaignRow): CampaignRecord {
     claimStatus: row.claim_status,
     schedule: row.schedule ? (JSON.parse(row.schedule) as Array<{ date: string; element: string; status: string }>) : undefined,
     trackingLinks: row.tracking_links ? (JSON.parse(row.tracking_links) as TrackingLink[]) : [],
+    archived: !!row.archived,
+    archivedAt: row.archived_at ?? null,
   };
 }
 
-export function getAllCampaigns(): CampaignRecord[] {
-  const rows = db.prepare('SELECT * FROM campaigns ORDER BY created_at DESC').all() as unknown as CampaignRow[];
+export function getAllCampaigns(includeArchived = false): CampaignRecord[] {
+  const where = includeArchived ? '' : 'WHERE archived = 0';
+  const rows = db.prepare(`SELECT * FROM campaigns ${where} ORDER BY created_at DESC`).all() as unknown as CampaignRow[];
   return rows.map(rowToRecord);
 }
 
@@ -296,4 +303,18 @@ export function getCampaignProgress(id: string): { total: number; complete: numb
     )
     .get(id) as unknown as { total: number; complete: number | null };
   return { total: row.total, complete: row.complete ?? 0 };
+}
+
+export function archiveCampaign(id: string): CampaignRecord | undefined {
+  const existing = getCampaignById(id);
+  if (!existing) return undefined;
+  db.prepare('UPDATE campaigns SET archived = 1, archived_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  return getCampaignById(id);
+}
+
+export function restoreCampaign(id: string): CampaignRecord | undefined {
+  const existing = getCampaignById(id);
+  if (!existing) return undefined;
+  db.prepare('UPDATE campaigns SET archived = 0, archived_at = NULL WHERE id = ?').run(id);
+  return getCampaignById(id);
 }

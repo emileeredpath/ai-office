@@ -19,6 +19,7 @@ import {
   insertFundingRecord,
   updateFundingRecordRow,
 } from '../db/fundingRepository.js';
+import { getEntityConfig, listEntityTypes } from './entityRegistry.js';
 import type { ActionRequest, ActionResult, ActionSource, TaskRecord, TaskHistoryEntry, TrackingLink, FundingRecord } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -37,11 +38,33 @@ const ALLOWED_ACTIONS = new Set([
   'create_funding_record',
   'update_funding_record',
   'list_funding_records',
+  // Generic entity access — see the Generic MCP Access brief.
+  'list_records',
+  'get_record',
+  'create_record',
+  'update_record',
+  'delete_record',
+  'restore_record',
+  'describe_schema',
 ]);
 
 // Actions that mutate data and are not safe to silently retry/auto-apply
 // without the caller (Claude, on the user's behalf) explicitly confirming.
-const HIGH_RISK_ACTIONS = new Set(['complete_task', 'update_task', 'update_campaign', 'update_funding_record']);
+// The generic create/update/delete/restore are ALL confirmation-gated,
+// stricter than the bespoke create_task/create_campaign/create_tracking_link
+// (which are direct-create) — broad, entity-agnostic write access is exactly
+// the case the Generic MCP Access brief's guardrails call out as needing the
+// extra step, even for creates.
+const HIGH_RISK_ACTIONS = new Set([
+  'complete_task',
+  'update_task',
+  'update_campaign',
+  'update_funding_record',
+  'create_record',
+  'update_record',
+  'delete_record',
+  'restore_record',
+]);
 
 const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
 const STATUSES = [
@@ -808,6 +831,265 @@ function doListFundingRecords(): ActionResult {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Generic entity access — see the Generic MCP Access brief. Each of these
+// dispatches through entityRegistry rather than talking to a repository
+// directly, so the same validation/audit/confirmation discipline applies
+// uniformly no matter which entity is named.
+// ---------------------------------------------------------------------------
+const genericEntitySchema = z.object({ entity: z.string().min(1) });
+
+function doDescribeSchema(payload: unknown): ActionResult {
+  const parsed = z.object({ entity: z.string().min(1).optional() }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'describe_schema', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  if (!parsed.data.entity) {
+    const entities = listEntityTypes();
+    return {
+      success: true,
+      action: 'describe_schema',
+      result: entities,
+      message: `${entities.length} entity type(s) available. Call again with an entity name for its full field list.`,
+    };
+  }
+  const config = getEntityConfig(parsed.data.entity);
+  if (!config) {
+    return { success: false, action: 'describe_schema', message: `Unknown entity "${parsed.data.entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  return { success: true, action: 'describe_schema', result: config.schema, message: `Schema for "${parsed.data.entity}".` };
+}
+
+function doListRecords(payload: unknown): ActionResult {
+  const parsed = genericEntitySchema.extend({ filters: z.record(z.any()).optional() }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'list_records', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const config = getEntityConfig(parsed.data.entity);
+  if (!config) {
+    return { success: false, action: 'list_records', message: `Unknown entity "${parsed.data.entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  try {
+    const records = config.list(parsed.data.filters ?? {});
+    return { success: true, action: 'list_records', result: records, message: `Found ${(records as unknown[]).length} "${parsed.data.entity}" record(s).` };
+  } catch (err) {
+    return { success: false, action: 'list_records', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function doGetRecord(payload: unknown): ActionResult {
+  const parsed = genericEntitySchema.extend({ id: z.string().min(1) }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'get_record', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const config = getEntityConfig(parsed.data.entity);
+  if (!config) {
+    return { success: false, action: 'get_record', message: `Unknown entity "${parsed.data.entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  try {
+    const record = config.get(parsed.data.id);
+    if (!record) {
+      return { success: false, action: 'get_record', message: `No "${parsed.data.entity}" record found with id ${parsed.data.id}.` };
+    }
+    return { success: true, action: 'get_record', result: record, message: `Found "${parsed.data.entity}" ${parsed.data.id}.` };
+  } catch (err) {
+    return { success: false, action: 'get_record', message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function doCreateRecord(payload: unknown, source: ActionSource | undefined, requestId: string | undefined, confirmed: boolean): ActionResult {
+  const parsed = genericEntitySchema.extend({ fields: z.record(z.any()) }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'create_record', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const { entity, fields } = parsed.data;
+  const config = getEntityConfig(entity);
+  if (!config) {
+    return { success: false, action: 'create_record', message: `Unknown entity "${entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  if (!config.writable || !config.create) {
+    return { success: false, action: 'create_record', message: `"${entity}" is read-only — it cannot be created via the generic tools.` };
+  }
+  const fieldsParsed = config.createSchema ? config.createSchema.safeParse(fields) : { success: true as const, data: fields };
+  if (!fieldsParsed.success) {
+    return { success: false, action: 'create_record', message: `Invalid fields for "${entity}".`, error: fieldsParsed.error.issues.map((i: z.ZodIssue) => i.message).join('; ') };
+  }
+
+  if (!confirmed) {
+    return {
+      success: false,
+      action: 'create_record',
+      requires_confirmation: true,
+      message: `About to create a new "${entity}" record. Confirm to apply.`,
+      preview: { entity, fields: fieldsParsed.data },
+    };
+  }
+
+  let created: unknown;
+  try {
+    created = config.create(fieldsParsed.data as Record<string, unknown>);
+  } catch (err) {
+    return { success: false, action: 'create_record', message: err instanceof Error ? err.message : String(err) };
+  }
+
+  const createdId = (created as { id?: string })?.id;
+  writeAuditLog({
+    action: 'create_record',
+    resourceType: entity,
+    resourceId: createdId ?? null,
+    previousValue: null,
+    newValue: created,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return { success: true, action: 'create_record', result: created, message: `Created "${entity}"${createdId ? ` ${createdId}` : ''}.` };
+}
+
+function doUpdateRecord(payload: unknown, source: ActionSource | undefined, requestId: string | undefined, confirmed: boolean): ActionResult {
+  const parsed = genericEntitySchema.extend({ id: z.string().min(1), fields: z.record(z.any()) }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'update_record', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const { entity, id, fields } = parsed.data;
+  const config = getEntityConfig(entity);
+  if (!config) {
+    return { success: false, action: 'update_record', message: `Unknown entity "${entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  if (!config.writable || !config.update) {
+    return { success: false, action: 'update_record', message: `"${entity}" does not support updates via the generic tools.` };
+  }
+  const existing = config.get(id);
+  if (!existing) {
+    return { success: false, action: 'update_record', message: `No "${entity}" record found with id ${id}.` };
+  }
+  const fieldsParsed = config.updateSchema ? config.updateSchema.safeParse(fields) : { success: true as const, data: fields };
+  if (!fieldsParsed.success) {
+    return { success: false, action: 'update_record', message: `Invalid fields for "${entity}".`, error: fieldsParsed.error.issues.map((i: z.ZodIssue) => i.message).join('; ') };
+  }
+
+  if (!confirmed) {
+    return {
+      success: false,
+      action: 'update_record',
+      requires_confirmation: true,
+      message: `About to update "${entity}" ${id}. Confirm to apply.`,
+      preview: { entity, id, current: existing, changes: fieldsParsed.data },
+    };
+  }
+
+  let updated: unknown;
+  try {
+    updated = config.update(id, fieldsParsed.data as Record<string, unknown>);
+  } catch (err) {
+    return { success: false, action: 'update_record', message: err instanceof Error ? err.message : String(err) };
+  }
+
+  writeAuditLog({
+    action: 'update_record',
+    resourceType: entity,
+    resourceId: id,
+    previousValue: existing,
+    newValue: updated,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return { success: true, action: 'update_record', result: updated, message: `Updated "${entity}" ${id}.` };
+}
+
+function doDeleteRecord(payload: unknown, source: ActionSource | undefined, requestId: string | undefined, confirmed: boolean): ActionResult {
+  const parsed = genericEntitySchema.extend({ id: z.string().min(1) }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'delete_record', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const { entity, id } = parsed.data;
+  const config = getEntityConfig(entity);
+  if (!config) {
+    return { success: false, action: 'delete_record', message: `Unknown entity "${entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  if (!config.supportsArchive || !config.archive) {
+    return { success: false, action: 'delete_record', message: `"${entity}" does not support delete/archive via the generic tools.` };
+  }
+  const existing = config.get(id);
+  if (!existing) {
+    return { success: false, action: 'delete_record', message: `No "${entity}" record found with id ${id}.` };
+  }
+
+  if (!confirmed) {
+    return {
+      success: false,
+      action: 'delete_record',
+      requires_confirmation: true,
+      message: `About to archive "${entity}" ${id}. This is a soft delete — it can be restored with restore_record. Confirm to apply.`,
+      preview: { entity, id, current: existing },
+    };
+  }
+
+  const archived = config.archive(id);
+  writeAuditLog({
+    action: 'delete_record',
+    resourceType: entity,
+    resourceId: id,
+    previousValue: existing,
+    newValue: archived,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return { success: true, action: 'delete_record', result: archived, message: `Archived "${entity}" ${id}. Restorable via restore_record.` };
+}
+
+function doRestoreRecord(payload: unknown, source: ActionSource | undefined, requestId: string | undefined, confirmed: boolean): ActionResult {
+  const parsed = genericEntitySchema.extend({ id: z.string().min(1) }).safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, action: 'restore_record', message: 'Invalid input.', error: parsed.error.issues.map((i) => i.message).join('; ') };
+  }
+  const { entity, id } = parsed.data;
+  const config = getEntityConfig(entity);
+  if (!config) {
+    return { success: false, action: 'restore_record', message: `Unknown entity "${entity}". Call describe_schema with no entity to list valid entity names.` };
+  }
+  if (!config.supportsArchive || !config.restore) {
+    return { success: false, action: 'restore_record', message: `"${entity}" does not support restore via the generic tools.` };
+  }
+  const existing = config.get(id);
+  if (!existing) {
+    return { success: false, action: 'restore_record', message: `No "${entity}" record found with id ${id}.` };
+  }
+
+  if (!confirmed) {
+    return {
+      success: false,
+      action: 'restore_record',
+      requires_confirmation: true,
+      message: `About to restore "${entity}" ${id}. Confirm to apply.`,
+      preview: { entity, id, current: existing },
+    };
+  }
+
+  const restored = config.restore(id);
+  writeAuditLog({
+    action: 'restore_record',
+    resourceType: entity,
+    resourceId: id,
+    previousValue: existing,
+    newValue: restored,
+    source,
+    requestId,
+    confirmed: true,
+    automatic: false,
+  });
+
+  return { success: true, action: 'restore_record', result: restored, message: `Restored "${entity}" ${id}.` };
+}
+
 function doGetWorkspaceContext(): ActionResult {
   const tasks = getAllTasks();
   const today = new Date();
@@ -893,6 +1175,27 @@ export function executeAction(request: ActionRequest): ActionResult {
       break;
     case 'list_funding_records':
       result = doListFundingRecords();
+      break;
+    case 'describe_schema':
+      result = doDescribeSchema(payload);
+      break;
+    case 'list_records':
+      result = doListRecords(payload);
+      break;
+    case 'get_record':
+      result = doGetRecord(payload);
+      break;
+    case 'create_record':
+      result = doCreateRecord(payload, source, requestId, isConfirmed);
+      break;
+    case 'update_record':
+      result = doUpdateRecord(payload, source, requestId, isConfirmed);
+      break;
+    case 'delete_record':
+      result = doDeleteRecord(payload, source, requestId, isConfirmed);
+      break;
+    case 'restore_record':
+      result = doRestoreRecord(payload, source, requestId, isConfirmed);
       break;
     default:
       result = { success: false, action, message: 'Not implemented.' };

@@ -59,9 +59,12 @@ export interface FundingRecord {
   targetSpend: number | null;
   percentOfTarget: number | null;
   bonusTiers: FundingBonusTier[];
+  period: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
+  archived: boolean;
+  archivedAt: string | null;
 }
 
 export type AISkill =

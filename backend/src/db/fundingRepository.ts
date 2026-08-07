@@ -17,9 +17,12 @@ interface FundingRow {
   credited_frequency: string;
   target_spend: number | null;
   bonus_tiers: string;
+  period: string;
   notes: string;
   created_at: string;
   updated_at: string;
+  archived: number;
+  archived_at: string | null;
 }
 
 function rowToRecord(row: FundingRow): FundingRecord {
@@ -43,14 +46,18 @@ function rowToRecord(row: FundingRow): FundingRecord {
     targetSpend: row.target_spend,
     percentOfTarget,
     bonusTiers: row.bonus_tiers ? (JSON.parse(row.bonus_tiers) as FundingBonusTier[]) : [],
+    period: row.period,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    archived: !!row.archived,
+    archivedAt: row.archived_at,
   };
 }
 
-export function getAllFundingRecords(): FundingRecord[] {
-  const rows = db.prepare('SELECT * FROM funding_records ORDER BY created_at DESC').all() as unknown as FundingRow[];
+export function getAllFundingRecords(includeArchived = false): FundingRecord[] {
+  const where = includeArchived ? '' : 'WHERE archived = 0';
+  const rows = db.prepare(`SELECT * FROM funding_records ${where} ORDER BY created_at DESC`).all() as unknown as FundingRow[];
   return rows.map(rowToRecord);
 }
 
@@ -74,6 +81,7 @@ export interface NewFundingRecordInput {
   creditedFrequency?: string;
   targetSpend?: number | null;
   bonusTiers?: FundingBonusTier[];
+  period?: string;
   notes?: string;
 }
 
@@ -86,11 +94,11 @@ export function insertFundingRecord(input: NewFundingRecordInput): FundingRecord
       id, brand, vendor, scheme_name, rebate_type, rebate_percent,
       total_purchases, amount_earned, amount_claimed, claim_status,
       claim_deadline, credited_frequency, target_spend, bonus_tiers,
-      notes, created_at, updated_at
+      period, notes, created_at, updated_at
     ) VALUES (@id, @brand, @vendor, @schemeName, @rebateType, @rebatePercent,
       @totalPurchases, @amountEarned, @amountClaimed, @claimStatus,
       @claimDeadline, @creditedFrequency, @targetSpend, @bonusTiers,
-      @notes, @createdAt, @updatedAt)`
+      @period, @notes, @createdAt, @updatedAt)`
   ).run({
     id,
     brand: input.brand,
@@ -106,6 +114,7 @@ export function insertFundingRecord(input: NewFundingRecordInput): FundingRecord
     creditedFrequency: input.creditedFrequency ?? '',
     targetSpend: input.targetSpend ?? null,
     bonusTiers: JSON.stringify(input.bonusTiers ?? []),
+    period: input.period ?? '',
     notes: input.notes ?? '',
     createdAt: now,
     updatedAt: now,
@@ -132,6 +141,7 @@ export function updateFundingRecordRow(id: string, updates: Partial<NewFundingRe
     creditedFrequency: updates.creditedFrequency ?? existing.creditedFrequency,
     targetSpend: updates.targetSpend !== undefined ? updates.targetSpend : existing.targetSpend,
     bonusTiers: updates.bonusTiers ?? existing.bonusTiers,
+    period: updates.period ?? existing.period,
     notes: updates.notes ?? existing.notes,
     updatedAt: new Date().toISOString(),
   };
@@ -144,7 +154,7 @@ export function updateFundingRecordRow(id: string, updates: Partial<NewFundingRe
       amount_claimed = @amountClaimed, claim_status = @claimStatus,
       claim_deadline = @claimDeadline, credited_frequency = @creditedFrequency,
       target_spend = @targetSpend, bonus_tiers = @bonusTiers,
-      notes = @notes, updated_at = @updatedAt
+      period = @period, notes = @notes, updated_at = @updatedAt
     WHERE id = @id`
   ).run({
     id,
@@ -161,9 +171,24 @@ export function updateFundingRecordRow(id: string, updates: Partial<NewFundingRe
     creditedFrequency: merged.creditedFrequency,
     targetSpend: merged.targetSpend,
     bonusTiers: JSON.stringify(merged.bonusTiers),
+    period: merged.period,
     notes: merged.notes,
     updatedAt: merged.updatedAt,
   });
 
+  return getFundingRecordById(id);
+}
+
+export function archiveFundingRecord(id: string): FundingRecord | undefined {
+  const existing = getFundingRecordById(id);
+  if (!existing) return undefined;
+  db.prepare('UPDATE funding_records SET archived = 1, archived_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  return getFundingRecordById(id);
+}
+
+export function restoreFundingRecord(id: string): FundingRecord | undefined {
+  const existing = getFundingRecordById(id);
+  if (!existing) return undefined;
+  db.prepare('UPDATE funding_records SET archived = 0, archived_at = NULL WHERE id = ?').run(id);
   return getFundingRecordById(id);
 }

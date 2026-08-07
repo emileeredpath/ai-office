@@ -439,6 +439,136 @@ export function createAiOfficeMcpServer(): McpServer {
     }
   );
 
+  // Generic Entity Access — see the Generic MCP Access brief. These reach
+  // every registered entity (task, campaign, tracking_link, funding_record,
+  // business_objective, quick_capture_item, document; wave1_metric and
+  // audit_log read-only) through one small set of tools instead of a
+  // bespoke tool per feature. The existing ai_office_create_task /
+  // update_campaign / create_tracking_link / etc. tools above are untouched
+  // and keep working exactly as before — this is an additional, more
+  // general path onto the same data, not a replacement.
+  server.registerTool(
+    'ai_office_describe_schema',
+    {
+      title: 'Describe an entity\'s fields (generic access)',
+      description:
+        'Call with no entity to list every entity type the generic tools can reach (task, campaign, tracking_link, funding_record, business_objective, quick_capture_item, document, plus the read-only wave1_metric and audit_log). Call with an entity name for its full field list — names, types, which are required, valid enum values — so you know what create_record/update_record will accept before calling them. Read-only.',
+      inputSchema: {
+        entity: z.string().optional().describe('Omit to list all entity types; provide one for its field list'),
+      },
+    },
+    async (input) => {
+      const result = executeAction({ action: 'describe_schema', payload: input, source: { type: 'claude' } });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_list_records',
+    {
+      title: 'List records of any entity type (generic access)',
+      description:
+        'List records for any entity registered with the generic access layer. Call ai_office_describe_schema first if unsure what filters an entity supports (e.g. task takes campaignId/brand/status; funding_record takes brand/claimStatus/vendor). Archived records are excluded unless filters.includeArchived is true. Read-only.',
+      inputSchema: {
+        entity: z.string().min(1).describe('e.g. "task", "campaign", "funding_record", "tracking_link", "business_objective", "quick_capture_item", "document", "wave1_metric", "audit_log"'),
+        filters: z.record(z.any()).optional().describe('Entity-specific filter fields — see ai_office_describe_schema for what each entity accepts'),
+      },
+    },
+    async (input) => {
+      const result = executeAction({ action: 'list_records', payload: input, source: { type: 'claude' } });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_get_record',
+    {
+      title: 'Get one record by id (generic access)',
+      description: 'Fetch a single record of any entity type by id. Read-only.',
+      inputSchema: {
+        entity: z.string().min(1),
+        id: z.string().min(1),
+      },
+    },
+    async (input) => {
+      const result = executeAction({ action: 'get_record', payload: input, source: { type: 'claude' } });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_create_record',
+    {
+      title: 'Create a record of any entity type (generic access)',
+      description:
+        'Create a new record for any writable entity. Call ai_office_describe_schema first to see required/optional fields and valid enum values for that entity. Higher-risk action: the first call (without confirmed: true) returns a preview instead of creating it — show that to the user, then re-call with confirmed: true once they agree. This applies even to entities whose bespoke tool (e.g. ai_office_create_task) creates directly without a preview — the generic path is deliberately stricter.',
+      inputSchema: {
+        entity: z.string().min(1),
+        fields: z.record(z.any()).describe('Field values for the new record — see ai_office_describe_schema'),
+        confirmed: z.boolean().optional().describe('Set true only after the user has approved the previewed record'),
+      },
+    },
+    async ({ confirmed, ...payload }) => {
+      const result = executeAction({ action: 'create_record', payload, source: { type: 'claude' }, confirmed });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_update_record',
+    {
+      title: 'Update a record of any entity type (generic access)',
+      description:
+        'Update fields on an existing record of any writable entity. Higher-risk action: the first call (without confirmed: true) returns a preview of current values vs. changes instead of applying it — show that to the user, then re-call with confirmed: true once they agree.',
+      inputSchema: {
+        entity: z.string().min(1),
+        id: z.string().min(1),
+        fields: z.record(z.any()).describe('Only the fields being changed'),
+        confirmed: z.boolean().optional().describe('Set true only after the user has approved the previewed change'),
+      },
+    },
+    async ({ confirmed, ...payload }) => {
+      const result = executeAction({ action: 'update_record', payload, source: { type: 'claude' }, confirmed });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_delete_record',
+    {
+      title: 'Archive (soft-delete) a record of any entity type (generic access)',
+      description:
+        'Archive a record — this is a soft delete: the row is never physically removed, it\'s just excluded from normal listings, and can be brought back with ai_office_restore_record. Higher-risk action: the first call (without confirmed: true) returns a preview instead of applying it — show that to the user, then re-call with confirmed: true once they agree.',
+      inputSchema: {
+        entity: z.string().min(1),
+        id: z.string().min(1),
+        confirmed: z.boolean().optional().describe('Set true only after the user has approved the archive'),
+      },
+    },
+    async ({ confirmed, ...payload }) => {
+      const result = executeAction({ action: 'delete_record', payload, source: { type: 'claude' }, confirmed });
+      return toToolResult(result);
+    }
+  );
+
+  server.registerTool(
+    'ai_office_restore_record',
+    {
+      title: 'Restore an archived record of any entity type (generic access)',
+      description:
+        'Undo an ai_office_delete_record archive, bringing the record back into normal listings. Higher-risk action: the first call (without confirmed: true) returns a preview instead of applying it — show that to the user, then re-call with confirmed: true once they agree.',
+      inputSchema: {
+        entity: z.string().min(1),
+        id: z.string().min(1),
+        confirmed: z.boolean().optional().describe('Set true only after the user has approved the restore'),
+      },
+    },
+    async ({ confirmed, ...payload }) => {
+      const result = executeAction({ action: 'restore_record', payload, source: { type: 'claude' }, confirmed });
+      return toToolResult(result);
+    }
+  );
+
   // MarketingOS Tools
   server.registerTool(
     'marketingos_get_objectives',

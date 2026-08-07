@@ -49,9 +49,12 @@ export interface FundingRecord {
   // Derived (totalPurchases / targetSpend * 100) when targetSpend is set.
   percentOfTarget: number | null;
   bonusTiers: FundingBonusTier[];
+  period: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
+  archived: boolean;
+  archivedAt: string | null;
 }
 
 export type TaskType = 'task' | 'email-send';
@@ -121,6 +124,13 @@ export interface TaskRecord {
   clickRate: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  // Optional (rather than required like the rest of this interface) so the
+  // several existing call sites that construct a full TaskRecord literal
+  // (seed data, campaign-monitor sync, actions API) don't all need updating
+  // — taskRepository fills these from the DB regardless, where the column
+  // default is 0/NULL.
+  archived?: boolean;
+  archivedAt?: string | null;
 }
 
 export interface ActionSource {

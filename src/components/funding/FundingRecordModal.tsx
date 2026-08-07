@@ -42,6 +42,7 @@ export function FundingRecordModal({ record, onClose }: FundingRecordModalProps)
     claimDeadline: record?.claimDeadline ?? '',
     creditedFrequency: record?.creditedFrequency ?? '',
     targetSpend: record?.targetSpend?.toString() ?? '',
+    period: record?.period ?? '',
     notes: record?.notes ?? '',
   });
 
@@ -80,6 +81,7 @@ export function FundingRecordModal({ record, onClose }: FundingRecordModalProps)
       claimDeadline: formData.claimDeadline || null,
       creditedFrequency: formData.creditedFrequency.trim(),
       targetSpend: formData.targetSpend ? Number(formData.targetSpend) : null,
+      period: formData.period.trim(),
       bonusTiers,
       notes: formData.notes,
     };
@@ -248,6 +250,17 @@ export function FundingRecordModal({ record, onClose }: FundingRecordModalProps)
                 className="input"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">Period</label>
+            <input
+              type="text"
+              value={formData.period}
+              onChange={(e) => setFormData({ ...formData, period: e.target.value })}
+              placeholder="e.g. Q3 2026"
+              className="input"
+            />
           </div>
 
           {/* Bonus tiers */}

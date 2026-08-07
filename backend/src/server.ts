@@ -8,6 +8,7 @@ import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import campaignsRouter from './routes/campaigns.js';
 import fundingRouter from './routes/funding.js';
+import documentsRouter from './routes/documents.js';
 import campaignMonitorRouter from './routes/campaignMonitor.js';
 import analyticsRouter from './routes/analytics.js';
 import mcpRouter from './routes/mcp.js';
@@ -35,8 +36,17 @@ app.use(
 );
 
 // Payload size limit — the actions API accepts small structured requests,
-// never bulk file uploads.
-app.use(express.json({ limit: '100kb' }));
+// never bulk file uploads. /mcp is the one exception: creating a document
+// attachment (entity: "document") via ai_office_create_record can carry a
+// base64-encoded file (e.g. a source PDF), so it gets a much larger limit.
+// Exactly one parser runs per request — never stack two express.json()
+// calls on the same request, since the second would try to read an
+// already-consumed body stream.
+const smallJsonParser = express.json({ limit: '100kb' });
+const mcpJsonParser = express.json({ limit: '15mb' });
+app.use((req: Request, res: Response, next: NextFunction) => {
+  (req.path === '/mcp' ? mcpJsonParser : smallJsonParser)(req, res, next);
+});
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
@@ -126,6 +136,7 @@ app.use('/api/campaign-monitor/seed-test-data', async (req: Request, res: Respon
 app.use('/api/tasks', requireSession, tasksRouter);
 app.use('/api/campaigns', requireSession, campaignsRouter);
 app.use('/api/funding', requireSession, fundingRouter);
+app.use('/api/documents', requireSession, documentsRouter);
 app.use('/api/campaign-monitor', requireSession, campaignMonitorRouter);
 app.use('/api/analytics', requireSession, analyticsRouter);
 app.use('/api/actions', requireSession, actionsRouter);

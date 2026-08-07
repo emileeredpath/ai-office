@@ -13,6 +13,8 @@ export interface BusinessObjective {
   riskNotes?: string;
   createdAt: string;
   updatedAt: string;
+  archived: boolean;
+  archivedAt: string | null;
 }
 
 export interface DashboardContext {
@@ -61,27 +63,7 @@ export interface DailyDashboardSnapshot {
   sourcesUsed: string[];
 }
 
-export function getAllBusinessObjectives(): BusinessObjective[] {
-  const stmt = db.prepare('SELECT * FROM business_objectives ORDER BY created_at ASC');
-  return stmt.all().map((row: any) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    successStatement: row.success_statement,
-    metrics: JSON.parse(row.metrics),
-    status: row.status,
-    progressPercentage: row.progress_percentage,
-    riskLevel: row.risk_level,
-    riskNotes: row.risk_notes,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
-}
-
-export function getBusinessObjectiveById(id: string): BusinessObjective | null {
-  const stmt = db.prepare('SELECT * FROM business_objectives WHERE id = ?');
-  const row = stmt.get(id) as any;
-  if (!row) return null;
+function rowToObjective(row: any): BusinessObjective {
   return {
     id: row.id,
     title: row.title,
@@ -94,7 +76,34 @@ export function getBusinessObjectiveById(id: string): BusinessObjective | null {
     riskNotes: row.risk_notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    archived: !!row.archived,
+    archivedAt: row.archived_at ?? null,
   };
+}
+
+export function getAllBusinessObjectives(includeArchived = false): BusinessObjective[] {
+  const where = includeArchived ? '' : 'WHERE archived = 0';
+  const stmt = db.prepare(`SELECT * FROM business_objectives ${where} ORDER BY created_at ASC`);
+  return stmt.all().map(rowToObjective);
+}
+
+export function getBusinessObjectiveById(id: string): BusinessObjective | null {
+  const stmt = db.prepare('SELECT * FROM business_objectives WHERE id = ?');
+  const row = stmt.get(id) as any;
+  if (!row) return null;
+  return rowToObjective(row);
+}
+
+export function archiveBusinessObjective(id: string): BusinessObjective | null {
+  if (!getBusinessObjectiveById(id)) return null;
+  db.prepare('UPDATE business_objectives SET archived = 1, archived_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+  return getBusinessObjectiveById(id);
+}
+
+export function restoreBusinessObjective(id: string): BusinessObjective | null {
+  if (!getBusinessObjectiveById(id)) return null;
+  db.prepare('UPDATE business_objectives SET archived = 0, archived_at = NULL WHERE id = ?').run(id);
+  return getBusinessObjectiveById(id);
 }
 
 export function upsertBusinessObjective(objective: Partial<BusinessObjective>): BusinessObjective {

@@ -259,4 +259,48 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_funding_records_claim_status ON funding_records(claim_status);
 `);
 
+// A reporting period tag for a funding record (e.g. "Q3 2026"), independent
+// of claim_deadline — see the Generic MCP Access brief.
+addColumnIfMissing('funding_records', 'period', "TEXT NOT NULL DEFAULT ''");
+
+// Soft-delete for the generic MCP access layer — see the Generic MCP Access
+// brief. Archived rows are excluded from each repository's default list()
+// but never physically removed, and can be restored. Applied to every
+// entity the generic tools can write to; tracking_link and quick_capture_item
+// reuse an existing status-style field instead of a new column (see their
+// repositories), and wave1_metric/audit_log are read-only so they don't need
+// archival at all.
+addColumnIfMissing('campaigns', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('campaigns', 'archived_at', 'TEXT');
+addColumnIfMissing('tasks', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('tasks', 'archived_at', 'TEXT');
+addColumnIfMissing('funding_records', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('funding_records', 'archived_at', 'TEXT');
+addColumnIfMissing('business_objectives', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('business_objectives', 'archived_at', 'TEXT');
+
+// Generic file attachments — see the Generic MCP Access brief. A document
+// attaches to any entity/record pair via entity_type + record_id (no FK,
+// since it spans multiple tables). Exactly one of url / content_base64 is
+// expected to be set — enforced in the documents route/action schema, not
+// here, since SQLite has no meaningful CHECK across NULL-vs-not-NULL here
+// worth the complexity.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS documents (
+    id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    url TEXT,
+    content_base64 TEXT,
+    description TEXT NOT NULL DEFAULT '',
+    uploaded_at TEXT NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0,
+    archived_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_documents_entity_record ON documents(entity_type, record_id);
+`);
+
 export default db;
