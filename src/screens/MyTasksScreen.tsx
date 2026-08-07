@@ -65,6 +65,18 @@ export function MyTasksScreen() {
       groups[key].push(task);
     });
 
+    // Completed tasks sink to the bottom of each group, shuffled — everything
+    // still open stays on top in its existing order.
+    Object.keys(groups).forEach((key) => {
+      const open = groups[key].filter((t) => t.status !== 'complete');
+      const completed = groups[key].filter((t) => t.status === 'complete');
+      for (let i = completed.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [completed[i], completed[j]] = [completed[j], completed[i]];
+      }
+      groups[key] = [...open, ...completed];
+    });
+
     return groups;
   }, [tasks, filterBrand, filterStatus, filterPriority]);
 
