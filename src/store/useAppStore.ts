@@ -19,6 +19,7 @@ import {
   createFundingRecordInApi,
   updateFundingRecordInApi,
 } from '@/services/fundingRecordsApi';
+import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
 
 export interface Wave1CallData {
   id: string;
@@ -73,6 +74,9 @@ interface AppState {
   // Funding & Rewards records
   fundingRecords: FundingRecord[];
 
+  // Recent activity feed (Home screen)
+  auditLog: AuditLogEntry[];
+
   // All reads and writes go straight through to the shared backend — the
   // same database Claude's MCP tools use — so there is nothing "local only"
   // left in this store. localStorage is not used for real data any more.
@@ -100,6 +104,9 @@ interface AppState {
   syncFundingRecordsFromApi: () => Promise<void>;
   addFundingRecord: (record: Omit<FundingRecord, 'id' | 'balanceToClaim' | 'percentOfTarget' | 'createdAt' | 'updatedAt' | 'archived' | 'archivedAt'>) => Promise<void>;
   updateFundingRecord: (id: string, updates: Partial<FundingRecord>) => Promise<void>;
+
+  // Recent activity
+  syncAuditLog: () => Promise<void>;
 
   // Derived data
   getTasksForToday: () => Task[];
@@ -170,6 +177,7 @@ export const useAppStore = create<AppState>((set, get) => {
     wave1Performance: null,
     wave1Syncing: false,
     fundingRecords: [],
+    auditLog: [],
 
     addTask: async (task: Task) => {
       const requestId = `add-${task.id}-${Date.now()}`;
@@ -547,6 +555,15 @@ export const useAppStore = create<AppState>((set, get) => {
         await get().syncFundingRecordsFromApi();
       } catch (err) {
         alert(friendlyErrorMessage(err));
+      }
+    },
+
+    syncAuditLog: async () => {
+      try {
+        const entries = await fetchRecentAuditLog(10);
+        set({ auditLog: entries });
+      } catch (err) {
+        console.error('Audit log sync error:', err);
       }
     },
   };
