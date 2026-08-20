@@ -21,6 +21,22 @@ import { syncCampaignMonitor } from './services/campaignMonitor.js';
 import { syncWave1Ga4, syncWave1Infinity } from './services/wave1Sync.js';
 import './scripts/seed.js';
 
+// Last-resort diagnostic net. Node's own default behavior on an uncaught
+// exception is to log and exit — registering a handler here overrides that,
+// so it MUST call process.exit(1) itself, or the process would instead hang
+// around in a corrupted state instead of exiting cleanly for Railway's
+// restartPolicy to recover it. This exists purely to tag the log line so a
+// real crash is easy to find/grep in Railway's logs, not to change when the
+// process dies.
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaughtException — exiting for Railway to restart:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandledRejection — exiting for Railway to restart:', reason);
+  process.exit(1);
+});
+
 const app = express();
 initMarketingTables();
 const PORT = process.env.PORT || 3001;
