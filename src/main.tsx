@@ -4,6 +4,8 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { EntityProvider } from './contexts/EntityContext';
+import { PeriodProvider } from './contexts/PeriodContext';
 import { LoginGate } from './components/auth/LoginGate';
 import './index.css';
 
@@ -15,7 +17,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <ErrorBoundary>
         <AuthProvider>
           <LoginGate>
-            <App />
+            <EntityProvider>
+              <PeriodProvider>
+                <App />
+              </PeriodProvider>
+            </EntityProvider>
           </LoginGate>
         </AuthProvider>
       </ErrorBoundary>

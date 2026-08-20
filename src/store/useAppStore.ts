@@ -57,6 +57,11 @@ export interface Wave1PerformanceData {
   };
   errors: string[];
   lastSynced?: string;
+  // Set by syncWave1Calls — kept separate from the GA4 `configured`/`errors`
+  // above because /api/analytics/wave1/calls reports Infinity's own
+  // configured/error state independently of GA4's.
+  infinityConfigured?: boolean;
+  infinityErrors?: string[];
 }
 
 interface AppState {
@@ -516,7 +521,14 @@ export const useAppStore = create<AppState>((set, get) => {
         const data = await response.json();
         // Merge call data with existing performance data
         set((state) => ({
-          wave1Performance: state.wave1Performance ? { ...state.wave1Performance, infinity: data.metrics } : data,
+          wave1Performance: state.wave1Performance
+            ? {
+                ...state.wave1Performance,
+                infinity: data.metrics,
+                infinityConfigured: data.configured,
+                infinityErrors: data.errors,
+              }
+            : { configured: false, errors: [], infinity: data.metrics, infinityConfigured: data.configured, infinityErrors: data.errors },
           wave1Syncing: false,
         }));
       } catch (err) {

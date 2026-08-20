@@ -1,20 +1,12 @@
 import { Brand } from '@/types/index';
+import { BRAND_LABEL } from '@/utils/brandColors';
 
 interface BrandBadgeProps {
   brand: Brand;
 }
 
-const BRAND_LABELS: Record<Brand, string> = {
-  'mtech': 'MTech',
-  'brentwood': 'Brentwood',
-  'radio-links': 'Radio Links',
-  'capcom': 'Capcom',
-  'ircl': 'IRCL',
-  'idaro': 'IDARO',
-};
-
 export function BrandBadge({ brand }: BrandBadgeProps) {
-  const label = BRAND_LABELS[brand];
+  const label = BRAND_LABEL[brand];
 
   return <span className={`badge-brand badge-brand-${brand}`}>{label}</span>;
 }
