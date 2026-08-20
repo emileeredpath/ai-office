@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
+import { KpiCard } from '@/components/common/KpiCard';
 import { BRAND_LABEL } from '@/utils/brandColors';
-import { Brand, FundingClaimStatus, FundingRecord } from '@/types/index';
+import { FundingClaimStatus, FundingRecord } from '@/types/index';
 import { formatDateShort } from '@/utils/dateUtils';
 import { FundingRecordModal } from '@/components/funding/FundingRecordModal';
 
-type BrandFilter = Brand | 'all';
 type StatusFilter = FundingClaimStatus | 'all';
 
 const CLAIM_STATUS_STYLE: Record<FundingClaimStatus, { background: string; color: string }> = {
@@ -30,8 +31,8 @@ export function FundingScreen() {
   const fundingRecords = useAppStore((s) => s.fundingRecords);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const { isEditor } = useAuth();
+  const { isGroupView, selectedEntity, matchesSelectedEntity } = useEntity();
 
-  const [filterBrand, setFilterBrand] = useState<BrandFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
   const [modalRecord, setModalRecord] = useState<FundingRecord | null | 'new'>(null);
 
@@ -39,13 +40,15 @@ export function FundingScreen() {
     syncFundingRecordsFromApi();
   }, [syncFundingRecordsFromApi]);
 
+  const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
+
   const filteredRecords = useMemo(() => {
     return fundingRecords.filter((r) => {
-      if (filterBrand !== 'all' && r.brand !== filterBrand) return false;
+      if (!matchesSelectedEntity(r.brand)) return false;
       if (filterStatus !== 'all' && r.claimStatus !== filterStatus) return false;
       return true;
     });
-  }, [fundingRecords, filterBrand, filterStatus]);
+  }, [fundingRecords, selectedEntity, filterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const summary = useMemo(() => {
     const totalEarned = filteredRecords.reduce((sum, r) => sum + r.amountEarned, 0);
@@ -58,13 +61,14 @@ export function FundingScreen() {
   const currency = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
+    <div className="v2-page">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="v2-page-header">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary mb-1">Funding</h1>
-            <p className="text-text-secondary">Supplier funding, rebates &amp; rewards — e.g. XEVA Rewards</p>
+            <h1 className="text-3xl font-bold text-text-primary mb-2">Funding</h1>
+            <p className="text-text-secondary">
+              {isGroupView ? 'Supplier funding, rebates & rewards across MTech Group' : `Showing ${entityLabel}`}
+            </p>
           </div>
           {isEditor && (
             <button onClick={() => setModalRecord('new')} className="btn btn-primary flex items-center gap-2">
@@ -75,43 +79,21 @@ export function FundingScreen() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-4">
-          <div className="card p-4" style={{ textAlign: 'center' }}>
-            <div className="text-2xl font-bold text-text-primary">{currency(summary.totalEarned)}</div>
-            <div className="text-xs text-text-secondary">Total Earned</div>
-          </div>
-          <div className="card p-4" style={{ textAlign: 'center' }}>
-            <div className="text-2xl font-bold text-text-primary">{currency(summary.totalClaimed)}</div>
-            <div className="text-xs text-text-secondary">Total Claimed</div>
-          </div>
-          <div className="card p-4" style={{ textAlign: 'center' }}>
-            <div className="text-2xl font-bold text-text-primary">{currency(summary.totalBalance)}</div>
-            <div className="text-xs text-text-secondary">Balance to Claim</div>
-          </div>
-          <div className="card p-4" style={{ textAlign: 'center' }}>
-            <div className="text-2xl font-bold" style={{ color: summary.pendingClaims > 0 ? '#f59e0b' : 'var(--text-primary)' }}>
-              {summary.pendingClaims}
-            </div>
-            <div className="text-xs text-text-secondary">Pending Claims</div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <KpiCard title="Total Earned" value={currency(summary.totalEarned)} subtitle="Manually logged funding records" />
+          <KpiCard title="Total Claimed" value={currency(summary.totalClaimed)} subtitle="Manually logged funding records" />
+          <KpiCard title="Balance to Claim" value={currency(summary.totalBalance)} subtitle="Manually logged funding records" />
+          <KpiCard
+            title="Pending Claims"
+            value={summary.pendingClaims}
+            subtitle="Eligible or submitted"
+            accent={summary.pendingClaims > 0 ? 'var(--v2-orange)' : 'var(--v2-purple)'}
+          />
         </div>
-
-        {/* Orange Divider */}
-        <div style={{ height: '3px', backgroundColor: '#ff9d3d', marginBottom: '2rem' }} />
 
         {/* Filters */}
         <div className="card mb-6">
           <div className="flex gap-3 flex-wrap">
-            <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value as BrandFilter)} className="input flex-1 min-w-[150px]">
-              <option value="all">All brands</option>
-              <option value="mtech">MTech</option>
-              <option value="brentwood">Brentwood</option>
-              <option value="radio-links">Radio Links</option>
-              <option value="capcom">Capcom</option>
-              <option value="ircl">IRCL</option>
-              <option value="idaro">IDARO</option>
-            </select>
-
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as StatusFilter)} className="input flex-1 min-w-[150px]">
               <option value="all">All claim statuses</option>
               <option value="eligible">Eligible</option>
@@ -168,7 +150,9 @@ export function FundingScreen() {
               </tbody>
             </table>
           ) : (
-            <p className="text-sm text-text-secondary p-4">No funding records yet.</p>
+            <p className="text-sm text-text-secondary p-4">
+              No funding records{isGroupView ? '' : ` for ${entityLabel}`}{filterStatus !== 'all' ? ' matching this status' : ''}.
+            </p>
           )}
         </div>
       </div>
