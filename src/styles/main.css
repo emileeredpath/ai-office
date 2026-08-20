@@ -1589,6 +1589,89 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
   margin: 4px 0 0;
 }
 
+/* V2 PPC — measurement journey */
+
+.v2-ppc-journey {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+}
+
+.v2-ppc-journey-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.v2-ppc-journey-source {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  min-width: 96px;
+}
+
+.v2-ppc-journey-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.v2-ppc-journey-step-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-ppc-journey-step {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.v2-ppc-journey-step[data-group='ads'] {
+  border-color: color-mix(in srgb, var(--v2-purple) 35%, var(--v2-border));
+}
+
+.v2-ppc-journey-step[data-group='crm'] {
+  border-color: color-mix(in srgb, var(--v2-green) 35%, var(--v2-border));
+}
+
+.v2-ppc-journey-divider {
+  display: flex;
+  justify-content: center;
+}
+
+.v2-ppc-journey-note {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  max-width: 640px;
+  margin: 4px 0 0;
+}
+
+@media (max-width: 900px) {
+  .v2-ppc-journey-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .v2-ppc-journey-source {
+    min-width: 0;
+  }
+}
+
 .v2-row-name-btn {
   background: none;
   border: none;

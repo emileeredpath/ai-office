@@ -563,7 +563,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               <KpiCard title="Email" status="not-connected" subtitle="No Campaign Monitor sends logged" size="compact" />
             )}
             <KpiCard title="Social" status="not-connected" subtitle="No integration configured" size="compact" />
-            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" size="compact" />
+            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" onClick={() => onNavigate?.('ppc')} size="compact" />
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (
