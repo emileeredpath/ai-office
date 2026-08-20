@@ -268,6 +268,22 @@ export function CampaignsScreen() {
                 </span>{' '}
                 <span className={budgetPercent > 100 ? 'text-red-600' : 'text-text-secondary'}>({budgetPercent}%)</span>
               </div>
+
+              {/* Marketing leads */}
+              <div className="text-sm text-text-secondary mb-2">
+                Marketing Leads: <span className="text-text-primary font-medium">{campaign.leads}</span>
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectCampaign(campaign.id);
+                }}
+                className="text-sm font-medium"
+                style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+              >
+                View Campaign →
+              </button>
             </div>
 
             {/* Results — display once logged */}
@@ -429,28 +445,28 @@ export function CampaignsScreen() {
 
         {/* Roll-up metrics */}
         {campaigns.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border" style={{ minWidth: 0 }}>
               <p className="text-xs font-semibold text-text-secondary mb-1">Campaigns</p>
-              <p className="text-2xl font-bold text-text-primary">{metrics.campaigns}</p>
+              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{metrics.campaigns}</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border" style={{ minWidth: 0 }}>
               <p className="text-xs font-semibold text-text-secondary mb-1">Budget</p>
-              <p className="text-2xl font-bold text-text-primary">{formatCurrency(metrics.budget)}</p>
+              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{formatCurrency(metrics.budget)}</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border" style={{ minWidth: 0 }}>
               <p className="text-xs font-semibold text-text-secondary mb-1">Actual Spend</p>
-              <p className="text-2xl font-bold text-text-primary">{formatCurrency(metrics.spend)}</p>
+              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{formatCurrency(metrics.spend)}</p>
               <p className="text-xs text-text-secondary mt-1">{metrics.budget > 0 ? Math.round((metrics.spend / metrics.budget) * 100) : 0}%</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
-              <p className="text-xs font-semibold text-text-secondary mb-1">Leads / Value</p>
-              <p className="text-2xl font-bold text-text-primary">{metrics.leads}</p>
-              <p className="text-xs text-text-secondary mt-1">{formatCurrency(metrics.valueGenerated)}</p>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border" style={{ minWidth: 0 }}>
+              <p className="text-xs font-semibold text-text-secondary mb-1">Marketing Leads</p>
+              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{metrics.leads}</p>
+              <p className="text-xs text-text-secondary mt-1 truncate">{formatCurrency(metrics.valueGenerated)} value generated</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-border" style={{ minWidth: 0 }}>
               <p className="text-xs font-semibold text-text-secondary mb-1">Fundable Spend</p>
-              <p className="text-2xl font-bold text-text-primary">{formatCurrency(metrics.fundableSpend)}</p>
+              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{formatCurrency(metrics.fundableSpend)}</p>
             </div>
           </div>
         )}

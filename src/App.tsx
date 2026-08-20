@@ -16,10 +16,10 @@ import {
 import { Sidebar, type NavItem } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
-import { CampaignDetailPanel } from '@/components/campaigns/CampaignDetailPanel';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { MyTasksScreen } from '@/screens/MyTasksScreen';
 import { CampaignsScreen } from '@/screens/CampaignsScreen';
+import { CampaignDetailScreen } from '@/screens/CampaignDetailScreen';
 import { CalendarScreen } from '@/screens/CalendarScreen';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { MetricsScreen } from '@/screens/MetricsScreen';
@@ -63,6 +63,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
+  const selectCampaign = useAppStore((s) => s.selectCampaign);
 
   useEffect(() => {
     const ping = () => fetch(`${API_URL}/health`, { method: 'GET' }).catch(() => {});
@@ -109,8 +110,13 @@ export default function App() {
       <div className="v2-main-column">
         <TopBar />
         <main className="flex-1 overflow-hidden flex">
-          <div className="flex-1 overflow-y-auto">{renderScreen()}</div>
-          {selectedCampaignId && <CampaignDetailPanel />}
+          <div className="flex-1 overflow-y-auto">
+            {selectedCampaignId ? (
+              <CampaignDetailScreen campaignId={selectedCampaignId} onBack={() => selectCampaign(null)} />
+            ) : (
+              renderScreen()
+            )}
+          </div>
           {selectedTaskId && !selectedCampaignId && <TaskDetailPanel />}
         </main>
       </div>
