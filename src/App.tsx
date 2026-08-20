@@ -23,7 +23,7 @@ import { CampaignDetailScreen } from '@/screens/CampaignDetailScreen';
 import { CalendarScreen } from '@/screens/CalendarScreen';
 import { PerformanceScreen } from '@/screens/PerformanceScreen';
 import { LeadsCrmScreen } from '@/screens/LeadsCrmScreen';
-import { MetricsScreen } from '@/screens/MetricsScreen';
+import { ReportsScreen } from '@/screens/ReportsScreen';
 import { PpcScreen } from '@/screens/PpcScreen';
 import { InfinityTrackingScreen } from '@/screens/InfinityTrackingScreen';
 import { FundingScreen } from '@/screens/FundingScreen';
@@ -39,9 +39,8 @@ type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads
 // screen (id = the Screen it opens) except the one item still flagged
 // `comingSoon: true` — Uploads has no real screen to open yet, so it's
 // shown (per the shell's information architecture) but disabled rather
-// than faked. "Reports" restores MetricsScreen, which had no sidebar
-// entry before this change (a pre-existing dead route, not a regression
-// introduced here).
+// than faked. "Reports" opens ReportsScreen (route id kept as 'metrics'
+// to avoid touching unrelated navigation).
 const PRIMARY_NAV: NavItem[] = [
   { id: 'home' as Screen, icon: LayoutDashboard, label: 'Overview' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
@@ -94,7 +93,7 @@ export default function App() {
       case 'funding':
         return <FundingScreen />;
       case 'metrics':
-        return <MetricsScreen />;
+        return <ReportsScreen />;
       case 'settings':
         return <SettingsScreen />;
       default:

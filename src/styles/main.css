@@ -1985,3 +1985,24 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
     min-width: auto;
   }
 }
+
+/* V2 Reports — print / "Save as PDF" */
+
+@media print {
+  .v2-sidebar,
+  .v2-topbar,
+  .v2-no-print {
+    display: none !important;
+  }
+
+  .v2-main-column,
+  .v2-report-page {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .v2-report-page .card {
+    break-inside: avoid;
+    border: 1px solid #ccc;
+  }
+}
