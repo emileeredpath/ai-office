@@ -185,7 +185,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
         </div>
 
         {/* KPI strip */}
-        <div className="grid grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : '—'} subtitle="Set on this campaign" />
           <KpiCard title="Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle="Manually logged" />
           <KpiCard title="Marketing Leads" value={campaign.leads} subtitle="Manually logged, not CRM-linked" accent="var(--v2-green)" />

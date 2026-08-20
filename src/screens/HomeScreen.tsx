@@ -10,7 +10,9 @@ import { MarketingFunnel, type FunnelStage } from '@/components/common/Marketing
 import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataFreshnessBar';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
-import { CampaignStatus } from '@/types/index';
+import { getCampaignProgressInfo } from '@/utils/campaignProgress';
+import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
+import { isWave1Campaign } from '@/utils/wave1';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
@@ -18,20 +20,6 @@ const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-
 interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
 }
-
-const STATUS_BADGE_STYLE: Record<CampaignStatus, { background: string; color: string }> = {
-  active: { background: '#10b981', color: 'white' },
-  completed: { background: '#9ca3af', color: 'white' },
-  planning: { background: '#3b82f6', color: 'white' },
-  'on-hold': { background: '#f59e0b', color: 'white' },
-};
-
-const STATUS_LABEL: Record<CampaignStatus, string> = {
-  active: 'Active',
-  completed: 'Completed',
-  planning: 'Planning',
-  'on-hold': 'On Hold',
-};
 
 function describeAuditEntry(entry: AuditLogEntry): string {
   const value = (entry.newValue ?? entry.previousValue) as any;
@@ -156,11 +144,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   // ---- Needs Your Attention --------------------------------------------
   // Real, rule-based triggers only — no invented warnings. Task rules reuse
-  // the original HomeScreen logic; the funding-expiry rule is new but uses
-  // the same real fundingRecords data already fetched on this screen.
+  // the original HomeScreen logic; the funding-expiry rule uses the same
+  // real fundingRecords data already fetched on this screen. Each item
+  // carries a short `tag` (what happened) plus `detail` (why it matters) so
+  // the list is scannable without reading full sentences.
   type AttentionSeverity = 'red' | 'orange' | 'purple';
   interface AttentionItem {
     id: string;
+    tag: string;
     title: string;
     detail: string;
     severity: AttentionSeverity;
@@ -177,16 +168,18 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       if (t.deadline && new Date(t.deadline) < now) {
         items.push({
           id: `task-overdue-${t.id}`,
+          tag: 'Overdue',
           title: t.title,
-          detail: `Overdue since ${formatDateShort(t.deadline)}`,
+          detail: `Since ${formatDateShort(t.deadline)} — needs action`,
           severity: 'red',
           onClick: () => selectTask(t.id),
         });
       } else if (t.status === 'waiting-approval' || t.status === 'waiting-john') {
         items.push({
           id: `task-waiting-${t.id}`,
+          tag: t.status === 'waiting-approval' ? 'Awaiting approval' : 'Awaiting John',
           title: t.title,
-          detail: t.status === 'waiting-approval' ? 'Waiting approval' : 'Waiting for John',
+          detail: t.deadline ? `Due ${formatDateShort(t.deadline)}` : 'No deadline set',
           severity: 'orange',
           onClick: () => selectTask(t.id),
         });
@@ -195,6 +188,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         if (d >= now && d <= in48h) {
           items.push({
             id: `task-due-${t.id}`,
+            tag: 'Due soon',
             title: t.title,
             detail: `Due ${formatDateShort(t.deadline)}`,
             severity: 'orange',
@@ -213,8 +207,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       if (deadline >= now && deadline <= in30days) {
         items.push({
           id: `funding-${r.id}`,
+          tag: 'Funding expiring',
           title: `${r.vendor} — ${r.schemeName}`,
-          detail: `Funding claim deadline ${formatDateShort(r.claimDeadline)}`,
+          detail: `Claim by ${formatDateShort(r.claimDeadline)}`,
           severity: 'orange',
           onClick: () => onNavigate?.('funding'),
         });
@@ -225,45 +220,61 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   }, [entityTasks, entityFundingRecords, selectTask, onNavigate]);
 
   // ---- Coming Up ---------------------------------------------------------
-  // Real upcoming task deadlines only. Microsoft To Do deadlines are not
-  // wired in — Microsoft To Do remains the primary personal task manager,
-  // per product direction; this section is deliberately not a task manager.
-  const comingUp = useMemo(() => {
-    const now = new Date();
-    return entityTasks
-      .filter((t) => t.status !== 'complete' && t.deadline && new Date(t.deadline) >= now)
-      .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
-      .slice(0, 5)
-      .map((t) => {
-        const campaign = campaigns.find((c) => c.id === t.campaignId);
-        return { id: t.id, title: t.title, due: t.deadline!, campaignName: campaign?.name };
-      });
-  }, [entityTasks, campaigns]);
+  // A short marketing diary, not a task manager: merges real upcoming task
+  // deadlines, real campaign milestones (campaign.schedule — previously only
+  // visible inside Campaign Detail's Calendar tab), and real funding claim
+  // deadlines into one sorted feed. Microsoft To Do deadlines are not wired
+  // in yet — Microsoft To Do remains the primary personal task manager.
+  type ComingUpKind = 'task' | 'milestone' | 'funding';
+  interface ComingUpItem {
+    id: string;
+    kind: ComingUpKind;
+    title: string;
+    due: Date;
+    context?: string;
+    onClick?: () => void;
+  }
 
-  // ---- Active Campaigns table ------------------------------------------
-  const activeCampaignsTable = useMemo(() => {
+  const comingUp = useMemo<ComingUpItem[]>(() => {
+    const now = new Date();
+    const items: ComingUpItem[] = [];
+
+    for (const t of entityTasks) {
+      if (t.status === 'complete' || !t.deadline || new Date(t.deadline) < now) continue;
+      const campaign = campaigns.find((c) => c.id === t.campaignId);
+      items.push({ id: `task-${t.id}`, kind: 'task', title: t.title, due: new Date(t.deadline), context: campaign?.name, onClick: () => selectTask(t.id) });
+    }
+
+    for (const c of entityCampaigns) {
+      for (const s of c.schedule || []) {
+        if (!s.date || s.status === 'complete') continue;
+        const d = new Date(s.date);
+        if (d < now) continue;
+        items.push({ id: `milestone-${c.id}-${s.date}-${s.element}`, kind: 'milestone', title: s.element, due: d, context: c.name, onClick: () => selectCampaign(c.id) });
+      }
+    }
+
+    for (const r of entityFundingRecords) {
+      if (r.archived || !r.claimDeadline) continue;
+      if (r.claimStatus !== 'eligible' && r.claimStatus !== 'submitted') continue;
+      const d = new Date(r.claimDeadline);
+      if (d < now) continue;
+      items.push({ id: `funding-${r.id}`, kind: 'funding', title: `${r.vendor} funding claim due`, due: d, context: r.schemeName, onClick: () => onNavigate?.('funding') });
+    }
+
+    return items.sort((a, b) => a.due.getTime() - b.due.getTime()).slice(0, 6);
+  }, [entityTasks, entityCampaigns, entityFundingRecords, campaigns, selectTask, selectCampaign, onNavigate]);
+
+  // ---- Active Campaigns (compact) ---------------------------------------
+  // Date-based progress, shared with Campaign Detail and the Campaigns
+  // table (src/utils/campaignProgress.ts) — same honest formula everywhere.
+  const activeCampaignsCompact = useMemo(() => {
     return entityCampaigns
       .filter((c) => c.status === 'active')
-      .map((c) => {
-        const campaignTasks = tasks.filter((t) => t.campaignId === c.id);
-        const total = campaignTasks.length;
-        const complete = campaignTasks.filter((t) => t.status === 'complete').length;
-        const upcoming = campaignTasks
-          .filter((t) => t.deadline && t.status !== 'complete')
-          .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0];
-        return {
-          id: c.id,
-          name: c.name,
-          brand: c.brand,
-          status: c.status,
-          progress: total > 0 ? Math.round((complete / total) * 100) : null,
-          leads: c.leads || 0,
-          spend: c.spend || 0,
-          due: upcoming?.deadline ?? null,
-        };
-      })
-      .slice(0, 6);
-  }, [entityCampaigns, tasks]);
+      .map((c) => ({ ...c, progress: getCampaignProgressInfo(c.status, c.startDate, c.endDate) }))
+      .sort((a, b) => a.progress.percent === b.progress.percent ? 0 : b.progress.percent - a.progress.percent)
+      .slice(0, 3);
+  }, [entityCampaigns]);
 
   // ---- Channel Snapshot ---------------------------------------------------
   // Email: derived from real email-send tasks (Campaign Monitor sync writes
@@ -279,9 +290,29 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     return { sends: emailSendTasks.length, opens: totalOpens, clicks: totalClicks };
   }, [emailSendTasks]);
 
+  // Infinity's real data today is scoped to one hardcoded campaign (see
+  // isWave1Campaign) — only surface it here if that campaign actually
+  // belongs to the currently-selected entity, otherwise it would silently
+  // show another entity's figure under the wrong selection.
+  const wave1TargetCampaign = useMemo(() => campaigns.find(isWave1Campaign), [campaigns]);
   const infinityConfigured = wave1Performance?.infinityConfigured === true;
+  const infinityMatchesEntity = wave1TargetCampaign ? matchesSelectedEntity(wave1TargetCampaign.brand) : false;
   const callsSnapshot =
-    infinityConfigured && wave1Performance?.infinity ? wave1Performance.infinity : null;
+    infinityConfigured && infinityMatchesEntity && wave1Performance?.infinity ? wave1Performance.infinity : null;
+
+  // ---- Recent Activity — respect the global entity selector -------------
+  // audit_log rows don't carry a brand column directly, so entity-scoping
+  // cross-references each entry's resourceId against this entity's real
+  // campaigns/tasks/funding records — same pattern as Campaign Detail's
+  // "Recent Campaign Activity".
+  const visibleActivity = useMemo(() => {
+    if (isGroupView) return auditLog.slice(0, 8);
+    const ids = new Set<string>();
+    entityCampaigns.forEach((c) => ids.add(c.id));
+    entityTasks.forEach((t) => ids.add(t.id));
+    entityFundingRecords.forEach((r) => ids.add(r.id));
+    return auditLog.filter((e) => e.resourceId && ids.has(e.resourceId)).slice(0, 8);
+  }, [auditLog, isGroupView, entityCampaigns, entityTasks, entityFundingRecords]);
 
   // ---- Data freshness -----------------------------------------------------
   const ga4Configured = wave1Performance?.configured === true;
@@ -327,7 +358,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         <DataFreshnessBar entries={freshnessEntries} />
 
         {/* Headline KPIs */}
-        <div className="grid grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 xl:gap-6 mb-8">
           <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" />
           <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
           <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
@@ -372,6 +403,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                         <Info size={14} color="var(--v2-purple)" style={{ marginTop: 2, flexShrink: 0 }} />
                       )}
                       <span style={{ flex: 1 }}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="text-xs font-bold"
+                            style={{ color: item.severity === 'red' ? 'var(--v2-red)' : item.severity === 'orange' ? 'var(--v2-orange)' : 'var(--v2-purple)' }}
+                          >
+                            {item.tag}
+                          </span>
+                        </span>
                         <span className="text-sm font-medium text-text-primary block">{item.title}</span>
                         <span className="text-xs text-text-secondary">{item.detail}</span>
                       </span>
@@ -397,13 +436,21 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             {comingUp.length > 0 ? (
               <div className="space-y-3">
                 {comingUp.map((item) => (
-                  <div key={item.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                    <div className="text-sm font-medium text-text-primary">{item.title}</div>
-                    <div className="text-xs text-text-secondary">
-                      Due {formatDateShort(item.due)}
-                      {item.campaignName ? ` · ${item.campaignName}` : ''}
+                  <button
+                    key={item.id}
+                    onClick={item.onClick}
+                    className="w-full text-left"
+                    style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', background: 'none', border: 'none', cursor: item.onClick ? 'pointer' : 'default' }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="v2-coming-up-kind" data-kind={item.kind}>
+                        {item.kind === 'task' ? 'Task' : item.kind === 'milestone' ? 'Milestone' : 'Funding'}
+                      </span>
+                      <span className="text-xs text-text-secondary">{formatDateShort(item.due)}</span>
                     </div>
-                  </div>
+                    <div className="text-sm font-medium text-text-primary">{item.title}</div>
+                    {item.context && <div className="text-xs text-text-secondary">{item.context}</div>}
+                  </button>
                 ))}
               </div>
             ) : (
@@ -430,40 +477,39 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                 View all campaigns <ArrowRight size={14} />
               </button>
             </div>
-            {activeCampaignsTable.length > 0 ? (
-              <div className="card p-0" style={{ overflow: 'auto' }}>
-                <table className="table" style={{ width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th>Campaign</th>
-                      <th>Entity</th>
-                      <th>Status</th>
-                      <th style={{ textAlign: 'right' }}>Progress</th>
-                      <th style={{ textAlign: 'right' }}>Leads</th>
-                      <th style={{ textAlign: 'right' }}>Spend</th>
-                      <th>Due</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeCampaignsTable.map((c) => (
-                      <tr key={c.id} onClick={() => selectCampaign(c.id)} style={{ cursor: 'pointer' }}>
-                        <td className="font-medium text-text-primary">{c.name}</td>
-                        <td>
-                          <BrandBadge brand={c.brand} />
-                        </td>
-                        <td>
-                          <span className="badge" style={{ ...STATUS_BADGE_STYLE[c.status], fontSize: '11px' }}>
-                            {STATUS_LABEL[c.status]}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>{c.progress !== null ? `${c.progress}%` : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{c.leads}</td>
-                        <td style={{ textAlign: 'right' }}>£{Math.round(c.spend).toLocaleString()}</td>
-                        <td className="text-sm text-text-secondary">{c.due ? formatDateShort(c.due) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {activeCampaignsCompact.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {activeCampaignsCompact.map((c) => (
+                  <div key={c.id} className="card v2-mini-campaign-card" onClick={() => selectCampaign(c.id)}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-semibold text-text-primary text-sm" style={{ lineHeight: 1.3 }}>{c.name}</div>
+                      <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[c.status], fontSize: '10px', flexShrink: 0 }}>
+                        {CAMPAIGN_STATUS_LABEL[c.status]}
+                      </span>
+                    </div>
+                    <div className="mt-1">
+                      <BrandBadge brand={c.brand} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="v2-progress-mini-track" style={{ width: 60 }}>
+                        <span className="v2-progress-mini-fill" style={{ width: `${c.progress.percent}%`, display: 'block' }} />
+                      </span>
+                      <span className="text-xs text-text-secondary">{c.progress.percent}% · {c.progress.label}</span>
+                    </div>
+                    <div className="v2-mini-campaign-stats">
+                      <div>
+                        <div className="v2-mini-campaign-stat-label">Marketing Leads</div>
+                        <div className="v2-mini-campaign-stat-value">{c.leads}</div>
+                      </div>
+                      <div>
+                        <div className="v2-mini-campaign-stat-label">Spend / Budget</div>
+                        <div className="v2-mini-campaign-stat-value">
+                          £{Math.round(c.spend).toLocaleString()}{c.budget != null ? ` / £${c.budget.toLocaleString()}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-text-secondary">No active campaigns{isGroupView ? '' : ' for this entity'}</p>
@@ -473,9 +519,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           <div>
             <h2 className="v2-section-title">Recent Activity</h2>
             <div className="card">
-              {auditLog.length > 0 ? (
+              {visibleActivity.length > 0 ? (
                 <div className="space-y-3">
-                  {auditLog.slice(0, 8).map((entry) => (
+                  {visibleActivity.map((entry) => (
                     <div key={entry.id} className="text-sm" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
                       <div className="text-text-primary">{describeAuditEntry(entry)}</div>
                       <div className="text-xs text-text-secondary mt-1">{formatDateShort(entry.createdAt)}</div>
@@ -483,7 +529,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                   ))}
                 </div>
               ) : (
-                <p className="text-text-secondary text-sm">No recent activity</p>
+                <p className="text-text-secondary text-sm">No recent activity{isGroupView ? '' : ' for this entity'}</p>
               )}
             </div>
           </div>
@@ -492,22 +538,24 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         {/* Channel Snapshot */}
         <div className="mb-8">
           <h2 className="v2-section-title">Channel Snapshot (This Period)</h2>
-          <div className="grid grid-cols-4 gap-6">
-            <KpiCard title="Website" status="not-connected" subtitle="Awaiting GA4 integration" />
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+            <KpiCard title="Website" status="not-connected" subtitle="Awaiting GA4 integration" size="compact" />
             {emailSnapshot ? (
               <KpiCard
                 title="Email"
                 value={`${emailSnapshot.opens} opens`}
                 subtitle={`${emailSnapshot.sends} sends logged · ${emailSnapshot.clicks} clicks`}
+                size="compact"
               />
             ) : (
-              <KpiCard title="Email" status="not-connected" subtitle="No Campaign Monitor sends logged" />
+              <KpiCard title="Email" status="not-connected" subtitle="No Campaign Monitor sends logged" size="compact" />
             )}
-            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" />
+            <KpiCard title="Social" status="not-connected" subtitle="No integration configured" size="compact" />
+            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" size="compact" />
             {callsSnapshot ? (
-              <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} />
+              <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (
-              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" />
+              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" size="compact" />
             )}
           </div>
         </div>
