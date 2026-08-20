@@ -188,7 +188,10 @@ async function runWave1Report(
             {
               filter: {
                 fieldName: 'customEvent:utm_campaign',
-                value: 'q3_education_wave1_repair',
+                stringFilter: {
+                  matchType: 'EXACT',
+                  value: 'q3_education_wave1_repair',
+                },
               },
             },
           ],
