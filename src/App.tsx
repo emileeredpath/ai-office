@@ -22,6 +22,7 @@ import { CampaignsScreen } from '@/screens/CampaignsScreen';
 import { CampaignDetailScreen } from '@/screens/CampaignDetailScreen';
 import { CalendarScreen } from '@/screens/CalendarScreen';
 import { PerformanceScreen } from '@/screens/PerformanceScreen';
+import { LeadsCrmScreen } from '@/screens/LeadsCrmScreen';
 import { MetricsScreen } from '@/screens/MetricsScreen';
 import { PpcScreen } from '@/screens/PpcScreen';
 import { InfinityTrackingScreen } from '@/screens/InfinityTrackingScreen';
@@ -31,22 +32,22 @@ import { useAppStore } from '@/store/useAppStore';
 import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'ppc' | 'infinity' | 'funding' | 'metrics' | 'settings';
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'infinity' | 'funding' | 'metrics' | 'settings';
 
 // Sidebar labels reflect the long-term MTech Marketing Hub navigation from
 // the approved V2 mockup. Every label maps to an existing, unmodified
-// screen (id = the Screen it opens) except the two items flagged
-// `comingSoon: true` — Leads & CRM and Uploads have no real screen to open
-// yet, so they're shown (per the shell's information architecture) but
-// disabled rather than faked. "Reports" restores MetricsScreen, which had
-// no sidebar entry before this change (a pre-existing dead route, not a
-// regression introduced here).
+// screen (id = the Screen it opens) except the one item still flagged
+// `comingSoon: true` — Uploads has no real screen to open yet, so it's
+// shown (per the shell's information architecture) but disabled rather
+// than faked. "Reports" restores MetricsScreen, which had no sidebar
+// entry before this change (a pre-existing dead route, not a regression
+// introduced here).
 const PRIMARY_NAV: NavItem[] = [
   { id: 'home' as Screen, icon: LayoutDashboard, label: 'Overview' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Content & Calendar' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Performance' },
-  { id: null, icon: Users, label: 'Leads & CRM', comingSoon: true },
+  { id: 'leads' as Screen, icon: Users, label: 'Leads & CRM' },
   { id: 'ppc' as Screen, icon: TrendingUp, label: 'PPC' },
   { id: 'infinity' as Screen, icon: Phone, label: 'Call Tracking' },
   { id: 'funding' as Screen, icon: Landmark, label: 'Funding' },
@@ -82,6 +83,8 @@ export default function App() {
         return <CampaignsScreen />;
       case 'dashboard':
         return <PerformanceScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
+      case 'leads':
+        return <LeadsCrmScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'calendar':
         return <CalendarScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'ppc':
