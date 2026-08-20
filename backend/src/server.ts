@@ -20,6 +20,12 @@ import { initMarketingTables } from './db/marketingRepository.js';
 import { syncCampaignMonitor } from './services/campaignMonitor.js';
 import { syncWave1Ga4, syncWave1Infinity } from './services/wave1Sync.js';
 import './scripts/seed.js';
+import { runPreviewSeed } from './scripts/previewSeed.js';
+
+// Preview-only sample data (dashboard-v2 Railway preview service). No-ops
+// unless both PREVIEW_SEED_ENABLED=true and DATABASE_PATH contains
+// "/preview/" — see scripts/previewSeed.ts. Never runs against production.
+runPreviewSeed();
 
 // Last-resort diagnostic net. Node's own default behavior on an uncaught
 // exception is to log and exit — registering a handler here overrides that,
