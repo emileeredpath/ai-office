@@ -1338,6 +1338,50 @@ h3 {
   color: var(--color-text-primary);
 }
 
+.v2-progress-mini-track {
+  width: 64px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.v2-progress-mini-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--v2-purple);
+}
+
+.v2-not-connected-text {
+  color: var(--v2-grey);
+  font-size: 13px;
+}
+
+.v2-campaigns-table tbody tr {
+  cursor: pointer;
+}
+
+.v2-campaigns-table tbody tr:hover {
+  background-color: var(--v2-surface);
+}
+
+.v2-row-name-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+.v2-row-name-btn:hover {
+  color: var(--v2-purple);
+}
+
 .v2-empty-state {
   text-align: center;
   padding: 2.5rem 1rem;

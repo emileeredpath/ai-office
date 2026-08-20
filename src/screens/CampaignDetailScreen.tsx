@@ -7,7 +7,8 @@ import { EditCampaignModal } from '@/components/campaigns/EditCampaignModal';
 import { CampaignCalendarTab } from '@/components/campaigns/CampaignCalendarTab';
 import { CampaignPerformanceTab } from '@/components/campaigns/CampaignPerformanceTab';
 import { formatDateShort } from '@/utils/dateUtils';
-import { CampaignStatus } from '@/types/index';
+import { getCampaignProgressInfo } from '@/utils/campaignProgress';
+import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 type DetailTab = 'overview' | 'performance' | 'leads' | 'opportunities' | 'content' | 'calendar' | 'files' | 'notes';
@@ -22,44 +23,6 @@ const TABS: { id: DetailTab; label: string }[] = [
   { id: 'files', label: 'Files' },
   { id: 'notes', label: 'Notes' },
 ];
-
-const STATUS_BADGE_STYLE: Record<CampaignStatus, { background: string; color: string }> = {
-  active: { background: '#10b981', color: 'white' },
-  completed: { background: '#9ca3af', color: 'white' },
-  planning: { background: '#3b82f6', color: 'white' },
-  'on-hold': { background: '#f59e0b', color: 'white' },
-};
-
-const STATUS_LABEL: Record<CampaignStatus, string> = {
-  active: 'Active',
-  completed: 'Completed',
-  planning: 'Planning',
-  'on-hold': 'On Hold',
-};
-
-function getProgressInfo(status: CampaignStatus, startDate: Date, endDate: Date) {
-  const now = new Date();
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  if (status === 'completed') {
-    const daysAgo = Math.round((now.getTime() - end.getTime()) / dayMs);
-    return { percent: 100, label: daysAgo > 0 ? `Completed — ended ${daysAgo}d ago` : 'Completed' };
-  }
-  if (now < start) {
-    const daysUntil = Math.round((start.getTime() - now.getTime()) / dayMs);
-    return { percent: 0, label: `Starts in ${daysUntil}d` };
-  }
-  if (now > end) {
-    return { percent: 100, label: 'Past end date' };
-  }
-  const total = end.getTime() - start.getTime();
-  const elapsed = now.getTime() - start.getTime();
-  const percent = total > 0 ? Math.min(100, Math.max(0, Math.round((elapsed / total) * 100))) : 0;
-  const daysRemaining = Math.max(0, Math.round((end.getTime() - now.getTime()) / dayMs));
-  return { percent, label: `${daysRemaining}d remaining` };
-}
 
 function describeAuditEntry(entry: AuditLogEntry): string {
   const value = (entry.newValue ?? entry.previousValue) as any;
@@ -142,7 +105,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   }
 
   const entities = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
-  const progress = getProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
+  const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
   const recipients = campaign.recipients || emailSends.reduce((sum, t) => sum + (t.recipients || 0), 0);
   const eligibleSpend = campaign.budget || 0;
   const recoverable = campaign.cofundRate != null && campaign.budget ? Math.round((campaign.budget * campaign.cofundRate) / 100) : 0;
@@ -168,8 +131,8 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
               {entities.map((entity) => (
                 <BrandBadge key={entity} brand={entity} />
               ))}
-              <span className="badge" style={{ ...STATUS_BADGE_STYLE[campaign.status], fontSize: '11px' }}>
-                {STATUS_LABEL[campaign.status]}
+              <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[campaign.status], fontSize: '11px' }}>
+                {CAMPAIGN_STATUS_LABEL[campaign.status]}
               </span>
               {(campaign.primaryIndustry || campaign.secondaryIndustry) && (
                 <span className="v2-detail-meta-dot">
