@@ -13,6 +13,7 @@ import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { isWave1Campaign } from '@/utils/wave1';
+import { getMarketingEvents } from '@/utils/marketingEvents';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
@@ -234,6 +235,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // visible inside Campaign Detail's Calendar tab), and real funding claim
   // deadlines into one sorted feed. Microsoft To Do deadlines are not wired
   // in yet — Microsoft To Do remains the primary personal task manager.
+  // Computation itself is shared with Content & Calendar via
+  // src/utils/marketingEvents.ts — this block only maps that shared output
+  // to the same three kinds ('task' | 'milestone' | 'funding') and the same
+  // click behaviour this section always had, so its rendered output is
+  // unchanged (email-send tasks render as 'task' here, exactly as before —
+  // Content & Calendar is the only place that distinguishes them).
   type ComingUpKind = 'task' | 'milestone' | 'funding';
   interface ComingUpItem {
     id: string;
@@ -246,33 +253,35 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   const comingUp = useMemo<ComingUpItem[]>(() => {
     const now = new Date();
-    const items: ComingUpItem[] = [];
+    const events = getMarketingEvents({
+      tasks,
+      campaigns,
+      fundingRecords,
+      matchesSelectedEntity,
+      rangeStart: now,
+      includeCompleted: false,
+      includeCampaignMarkers: false,
+    });
 
-    for (const t of entityTasks) {
-      if (t.status === 'complete' || !t.deadline || new Date(t.deadline) < now) continue;
-      const campaign = campaigns.find((c) => c.id === t.campaignId);
-      items.push({ id: `task-${t.id}`, kind: 'task', title: t.title, due: new Date(t.deadline), context: campaign?.name, onClick: () => selectTask(t.id) });
-    }
+    const items: ComingUpItem[] = events.map((e) => ({
+      id: e.id,
+      kind: e.kind === 'email' ? 'task' : (e.kind as ComingUpKind),
+      title: e.title,
+      due: e.date,
+      // Tasks (including email-sends, which render as plain 'task' here)
+      // always showed the linked campaign name as context, never the send
+      // stats — matches the original behaviour exactly.
+      context: e.kind === 'funding' ? e.subtitle : e.campaignName,
+      onClick:
+        e.kind === 'funding'
+          ? () => onNavigate?.('funding')
+          : e.kind === 'milestone'
+          ? () => selectCampaign(e.campaignId!)
+          : () => selectTask(e.taskId!),
+    }));
 
-    for (const c of entityCampaigns) {
-      for (const s of c.schedule || []) {
-        if (!s.date || s.status === 'complete') continue;
-        const d = new Date(s.date);
-        if (d < now) continue;
-        items.push({ id: `milestone-${c.id}-${s.date}-${s.element}`, kind: 'milestone', title: s.element, due: d, context: c.name, onClick: () => selectCampaign(c.id) });
-      }
-    }
-
-    for (const r of entityFundingRecords) {
-      if (r.archived || !r.claimDeadline) continue;
-      if (r.claimStatus !== 'eligible' && r.claimStatus !== 'submitted') continue;
-      const d = new Date(r.claimDeadline);
-      if (d < now) continue;
-      items.push({ id: `funding-${r.id}`, kind: 'funding', title: `${r.vendor} funding claim due`, due: d, context: r.schemeName, onClick: () => onNavigate?.('funding') });
-    }
-
-    return items.sort((a, b) => a.due.getTime() - b.due.getTime()).slice(0, 6);
-  }, [entityTasks, entityCampaigns, entityFundingRecords, campaigns, selectTask, selectCampaign, onNavigate]);
+    return items.slice(0, 6);
+  }, [tasks, campaigns, fundingRecords, matchesSelectedEntity, selectTask, selectCampaign, onNavigate]);
 
   // ---- Active Campaigns (compact) ---------------------------------------
   // Date-based progress, shared with Campaign Detail and the Campaigns

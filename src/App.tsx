@@ -83,7 +83,7 @@ export default function App() {
       case 'dashboard':
         return <DashboardScreen />;
       case 'calendar':
-        return <CalendarScreen />;
+        return <CalendarScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'ppc':
         return <PpcScreen />;
       case 'infinity':

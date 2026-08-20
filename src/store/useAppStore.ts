@@ -69,6 +69,10 @@ interface AppState {
   campaigns: Campaign[];
   selectedTaskId: string | null;
   selectedCampaignId: string | null;
+  // Optional deep-link into a specific Campaign Detail tab (e.g. 'calendar')
+  // when navigating there from elsewhere, such as clicking a milestone on
+  // Content & Calendar. Cleared whenever selectedCampaignId is cleared.
+  selectedCampaignInitialTab: string | null;
   apiConnected: boolean;
   apiSyncing: boolean;
 
@@ -98,7 +102,7 @@ interface AppState {
   updateCampaign: (id: string, updates: Partial<Campaign>) => Promise<void>;
   deleteCampaign: (id: string) => Promise<void>;
   getCampaignById: (id: string) => Campaign | undefined;
-  selectCampaign: (id: string | null) => void;
+  selectCampaign: (id: string | null, initialTab?: string) => void;
   syncCampaignsFromApi: () => Promise<void>;
 
   // Wave 1 data
@@ -177,6 +181,7 @@ export const useAppStore = create<AppState>((set, get) => {
     campaigns: [],
     selectedTaskId: null,
     selectedCampaignId: null,
+    selectedCampaignInitialTab: null,
     apiConnected: false,
     apiSyncing: false,
     wave1Performance: null,
@@ -425,8 +430,8 @@ export const useAppStore = create<AppState>((set, get) => {
       return get().campaigns.find((c) => c.id === id);
     },
 
-    selectCampaign: (id: string | null) => {
-      set({ selectedCampaignId: id });
+    selectCampaign: (id: string | null, initialTab?: string) => {
+      set({ selectedCampaignId: id, selectedCampaignInitialTab: id ? initialTab ?? null : null });
     },
 
     syncCampaignsFromApi: async () => {

@@ -52,8 +52,12 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const deleteCampaign = useAppStore((s) => s.deleteCampaign);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
+  // Set (and consumed) via selectCampaign(id, 'calendar') — lets other
+  // screens (Content & Calendar) deep-link straight into a specific tab
+  // instead of always landing on Overview.
+  const selectedCampaignInitialTab = useAppStore((s) => s.selectedCampaignInitialTab);
 
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [activeTab, setActiveTab] = useState<DetailTab>((selectedCampaignInitialTab as DetailTab) || 'overview');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -61,8 +65,11 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const [toastId, setToastId] = useState(0);
 
   useEffect(() => {
-    setActiveTab('overview');
+    setActiveTab((selectedCampaignInitialTab as DetailTab) || 'overview');
     setShowOverflowMenu(false);
+    // Only re-run when the campaign actually changes, not on every store
+    // update — selectedCampaignInitialTab is read once at navigation time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId]);
 
   useEffect(() => {
