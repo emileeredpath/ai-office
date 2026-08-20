@@ -230,7 +230,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered — see Call Tracking`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (
-              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" size="compact" />
+              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" onClick={() => onNavigate?.('infinity')} size="compact" />
             )}
           </div>
         </div>

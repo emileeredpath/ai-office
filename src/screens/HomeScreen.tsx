@@ -567,7 +567,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (
-              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" size="compact" />
+              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" onClick={() => onNavigate?.('infinity')} size="compact" />
             )}
           </div>
         </div>
