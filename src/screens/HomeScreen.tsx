@@ -43,6 +43,15 @@ function describeAuditEntry(entry: AuditLogEntry): string {
   return `${verb} ${resourceLabel} "${label}"`;
 }
 
+// Small type chip for Recent Activity, derived from the audit log's own
+// resource_type — no new data, just a clearer label on what already exists.
+function activityKind(resourceType: string): { kind: string; label: string } {
+  if (resourceType === 'task') return { kind: 'task', label: 'Task' };
+  if (resourceType === 'campaign') return { kind: 'campaign', label: 'Campaign' };
+  if (resourceType === 'funding_record') return { kind: 'funding', label: 'Funding' };
+  return { kind: 'other', label: resourceType.replace(/_/g, ' ') };
+}
+
 function timeAgo(iso: string | undefined): string {
   if (!iso) return '—';
   const then = new Date(iso).getTime();
@@ -285,9 +294,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const emailSendTasks = useMemo(() => entityTasks.filter((t) => t.type === 'email-send'), [entityTasks]);
   const emailSnapshot = useMemo(() => {
     if (emailSendTasks.length === 0) return null;
+    // `opens`/`clicks` are null (not 0) on a send until Campaign Monitor's
+    // engagement sync actually populates them — treating null as 0 would
+    // silently claim "0 opens" when open data was never reported at all.
+    const hasOpenData = emailSendTasks.some((t) => t.opens != null);
+    const hasClickData = emailSendTasks.some((t) => t.clicks != null);
     const totalOpens = emailSendTasks.reduce((sum, t) => sum + (t.opens || 0), 0);
     const totalClicks = emailSendTasks.reduce((sum, t) => sum + (t.clicks || 0), 0);
-    return { sends: emailSendTasks.length, opens: totalOpens, clicks: totalClicks };
+    return { sends: emailSendTasks.length, opens: totalOpens, clicks: totalClicks, hasOpenData, hasClickData };
   }, [emailSendTasks]);
 
   // Infinity's real data today is scoped to one hardcoded campaign (see
@@ -366,7 +380,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           <KpiCard
             title="Marketing Spend"
             value={`£${Math.round(marketingSpend).toLocaleString()}`}
-            subtitle="From campaign budgets"
+            subtitle="Manually logged campaign spend"
             onClick={() => onNavigate?.('campaigns')}
           />
         </div>
@@ -393,7 +407,6 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                       onClick={item.onClick}
                       className="v2-attention-item w-full flex items-start gap-2 text-left px-3 py-2 rounded"
                       data-severity={item.severity}
-                      style={{ border: '1px solid transparent' }}
                     >
                       {item.severity === 'red' ? (
                         <AlertTriangle size={14} color="var(--v2-red)" style={{ marginTop: 2, flexShrink: 0 }} />
@@ -492,9 +505,17 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <span className="v2-progress-mini-track" style={{ width: 60 }}>
-                        <span className="v2-progress-mini-fill" style={{ width: `${c.progress.percent}%`, display: 'block' }} />
+                        <span
+                          className="v2-progress-mini-fill"
+                          style={{ width: `${c.progress.percent}%`, display: 'block', backgroundColor: c.progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}
+                        />
                       </span>
-                      <span className="text-xs text-text-secondary">{c.progress.percent}% · {c.progress.label}</span>
+                      <span
+                        className="text-xs"
+                        style={{ color: c.progress.statusInconsistent ? 'var(--v2-orange)' : 'var(--color-text-secondary)', fontWeight: c.progress.statusInconsistent ? 600 : 400 }}
+                      >
+                        {c.progress.percent}% · {c.progress.label}
+                      </span>
                     </div>
                     <div className="v2-mini-campaign-stats">
                       <div>
@@ -516,17 +537,23 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             )}
           </div>
 
-          <div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <h2 className="v2-section-title">Recent Activity</h2>
-            <div className="card">
+            <div className="card" style={{ flex: 1 }}>
               {visibleActivity.length > 0 ? (
                 <div className="space-y-3">
-                  {visibleActivity.map((entry) => (
-                    <div key={entry.id} className="text-sm" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                      <div className="text-text-primary">{describeAuditEntry(entry)}</div>
-                      <div className="text-xs text-text-secondary mt-1">{formatDateShort(entry.createdAt)}</div>
-                    </div>
-                  ))}
+                  {visibleActivity.map((entry) => {
+                    const { kind, label } = activityKind(entry.resourceType);
+                    return (
+                      <div key={entry.id} className="text-sm" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="v2-coming-up-kind" data-kind={kind}>{label}</span>
+                          <span className="text-xs text-text-secondary">{formatDateShort(entry.createdAt)}</span>
+                        </div>
+                        <div className="text-text-primary">{describeAuditEntry(entry)}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-text-secondary text-sm">No recent activity{isGroupView ? '' : ' for this entity'}</p>
@@ -543,8 +570,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             {emailSnapshot ? (
               <KpiCard
                 title="Email"
-                value={`${emailSnapshot.opens} opens`}
-                subtitle={`${emailSnapshot.sends} sends logged · ${emailSnapshot.clicks} clicks`}
+                value={emailSnapshot.hasOpenData ? `${emailSnapshot.opens} opens` : `${emailSnapshot.sends} sends logged`}
+                subtitle={
+                  emailSnapshot.hasOpenData
+                    ? `${emailSnapshot.sends} sends logged · ${emailSnapshot.hasClickData ? `${emailSnapshot.clicks} clicks` : 'click data unavailable'}`
+                    : 'Open/click data unavailable for these sends'
+                }
                 size="compact"
               />
             ) : (

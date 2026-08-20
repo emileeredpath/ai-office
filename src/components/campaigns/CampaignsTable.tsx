@@ -98,10 +98,17 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, onSelectCamp
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
-                      <span className="v2-progress-mini-track">
-                        <span className="v2-progress-mini-fill" style={{ width: `${progress.percent}%`, display: 'block' }} />
+                      <span className="v2-progress-mini-track" title={progress.statusInconsistent ? progress.label : undefined}>
+                        <span
+                          className="v2-progress-mini-fill"
+                          style={{ width: `${progress.percent}%`, display: 'block', backgroundColor: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}
+                        />
                       </span>
-                      <span className="text-xs text-text-secondary" style={{ whiteSpace: 'nowrap' }}>
+                      <span
+                        className="text-xs"
+                        style={{ whiteSpace: 'nowrap', color: progress.statusInconsistent ? 'var(--v2-orange)' : 'var(--color-text-secondary)', fontWeight: progress.statusInconsistent ? 600 : 400 }}
+                        title={progress.statusInconsistent ? progress.label : undefined}
+                      >
                         {progress.percent}%
                       </span>
                     </div>

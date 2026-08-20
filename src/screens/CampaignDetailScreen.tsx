@@ -177,10 +177,12 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
         <div className="v2-progress-wrap">
           <div className="v2-progress-row">
             <span className="font-medium text-text-primary">{progress.percent}% complete</span>
-            <span className="text-text-secondary">{progress.label}</span>
+            <span style={{ color: progress.statusInconsistent ? 'var(--v2-orange)' : 'var(--color-text-secondary)', fontWeight: progress.statusInconsistent ? 600 : 400 }}>
+              {progress.label}
+            </span>
           </div>
           <div className="v2-progress-track">
-            <div className="v2-progress-fill" style={{ width: `${progress.percent}%` }} />
+            <div className="v2-progress-fill" style={{ width: `${progress.percent}%`, backgroundColor: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }} />
           </div>
         </div>
 

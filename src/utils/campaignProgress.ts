@@ -3,6 +3,10 @@ import { CampaignStatus } from '@/types/index';
 export interface CampaignProgressInfo {
   percent: number;
   label: string;
+  // True when the campaign's own end date has passed but its status is
+  // still something other than "completed" — a real inconsistency in the
+  // data (not something we silently fix by changing the status).
+  statusInconsistent?: boolean;
 }
 
 // Shared by Campaign Detail and the Campaigns table so both screens agree on
@@ -23,7 +27,9 @@ export function getCampaignProgressInfo(status: CampaignStatus, startDate: Date,
     return { percent: 0, label: `Starts in ${daysUntil}d` };
   }
   if (now > end) {
-    return { percent: 100, label: 'Past end date' };
+    // The campaign's own end date has passed but nobody marked it
+    // "completed" — flag this rather than implying a healthy 100%.
+    return { percent: 100, label: 'Ended — status needs updating', statusInconsistent: true };
   }
   const total = end.getTime() - start.getTime();
   const elapsed = now.getTime() - start.getTime();
