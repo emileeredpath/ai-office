@@ -21,7 +21,7 @@ import { MyTasksScreen } from '@/screens/MyTasksScreen';
 import { CampaignsScreen } from '@/screens/CampaignsScreen';
 import { CampaignDetailScreen } from '@/screens/CampaignDetailScreen';
 import { CalendarScreen } from '@/screens/CalendarScreen';
-import { DashboardScreen } from '@/screens/DashboardScreen';
+import { PerformanceScreen } from '@/screens/PerformanceScreen';
 import { MetricsScreen } from '@/screens/MetricsScreen';
 import { PpcScreen } from '@/screens/PpcScreen';
 import { InfinityTrackingScreen } from '@/screens/InfinityTrackingScreen';
@@ -81,7 +81,7 @@ export default function App() {
       case 'campaigns':
         return <CampaignsScreen />;
       case 'dashboard':
-        return <DashboardScreen />;
+        return <PerformanceScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'calendar':
         return <CalendarScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'ppc':

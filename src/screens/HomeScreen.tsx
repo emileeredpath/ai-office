@@ -9,11 +9,12 @@ import { KpiCard } from '@/components/common/KpiCard';
 import { MarketingFunnel, type FunnelStage } from '@/components/common/MarketingFunnel';
 import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataFreshnessBar';
 import { BrandBadge } from '@/components/common/BrandBadge';
-import { formatDate, formatDateShort } from '@/utils/dateUtils';
+import { formatDate, formatDateShort, timeAgo } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
-import { isWave1Campaign } from '@/utils/wave1';
 import { getMarketingEvents } from '@/utils/marketingEvents';
+import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
+import { getEmailSnapshot, getCallsSnapshot } from '@/utils/channelSnapshot';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
@@ -51,20 +52,6 @@ function activityKind(resourceType: string): { kind: string; label: string } {
   if (resourceType === 'campaign') return { kind: 'campaign', label: 'Campaign' };
   if (resourceType === 'funding_record') return { kind: 'funding', label: 'Funding' };
   return { kind: 'other', label: resourceType.replace(/_/g, ' ') };
-}
-
-function timeAgo(iso: string | undefined): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '—';
-  const diffMs = Date.now() - then;
-  const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
 }
 
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
@@ -117,10 +104,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   );
 
   const periodStart = useMemo(() => periodStartDate(period), [period]);
-  const periodCampaigns = useMemo(() => {
-    if (!periodStart) return entityCampaigns;
-    return entityCampaigns.filter((c) => c.startDate >= periodStart || c.endDate >= periodStart);
-  }, [entityCampaigns, periodStart]);
+  const periodCampaigns = useMemo(
+    () => filterCampaignsByPeriod(entityCampaigns, periodStart),
+    [entityCampaigns, periodStart]
+  );
 
   // ---- Headline KPIs (5) — real data only, honest "Not connected" ---
   // Marketing Leads and Marketing Spend come from manually-logged campaign
@@ -129,8 +116,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // Acumatica data. Open Pipeline, Won Revenue, Opportunities and Won Deals
   // have no data source in the app today (no CRM/Acumatica integration
   // exists) — they show "Not connected" rather than £0 or an invented figure.
-  const marketingLeads = useMemo(() => periodCampaigns.reduce((sum, c) => sum + (c.leads || 0), 0), [periodCampaigns]);
-  const marketingSpend = useMemo(() => periodCampaigns.reduce((sum, c) => sum + (c.spend || 0), 0), [periodCampaigns]);
+  // Shared with Performance via src/utils/campaignMetrics.ts so the two
+  // pages can never disagree on these totals.
+  const marketingLeads = useMemo(() => sumLeads(periodCampaigns), [periodCampaigns]);
+  const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
   const liveCampaignsCount = useMemo(() => entityCampaigns.filter((c) => c.status === 'active').length, [entityCampaigns]);
 
   // ---- Marketing Funnel -----------------------------------------------
@@ -140,10 +129,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // never previously aggregated — this is a genuine improvement using
   // existing data, not an invented number.
   // Opportunities / Won Deals: no CRM data model exists — not connected.
-  const enquiriesTotal = useMemo(
-    () => periodCampaigns.reduce((sum, c) => sum + (c.results?.enquiriesReceived || 0), 0),
-    [periodCampaigns]
-  );
+  const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
   const funnelStages: FunnelStage[] = [
     { label: 'Website Visits', value: null, subtitle: 'Awaiting GA4 integration' },
     { label: 'Enquiries', value: enquiriesTotal, subtitle: 'Manually logged per campaign' },
@@ -299,29 +285,15 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // these) if any exist; otherwise honestly "Not connected". Social and PPC
   // have no real data source at all (PPC screen is confirmed mock data — see
   // Phase 1A instructions — never surfaced here). Calls use the real
-  // Infinity wave1Performance response when configured.
-  const emailSendTasks = useMemo(() => entityTasks.filter((t) => t.type === 'email-send'), [entityTasks]);
-  const emailSnapshot = useMemo(() => {
-    if (emailSendTasks.length === 0) return null;
-    // `opens`/`clicks` are null (not 0) on a send until Campaign Monitor's
-    // engagement sync actually populates them — treating null as 0 would
-    // silently claim "0 opens" when open data was never reported at all.
-    const hasOpenData = emailSendTasks.some((t) => t.opens != null);
-    const hasClickData = emailSendTasks.some((t) => t.clicks != null);
-    const totalOpens = emailSendTasks.reduce((sum, t) => sum + (t.opens || 0), 0);
-    const totalClicks = emailSendTasks.reduce((sum, t) => sum + (t.clicks || 0), 0);
-    return { sends: emailSendTasks.length, opens: totalOpens, clicks: totalClicks, hasOpenData, hasClickData };
-  }, [emailSendTasks]);
-
-  // Infinity's real data today is scoped to one hardcoded campaign (see
-  // isWave1Campaign) — only surface it here if that campaign actually
-  // belongs to the currently-selected entity, otherwise it would silently
-  // show another entity's figure under the wrong selection.
-  const wave1TargetCampaign = useMemo(() => campaigns.find(isWave1Campaign), [campaigns]);
+  // Infinity wave1Performance response when configured. Shared with
+  // Performance's Channel Summary via src/utils/channelSnapshot.ts so the
+  // two pages can never disagree.
+  const emailSnapshot = useMemo(() => getEmailSnapshot(entityTasks), [entityTasks]);
+  const callsSnapshot = useMemo(
+    () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
+    [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const infinityConfigured = wave1Performance?.infinityConfigured === true;
-  const infinityMatchesEntity = wave1TargetCampaign ? matchesSelectedEntity(wave1TargetCampaign.brand) : false;
-  const callsSnapshot =
-    infinityConfigured && infinityMatchesEntity && wave1Performance?.infinity ? wave1Performance.infinity : null;
 
   // ---- Recent Activity — respect the global entity selector -------------
   // audit_log rows don't carry a brand column directly, so entity-scoping
