@@ -23,11 +23,11 @@ export function resolveCallDateRange(period: Period, now: Date = new Date()): { 
   };
 }
 
-// A call is only ever "bridged" once a person actually connects — used as
-// the answered/missed signal since Infinity's callState enum values
-// aren't confirmed against the real account yet (see infinity.ts).
-function isAnswered(call: InfinityCallRecord): boolean {
-  return (call.bridgeDuration ?? 0) > 0;
+// Confirmed against real Infinity responses: a call reaching the "bridge"
+// stage is genuinely answered/connected. callState is a hangup-reason
+// code, not an answered signal, and is not used here — see infinity.ts.
+export function isAnswered(call: InfinityCallRecord): boolean {
+  return call.callStage === 'bridge';
 }
 
 function formatDuration(seconds: number): string {
@@ -47,10 +47,15 @@ export interface CallPerformanceInfo {
 }
 
 function summarize(calls: InfinityCallRecord[], subtitle: string): CallPerformanceInfo {
-  const answeredCalls = calls.filter(isAnswered).length;
+  const answered = calls.filter(isAnswered);
+  const answeredCalls = answered.length;
   const missedCalls = calls.length - answeredCalls;
-  const durations = calls.map((c) => c.callDuration ?? 0);
-  const avgSeconds = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+  // Average Call Duration = connected/talk time (bridgeDuration), averaged
+  // across answered calls only — a missed call has no connected duration
+  // to average in.
+  const bridgeDurations = answered.map((c) => c.bridgeDuration ?? 0);
+  const avgSeconds =
+    bridgeDurations.length > 0 ? Math.round(bridgeDurations.reduce((a, b) => a + b, 0) / bridgeDurations.length) : 0;
   return {
     status: 'available',
     totalCalls: calls.length,

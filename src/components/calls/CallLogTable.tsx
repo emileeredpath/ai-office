@@ -1,6 +1,7 @@
 import { Phone, PhoneOff, Database, Users } from 'lucide-react';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import type { InfinityCallRecord } from '@/services/infinityCallsApi';
+import { isAnswered } from '@/utils/callPerformance';
 
 const COLUMNS = [
   'Date / Time',
@@ -21,10 +22,6 @@ const COLUMNS = [
 const NotAvailable = ({ label = 'Not available' }: { label?: string }) => (
   <span className="v2-not-connected-text">{label}</span>
 );
-
-function isAnswered(call: InfinityCallRecord): boolean {
-  return (call.bridgeDuration ?? 0) > 0;
-}
 
 function formatDuration(seconds: number | null): string {
   if (seconds == null) return '—';
@@ -141,7 +138,7 @@ export function CallLogTable({ calls, infinityConfigured, showRealTotals }: Call
                 <td className="text-xs text-text-secondary" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {call.landingPageUrl || <NotAvailable />}
                 </td>
-                <td>{formatDuration(call.callDuration)}</td>
+                <td>{formatDuration(answered ? call.bridgeDuration : call.callDuration)}</td>
                 <td>
                   <span
                     className="badge inline-flex items-center gap-1"

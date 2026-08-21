@@ -9,6 +9,17 @@
 //            has no concept of AI Office's internal campaign IDs)
 //   - The response body is newline-delimited JSON (one call object per
 //     line), not a single JSON document with a `calls[]` wrapper.
+//   - Answered/missed: `callStage === 'bridge'` means the call connected to
+//     a person — confirmed against real responses. `callState` (e.g.
+//     NORMAL_CLEARING_A/B) is a hangup-reason code, not an answered signal,
+//     and is not used for this. Connected-call duration is the numeric
+//     `bridgeDuration` field (seconds) — averaged across answered calls
+//     only, never across all calls. `callDuration` (ring + connected) is
+//     kept on the record but not used for this metric.
+//   - Pagination: confirmed real (limit/offset both honoured; a 30-day,
+//     125-row window was not truncated at limit=1000). No pagination loop
+//     is implemented yet — add one if a single window is ever observed at
+//     exactly 1000 rows, which would indicate real truncation.
 //
 // Entity attribution: the account's one IGRP (id set via INFINITY_IGRP_ID)
 // contains calls for multiple MTech entities, distinguished by each call's
@@ -55,24 +66,36 @@ export interface InfinityCallRecord {
   src: string | null;
   dialledPhoneNumber: string | null;
   customerPhoneNumber: string | null;
-  // Seconds. Total call duration (ring + connected).
+  // Seconds. Ring + connected — kept on the record, but not used as the
+  // connected-conversation duration (bridgeDuration is, see below).
   callDuration: number | null;
-  // Seconds. Only non-zero once a call is actually bridged to a person —
-  // used as the "answered" signal (see isAnswered below) since Infinity's
-  // `callState` enum values aren't confirmed against the real account yet.
+  // Seconds. The genuine connected/talk duration once a call reaches the
+  // "bridge" stage. Used for Average Call Duration, averaged across
+  // answered calls only.
   bridgeDuration: number | null;
   ringTime: number | null;
-  // Surfaced as-is, unclassified — once real callState values are
-  // confirmed, this can replace the bridgeDuration heuristic below.
+  // The stage the call reached: 'bridge' means answered/connected — the
+  // confirmed real signal (see isAnswered below). Not to be confused with
+  // callState, which is a hangup-reason code (e.g. NORMAL_CLEARING_A/B),
+  // not an answered/missed signal.
+  callStage: string | null;
+  // Hangup-reason code, surfaced as-is — not used for answered/missed.
   callState: string | null;
   callDirection: string | null;
   landingPageUrl: string | null;
   conversionPageUrl: string | null;
+  // Kept for future marketing-attribution use, not consumed yet.
+  pageTitle: string | null;
+  campaign: string | null;
+  adGroup: string | null;
   ppcAssisted: boolean | null;
 }
 
+// Confirmed against real responses: a call reaching the "bridge" stage is
+// a genuinely answered/connected call. Any other final stage (ring, ivr,
+// queue, voicemail) is treated as missed for this metric.
 function isAnswered(call: InfinityCallRecord): boolean {
-  return (call.bridgeDuration ?? 0) > 0;
+  return call.callStage === 'bridge';
 }
 
 export interface InfinityCallsResult {
@@ -98,10 +121,14 @@ interface RawCallRow {
   callDuration?: number;
   bridgeDuration?: number;
   ringTime?: number;
+  callStage?: string;
   callState?: string;
   callDirection?: string;
   landingPageUrl?: string;
   conversionPageUrl?: string;
+  pageTitle?: string;
+  campaign?: string;
+  adGroup?: string;
   ppcAssisted?: boolean;
 }
 
@@ -137,10 +164,14 @@ function toCallRecord(row: RawCallRow): InfinityCallRecord {
     callDuration: typeof row.callDuration === 'number' ? row.callDuration : null,
     bridgeDuration: typeof row.bridgeDuration === 'number' ? row.bridgeDuration : null,
     ringTime: typeof row.ringTime === 'number' ? row.ringTime : null,
+    callStage: row.callStage ?? null,
     callState: row.callState ?? null,
     callDirection: row.callDirection ?? null,
     landingPageUrl: row.landingPageUrl ?? null,
     conversionPageUrl: row.conversionPageUrl ?? null,
+    pageTitle: row.pageTitle ?? null,
+    campaign: row.campaign ?? null,
+    adGroup: row.adGroup ?? null,
     ppcAssisted: typeof row.ppcAssisted === 'boolean' ? row.ppcAssisted : null,
   };
 }
@@ -249,16 +280,21 @@ export async function getWave1CallMetrics(): Promise<InfinityResult> {
   }
 
   const { calls } = result;
-  const answeredCalls = calls.filter(isAnswered).length;
+  const answered = calls.filter(isAnswered);
+  const answeredCalls = answered.length;
   const missedCalls = calls.length - answeredCalls;
-  const durations = calls.map((c) => c.callDuration ?? 0);
-  const avgSeconds = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+  // Average Call Duration = connected/talk time (bridgeDuration), averaged
+  // across answered calls only — never across missed calls, which have no
+  // connected duration to average in.
+  const bridgeDurations = answered.map((c) => c.bridgeDuration ?? 0);
+  const avgSeconds =
+    bridgeDurations.length > 0 ? Math.round(bridgeDurations.reduce((a, b) => a + b, 0) / bridgeDurations.length) : 0;
 
   const callData: CallData[] = calls.map((c) => ({
     id: c.rowId,
     date: c.triggerDatetime.split('T')[0] ?? '',
     time: c.triggerDatetime.split('T')[1]?.slice(0, 5) ?? '',
-    duration: formatDuration(c.callDuration ?? 0),
+    duration: formatDuration(isAnswered(c) ? c.bridgeDuration ?? 0 : c.callDuration ?? 0),
     answered: isAnswered(c),
     callerNumber: c.customerPhoneNumber ?? '',
     campaign: '',

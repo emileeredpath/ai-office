@@ -14,10 +14,17 @@ export interface InfinityCallRecord {
   callDuration: number | null;
   bridgeDuration: number | null;
   ringTime: number | null;
+  // 'bridge' means answered/connected — see callPerformance.ts's isAnswered.
+  callStage: string | null;
+  // Hangup-reason code (e.g. NORMAL_CLEARING_A/B) — not an answered signal.
   callState: string | null;
   callDirection: string | null;
   landingPageUrl: string | null;
   conversionPageUrl: string | null;
+  // Kept for future marketing-attribution use, not consumed yet.
+  pageTitle: string | null;
+  campaign: string | null;
+  adGroup: string | null;
   ppcAssisted: boolean | null;
 }
 
