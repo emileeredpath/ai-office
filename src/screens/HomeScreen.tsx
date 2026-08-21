@@ -283,11 +283,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // ---- Channel Snapshot ---------------------------------------------------
   // Email: derived from real email-send tasks (Campaign Monitor sync writes
   // these) if any exist; otherwise honestly "Not connected". Social and PPC
-  // have no real data source at all (PPC screen is confirmed mock data — see
-  // Phase 1A instructions — never surfaced here). Calls use the real
-  // Infinity wave1Performance response when configured. Shared with
-  // Performance's Channel Summary via src/utils/channelSnapshot.ts so the
-  // two pages can never disagree.
+  // have no real data source at all — the PPC page (rebuilt honestly in a
+  // later phase) is itself all "Not connected" today too, awaiting Google
+  // Ads. Calls use the real Infinity wave1Performance response when
+  // configured. Shared with Performance's Channel Summary via
+  // src/utils/channelSnapshot.ts so the two pages can never disagree.
   const emailSnapshot = useMemo(() => getEmailSnapshot(entityTasks), [entityTasks]);
   const callsSnapshot = useMemo(
     () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
