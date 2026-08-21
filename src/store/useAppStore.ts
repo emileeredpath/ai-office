@@ -20,6 +20,7 @@ import {
   updateFundingRecordInApi,
 } from '@/services/fundingRecordsApi';
 import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
+import { apiFetch } from '@/services/apiConfig';
 
 export interface Wave1CallData {
   id: string;
@@ -502,7 +503,7 @@ export const useAppStore = create<AppState>((set, get) => {
     syncWave1Performance: async () => {
       set({ wave1Syncing: true });
       try {
-        const response = await fetch('/api/analytics/wave1/performance');
+        const response = await apiFetch('/api/analytics/wave1/performance');
         if (!response.ok) {
           console.error('Wave 1 performance sync failed:', response.status);
           return;
@@ -518,7 +519,7 @@ export const useAppStore = create<AppState>((set, get) => {
     syncWave1Calls: async () => {
       set({ wave1Syncing: true });
       try {
-        const response = await fetch('/api/analytics/wave1/calls');
+        const response = await apiFetch('/api/analytics/wave1/calls');
         if (!response.ok) {
           console.error('Wave 1 calls sync failed:', response.status);
           return;
