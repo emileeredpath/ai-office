@@ -23,6 +23,7 @@ import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi'
 import { apiFetch } from '@/services/apiConfig';
 import { fetchGa4Traffic, type Ga4TrafficResponse } from '@/services/ga4Api';
 import { fetchEmailPerformance, type EmailPerformanceResponse } from '@/services/emailPerformanceApi';
+import { fetchInfinityCalls, type InfinityCallsResponse } from '@/services/infinityCallsApi';
 
 export interface Wave1CallData {
   id: string;
@@ -97,6 +98,12 @@ interface AppState {
   emailPerformance: EmailPerformanceResponse | null;
   emailPerformanceSyncing: boolean;
 
+  // Real, entity-attributed Infinity call records (V2 Call Tracking page)
+  // — independent of wave1Performance.infinity, which stays a combined,
+  // entity-unaware total. See src/utils/callPerformance.ts.
+  infinityCalls: InfinityCallsResponse | null;
+  infinityCallsSyncing: boolean;
+
   // Funding & Rewards records
   fundingRecords: FundingRecord[];
 
@@ -133,6 +140,10 @@ interface AppState {
   // Real Campaign Monitor email performance, for the resolved date range
   // the caller wants — see resolveEmailDateRange().
   syncEmailPerformance: (startDate: string, endDate: string) => Promise<void>;
+
+  // Real, entity-attributed Infinity call records, for the resolved date
+  // range the caller wants — see resolveCallDateRange().
+  syncInfinityCalls: (startDate: string, endDate: string) => Promise<void>;
 
   // Funding & Rewards
   syncFundingRecordsFromApi: () => Promise<void>;
@@ -215,6 +226,8 @@ export const useAppStore = create<AppState>((set, get) => {
     ga4TrafficSyncing: false,
     emailPerformance: null,
     emailPerformanceSyncing: false,
+    infinityCalls: null,
+    infinityCallsSyncing: false,
     fundingRecords: [],
     auditLog: [],
 
@@ -590,6 +603,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('Campaign Monitor email performance sync error:', err);
         set({ emailPerformanceSyncing: false });
+      }
+    },
+
+    syncInfinityCalls: async (startDate: string, endDate: string) => {
+      set({ infinityCallsSyncing: true });
+      try {
+        const data = await fetchInfinityCalls(startDate, endDate);
+        set({ infinityCalls: data, infinityCallsSyncing: false });
+      } catch (err) {
+        console.error('Infinity calls sync error:', err);
+        set({ infinityCallsSyncing: false });
       }
     },
 

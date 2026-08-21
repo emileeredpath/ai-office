@@ -3,6 +3,7 @@ import { getBrandTraffic } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance } from '../services/emailPerformance.js';
+import { fetchInfinityCalls } from '../services/infinity.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
@@ -44,6 +45,22 @@ router.get('/campaign-monitor', (req: Request, res: Response) => {
     startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   }
   const result = getEmailPerformance(startDate as string, endDate as string);
+  res.json(result);
+});
+
+// Real, entity-attributed Infinity call records (V2 Call Tracking page —
+// see fetchInfinityCalls's own doc comment). Same startDate/endDate
+// contract as /ga4 and /campaign-monitor above: a genuine resolved
+// calendar period, never a rolling-day approximation. Falls back to
+// month-to-date if the range is missing or malformed. Unlike /wave1/calls
+// below, this is never scoped to a specific campaign — Infinity has no
+// identifier for one — and each call record carries its real dgrpName-
+// derived brand (or null if that dgrpName isn't a confirmed mapping yet).
+router.get('/infinity-calls', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await fetchInfinityCalls(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 
