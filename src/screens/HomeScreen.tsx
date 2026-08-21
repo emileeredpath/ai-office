@@ -15,6 +15,7 @@ import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/camp
 import { getMarketingEvents } from '@/utils/marketingEvents';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { getEmailSnapshot, getCallsSnapshot } from '@/utils/channelSnapshot';
+import { resolveGa4DateRange, getWebsiteUsers } from '@/utils/ga4Traffic';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
@@ -60,10 +61,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const fundingRecords = useAppStore((s) => s.fundingRecords);
   const auditLog = useAppStore((s) => s.auditLog);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
+  const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+  const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const selectTask = useAppStore((s) => s.selectTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { isEditor } = useAuth();
@@ -76,6 +79,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     syncWave1Performance();
     syncWave1Calls();
   }, [syncFundingRecordsFromApi, syncAuditLog, syncWave1Performance, syncWave1Calls]);
+
+  const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
+  useEffect(() => {
+    syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
 
   const today = new Date();
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -123,15 +131,23 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const liveCampaignsCount = useMemo(() => entityCampaigns.filter((c) => c.status === 'active').length, [entityCampaigns]);
 
   // ---- Marketing Funnel -----------------------------------------------
-  // Website Visits: GA4 general traffic is unconfigured in this environment
-  // (no frontend consumer of /api/analytics/ga4 either) — not connected.
+  // Website Users: real GA4 activeUsers (Phase 1) — see
+  // src/utils/ga4Traffic.ts for how the figure is resolved per entity.
   // Enquiries: real, but manually logged per campaign (CampaignResults),
   // never previously aggregated — this is a genuine improvement using
   // existing data, not an invented number.
   // Opportunities / Won Deals: no CRM data model exists — not connected.
   const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
+  const websiteUsers = useMemo(
+    () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
+    [ga4Traffic, isGroupView, selectedEntity]
+  );
   const funnelStages: FunnelStage[] = [
-    { label: 'Website Visits', value: null, subtitle: 'Awaiting GA4 integration' },
+    {
+      label: 'Website Users',
+      value: websiteUsers.status === 'available' ? websiteUsers.activeUsers! : null,
+      subtitle: websiteUsers.subtitle,
+    },
     { label: 'Enquiries', value: enquiriesTotal, subtitle: 'Manually logged per campaign' },
     { label: 'Marketing Leads', value: marketingLeads, subtitle: 'Manually logged per campaign' },
     { label: 'Opportunities', value: null, subtitle: 'Awaiting Acumatica integration' },
@@ -310,13 +326,17 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   }, [auditLog, isGroupView, entityCampaigns, entityTasks, entityFundingRecords]);
 
   // ---- Data freshness -----------------------------------------------------
-  const ga4Configured = wave1Performance?.configured === true;
-  const ga4HasErrors = (wave1Performance?.errors?.length ?? 0) > 0;
+  // GA4 freshness reflects the general website-traffic source this page
+  // actually uses (ga4Traffic), not the separate campaign-scoped Wave 1
+  // GA4 query — the two have independent configured/error states and must
+  // never be conflated into one misleading "Live"/"Not connected" signal.
+  const ga4Configured = ga4Traffic?.configured === true;
+  const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
   const campaignMonitorSyncEntry = auditLog.find((e) => e.resourceType === 'campaign_monitor');
 
   const freshnessEntries: FreshnessEntry[] = [
     ga4Configured
-      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : `Updated ${timeAgo(wave1Performance?.lastSynced)}` }
+      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : 'Live' }
       : { label: 'GA4', status: 'not-connected', detail: 'Not connected' },
     infinityConfigured
       ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
@@ -329,7 +349,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
   ];
 
-  const dataUpdatedLabel = ga4Configured && wave1Performance?.lastSynced ? `Data updated ${timeAgo(wave1Performance.lastSynced)}` : 'Live data — synced on page load';
+  const dataUpdatedLabel = 'Live data — synced on page load';
 
   return (
     <div className="v2-page">
@@ -547,7 +567,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         <div className="mb-8">
           <h2 className="v2-section-title">Channel Snapshot (This Period)</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            <KpiCard title="Website" status="not-connected" subtitle="Awaiting GA4 integration" size="compact" />
+            <KpiCard
+              title="Website"
+              value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
+              status={websiteUsers.status}
+              subtitle={websiteUsers.subtitle}
+              size="compact"
+            />
             {emailSnapshot ? (
               <KpiCard
                 title="Email"

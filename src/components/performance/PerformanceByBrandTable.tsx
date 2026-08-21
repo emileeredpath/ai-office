@@ -8,12 +8,16 @@ export interface BrandPerformanceRow {
   enquiries: number;
   leads: number;
   spend: number;
+  // Real GA4 activeUsers for this brand's property, or null when that
+  // entity's GA4 property isn't configured (or the fetch failed) — never
+  // a fabricated 0.
+  websiteUsers: number | null;
 }
 
-// Group-level comparison only — Entity is a real filter, Website
-// Users/Opportunities/Pipeline/Won Revenue have no data source yet
-// (GA4 general traffic and Acumatica are both unconnected), so those
-// columns are honest "Not connected" cells rather than fabricated figures.
+// Group-level comparison only — Entity is a real filter. Website Users is
+// real GA4 data (Phase 1) where a brand's property is configured;
+// Opportunities/Pipeline/Won Revenue have no data source yet (Acumatica
+// is unconnected), so those columns stay honest "Not connected" cells.
 export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] }) {
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -39,7 +43,9 @@ export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] 
                 <td>
                   <BrandBadge brand={row.brand} />
                 </td>
-                <td style={{ textAlign: 'right' }}><span className="v2-not-connected-text">Not connected</span></td>
+                <td style={{ textAlign: 'right' }}>
+                  {row.websiteUsers != null ? row.websiteUsers.toLocaleString() : <span className="v2-not-connected-text">Not connected</span>}
+                </td>
                 <td style={{ textAlign: 'right' }}>{row.enquiries}</td>
                 <td style={{ textAlign: 'right' }}>{row.leads}</td>
                 <td style={{ textAlign: 'right' }}>£{Math.round(row.spend).toLocaleString()}</td>

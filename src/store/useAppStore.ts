@@ -21,6 +21,7 @@ import {
 } from '@/services/fundingRecordsApi';
 import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
 import { apiFetch } from '@/services/apiConfig';
+import { fetchGa4Traffic, type Ga4TrafficResponse } from '@/services/ga4Api';
 
 export interface Wave1CallData {
   id: string;
@@ -81,6 +82,14 @@ interface AppState {
   wave1Performance: Wave1PerformanceData | null;
   wave1Syncing: boolean;
 
+  // General GA4 website traffic (V2 Overview/Performance/Reports) — kept
+  // entirely separate from wave1Performance's GA4 state, since that's a
+  // different, campaign-scoped query with its own configured/error state.
+  // See src/utils/ga4Traffic.ts for how pages derive "Website Users" from
+  // this shared response.
+  ga4Traffic: Ga4TrafficResponse | null;
+  ga4TrafficSyncing: boolean;
+
   // Funding & Rewards records
   fundingRecords: FundingRecord[];
 
@@ -109,6 +118,10 @@ interface AppState {
   // Wave 1 data
   syncWave1Performance: () => Promise<void>;
   syncWave1Calls: () => Promise<void>;
+
+  // General GA4 website traffic, for the resolved date range the caller
+  // (Overview/Performance/Reports) wants — see resolveGa4DateRange().
+  syncGa4Traffic: (startDate: string, endDate: string) => Promise<void>;
 
   // Funding & Rewards
   syncFundingRecordsFromApi: () => Promise<void>;
@@ -187,6 +200,8 @@ export const useAppStore = create<AppState>((set, get) => {
     apiSyncing: false,
     wave1Performance: null,
     wave1Syncing: false,
+    ga4Traffic: null,
+    ga4TrafficSyncing: false,
     fundingRecords: [],
     auditLog: [],
 
@@ -540,6 +555,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('Wave 1 calls sync error:', err);
         set({ wave1Syncing: false });
+      }
+    },
+
+    syncGa4Traffic: async (startDate: string, endDate: string) => {
+      set({ ga4TrafficSyncing: true });
+      try {
+        const data = await fetchGa4Traffic(startDate, endDate);
+        set({ ga4Traffic: data, ga4TrafficSyncing: false });
+      } catch (err) {
+        console.error('GA4 traffic sync error:', err);
+        set({ ga4TrafficSyncing: false });
       }
     },
 

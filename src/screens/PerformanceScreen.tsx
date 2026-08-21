@@ -11,9 +11,9 @@ import { PerformanceByBrandTable, type BrandPerformanceRow } from '@/components/
 import { CampaignPerformanceTable } from '@/components/performance/CampaignPerformanceTable';
 import { BRAND_COLOR } from '@/utils/brandColors';
 import { Brand } from '@/types/index';
-import { timeAgo } from '@/utils/dateUtils';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { getEmailSnapshot, getCallsSnapshot } from '@/utils/channelSnapshot';
+import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand } from '@/utils/ga4Traffic';
 
 interface PerformanceScreenProps {
   onNavigate?: (screen: string) => void;
@@ -31,8 +31,10 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const campaigns = useAppStore((s) => s.campaigns);
   const tasks = useAppStore((s) => s.tasks);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
+  const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+  const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
@@ -41,6 +43,11 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     syncWave1Performance();
     syncWave1Calls();
   }, [syncWave1Performance, syncWave1Calls]);
+
+  const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
+  useEffect(() => {
+    syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
 
   const entityCampaigns = useMemo(
     () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
@@ -61,6 +68,10 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const marketingLeads = useMemo(() => sumLeads(periodCampaigns), [periodCampaigns]);
   const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
   const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
+  const websiteUsers = useMemo(
+    () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
+    [ga4Traffic, isGroupView, selectedEntity]
+  );
 
   // ---- Leads by Brand (group) / Leads by Campaign (single entity) --------
   const leadsByBrandRows = useMemo<LeadsBreakdownRow[]>(() => {
@@ -100,15 +111,17 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         campaigns.filter((c) => c.brand === brand),
         periodStart
       );
+      const brandWebsiteUsers = getWebsiteUsersForBrand(ga4Traffic, brand);
       return {
         brand,
         label: o.label,
         enquiries: sumEnquiries(brandCampaigns),
         leads: sumLeads(brandCampaigns),
         spend: sumSpend(brandCampaigns),
+        websiteUsers: brandWebsiteUsers.status === 'available' ? brandWebsiteUsers.activeUsers! : null,
       };
     });
-  }, [campaigns, periodStart]);
+  }, [campaigns, periodStart, ga4Traffic]);
 
   // ---- Channel Summary — identical logic to Overview ----------------------
   const emailSnapshot = useMemo(() => getEmailSnapshot(entityTasks), [entityTasks]);
@@ -118,13 +131,16 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   );
 
   // ---- Data freshness -------------------------------------------------------
-  const ga4Configured = wave1Performance?.configured === true;
-  const ga4HasErrors = (wave1Performance?.errors?.length ?? 0) > 0;
+  // GA4 freshness reflects the general website-traffic source this page
+  // uses (ga4Traffic), not the separate campaign-scoped Wave 1 GA4 query —
+  // the two have independent configured/error states.
+  const ga4Configured = ga4Traffic?.configured === true;
+  const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
   const infinityConfigured = wave1Performance?.infinityConfigured === true;
 
   const freshnessEntries: FreshnessEntry[] = [
     ga4Configured
-      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : `Updated ${timeAgo(wave1Performance?.lastSynced)}` }
+      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : 'Live' }
       : { label: 'GA4', status: 'not-connected', detail: 'Not connected' },
     infinityConfigured
       ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
@@ -153,7 +169,12 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
 
         {/* Headline KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <KpiCard title="Website Users" status="not-connected" subtitle="Awaiting GA4 integration" />
+          <KpiCard
+            title="Website Users"
+            value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
+            status={websiteUsers.status}
+            subtitle={websiteUsers.subtitle}
+          />
           <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged per campaign" />
           <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" accent="var(--v2-green)" />
           <KpiCard title="Marketing Spend" value={`£${Math.round(marketingSpend).toLocaleString()}`} subtitle="Manually logged campaign spend" onClick={() => onNavigate?.('campaigns')} />
@@ -210,7 +231,13 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         <div className="mb-4">
           <h2 className="v2-section-title">Channel Summary</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            <KpiCard title="Website" status="not-connected" subtitle="Awaiting GA4 integration" size="compact" />
+            <KpiCard
+              title="Website"
+              value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
+              status={websiteUsers.status}
+              subtitle={websiteUsers.subtitle}
+              size="compact"
+            />
             {emailSnapshot ? (
               <KpiCard
                 title="Email"

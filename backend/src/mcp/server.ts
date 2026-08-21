@@ -720,7 +720,7 @@ export function createAiOfficeMcpServer(): McpServer {
     {
       title: 'Get per-brand GA4 website traffic',
       description:
-        'Fetch live sessions and active users for this week and this month from each brand entity\'s GA4 property (Brentwood, Radio Links, Capcom, IRCL). Requires GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* env var on the server.',
+        'Fetch live active users and sessions, month-to-date, from each brand entity\'s GA4 property (Brentwood, Radio Links, Capcom, IRCL). Requires GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* env var on the server.',
       inputSchema: {},
     },
     async () => {

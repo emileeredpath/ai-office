@@ -1,10 +1,12 @@
 // Google Analytics 4 integration — a simplified per-brand website traffic
-// view for the Dashboard. Each brand entity (Brentwood, Radio Links, Capcom,
-// IRCL) has its own GA4 property; this fetches live "sessions" and
-// "activeUsers" totals for this week and this month per property, on
-// request — no local storage, no scheduled sync. GA4 numbers are cheap and
-// fast to query live, unlike Campaign Monitor's per-send data, so there's
-// no need to persist a copy of them.
+// view for V2 (Overview, Performance, Reports). Each brand entity
+// (Brentwood, Radio Links, Capcom, IRCL) has its own GA4 property; this
+// fetches live "sessions" and "activeUsers" totals for a caller-supplied
+// date range per property, on request — no local storage, no scheduled
+// sync. GA4 numbers are cheap and fast to query live, unlike Campaign
+// Monitor's per-send data, so there's no need to persist a copy of them
+// (see wave_1_performance_metrics for the one GA4 path that IS persisted —
+// the separate, campaign-scoped Wave 1 integration below, untouched here).
 //
 // IMPORTANT — untested against a real account from this environment: no
 // GA4_SERVICE_ACCOUNT_JSON or GA4_PROPERTY_ID_* vars exist here, and this
@@ -31,17 +33,35 @@ const PROPERTY_ID_ENV: Partial<Record<Brand, string>> = {
 
 export interface BrandTraffic {
   brand: Brand;
-  sessionsWeek: number;
-  usersWeek: number;
-  sessionsMonth: number;
-  usersMonth: number;
+  // "Website Users" everywhere in V2 means GA4 activeUsers specifically —
+  // never sessions. sessions is kept as a separate, honestly-labelled
+  // figure for later use, not folded into or confused with activeUsers.
+  activeUsers: number;
+  sessions: number;
 }
 
 export interface Ga4Result {
   configured: boolean;
+  startDate: string;
+  endDate: string;
   brands: BrandTraffic[];
+  // Every brand with a property ID configured, regardless of whether that
+  // brand's query succeeded this call — lets a caller distinguish "this
+  // brand has no GA4 property" (absent from configuredBrands) from "this
+  // brand's property is configured but this particular fetch failed"
+  // (present in configuredBrands, absent from brands, with an error).
+  configuredBrands: Brand[];
   errors: string[];
 }
+
+// GA4's own earliest supported date for the Analytics Data API — used as
+// the honest "all time" floor when a caller doesn't supply a date range,
+// rather than an unbounded or fabricated period. This isn't a guess at
+// when any given property started collecting data — GA4 simply returns
+// real (possibly zero) figures for any date before a property existed —
+// it's the API's own documented lower bound, so it can never overstate
+// what's genuinely available.
+export const GA4_EARLIEST_SUPPORTED_DATE = '2015-08-14';
 
 function base64url(input: Buffer | string): string {
   return (Buffer.isBuffer(input) ? input : Buffer.from(input))
@@ -320,14 +340,33 @@ export async function getWave1Performance(): Promise<Wave1Result> {
   }
 }
 
-export async function getBrandTraffic(): Promise<Ga4Result> {
+function defaultMonthToDateRange(): { startDate: string; endDate: string } {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  return { startDate: isoDate(monthStart), endDate: isoDate(today) };
+}
+
+// startDate/endDate are the resolved calendar-period boundaries the caller
+// wants (e.g. from the frontend's global Period selector) — this function
+// never approximates a period with a rolling day count. If omitted (e.g.
+// the zero-arg MCP tool call), defaults to month-to-date, a reasonable
+// single range to preserve for a caller that doesn't have a period concept.
+export async function getBrandTraffic(startDate?: string, endDate?: string): Promise<Ga4Result> {
   const errors: string[] = [];
   const configuredBrands = (Object.keys(PROPERTY_ID_ENV) as Brand[]).filter(
     (brand) => !!process.env[PROPERTY_ID_ENV[brand] as string]
   );
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
 
   if (!process.env.GA4_SERVICE_ACCOUNT_JSON || configuredBrands.length === 0) {
-    return { configured: false, brands: [], errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'] };
+    return {
+      configured: false,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      brands: [],
+      configuredBrands: [],
+      errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
+    };
   }
 
   let token: string;
@@ -336,29 +375,15 @@ export async function getBrandTraffic(): Promise<Ga4Result> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[ga4] failed to get access token:', msg);
-    return { configured: true, brands: [], errors: [msg] };
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, brands: [], configuredBrands, errors: [msg] };
   }
-
-  const today = new Date();
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 6);
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
   const brands: BrandTraffic[] = [];
   for (const brand of configuredBrands) {
     const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string;
     try {
-      const [week, month] = await Promise.all([
-        runReport(propertyId, token, isoDate(weekAgo), isoDate(today)),
-        runReport(propertyId, token, isoDate(monthStart), isoDate(today)),
-      ]);
-      brands.push({
-        brand,
-        sessionsWeek: week.sessions,
-        usersWeek: week.users,
-        sessionsMonth: month.sessions,
-        usersMonth: month.users,
-      });
+      const result = await runReport(propertyId, token, range.startDate, range.endDate);
+      brands.push({ brand, activeUsers: result.users, sessions: result.sessions });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[ga4] failed to fetch traffic for ${brand}:`, msg);
@@ -366,5 +391,5 @@ export async function getBrandTraffic(): Promise<Ga4Result> {
     }
   }
 
-  return { configured: true, brands, errors };
+  return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, errors };
 }

@@ -105,16 +105,21 @@ If `CAMPAIGN_MONITOR_SYNC_ENABLED=true`, the server logs will show:
 ## GA4 Integration
 
 ### What It Does
-- Fetches live website traffic (sessions, active users) for each brand
-- Queries past 7 days AND past month per brand property
-- Shows on Dashboard "Website Traffic" widget
-- No local caching — fetches on every Dashboard load
+- Fetches live website traffic (activeUsers, sessions) for each brand, for
+  a caller-supplied date range
+- "Website Users" throughout V2 means GA4 `activeUsers` specifically, never
+  `sessions` — the two are returned separately and never combined
+- Shows on the V2 Overview, Performance, and Reports pages (Website Users
+  KPI, Performance by Brand, Channel Summary) — all three read from the
+  same shared frontend GA4 state, so they can never disagree
+- No local caching — fetches live on each page load / period or entity
+  change
 
 ### Files
-- **Service:** `backend/src/services/ga4.ts` (lines 1-181)
-- **Route:** `backend/src/routes/analytics.ts` (line 6-9)
-  - `GET /api/analytics/ga4` — fetch brand traffic
-- **Frontend:** `src/screens/DashboardScreen.tsx` (lines 150-156)
+- **Service:** `backend/src/services/ga4.ts` — `getBrandTraffic(startDate?, endDate?)`
+- **Route:** `backend/src/routes/analytics.ts`
+  - `GET /api/analytics/ga4?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` — fetch brand traffic for that exact range (both params optional together; omitting them defaults to month-to-date)
+- **Frontend:** `src/utils/ga4Traffic.ts` (shared aggregation logic), `src/services/ga4Api.ts` (fetch), consumed by `src/screens/HomeScreen.tsx`, `src/screens/PerformanceScreen.tsx`, `src/screens/ReportsScreen.tsx`
 
 ### Required Environment Variables
 
@@ -168,44 +173,52 @@ GA4_PROPERTY_ID_IDARO=678901234
 #### Test 1: Fetch GA4 Data
 ```bash
 # From browser console (via Railway URL):
-fetch('/api/analytics/ga4', { credentials: 'include' })
+fetch('/api/analytics/ga4?startDate=2026-08-01&endDate=2026-08-21', { credentials: 'include' })
   .then(r => r.json())
   .then(console.log)
 
 # Expected response (on success):
 {
   configured: true,
+  startDate: "2026-08-01",
+  endDate: "2026-08-21",
   brands: [
-    {
-      brand: "brentwood",
-      sessionsWeek: 1234,
-      usersWeek: 456,
-      sessionsMonth: 5678,
-      usersMonth: 1200
-    },
-    ... (one per configured brand)
+    { brand: "brentwood", activeUsers: 456, sessions: 1234 },
+    ... (one per brand whose property fetch succeeded this call)
   ],
+  configuredBrands: ["brentwood", "radio-links"], // every brand with a property ID set, even if its fetch failed
   errors: []
 }
 
-# If GA4 not configured:
+# If GA4 not configured at all:
 {
   configured: false,
+  startDate: "2026-08-01",
+  endDate: "2026-08-21",
   brands: [],
+  configuredBrands: [],
   errors: [
     "GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable."
   ]
 }
+
+# startDate/endDate are both optional but must be supplied together —
+# GET /api/analytics/ga4 with no params defaults to month-to-date.
 ```
 
-#### Test 2: Dashboard Widget
-1. Visit the Dashboard (any user)
-2. Look for **Website Traffic** section (right side)
+#### Test 2: V2 Pages
+1. Visit **Overview**, **Performance**, or **Reports** (any user)
+2. Look for the **Website Users** KPI card (and, on Performance, the
+   "Performance by Brand" table's Website Users column, and the Channel
+   Summary's Website card)
 3. You should see:
-   - Brand names with traffic metrics
-   - Sessions & users for this week
-   - Sessions & users for this month
-   - Green = configured, red text = error
+   - A real GA4 `activeUsers` figure per configured entity, recalculating
+     when the global Entity or Period selector changes
+   - "Not connected" for any entity whose GA4 property isn't configured —
+     never a fabricated 0
+   - At MTech Group level, a combined figure across whichever of
+     Brentwood/Radio Links/Capcom/Irish Radio are configured, labelled to
+     say so rather than implying full group coverage
 
 #### Test 3: Check Logs
 Server logs will show:
@@ -240,7 +253,7 @@ Server logs will show:
 - [ ] Service account has Viewer role in GA4 property
 - [ ] At least one `GA4_PROPERTY_ID_*` set
 - [ ] `/api/analytics/ga4` endpoint returns `configured: true`
-- [ ] Dashboard Website Traffic widget displays metrics
+- [ ] Overview/Performance/Reports Website Users KPI displays real metrics
 
 ---
 

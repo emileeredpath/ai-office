@@ -10,6 +10,7 @@ import { ReportExportButtons } from '@/components/reports/ReportExportButtons';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { getEmailSnapshot, getCallsSnapshot } from '@/utils/channelSnapshot';
 import { buildReportCsv, downloadCsv, type ReportCsvSection } from '@/utils/reportExport';
+import { resolveGa4DateRange, getWebsiteUsers } from '@/utils/ga4Traffic';
 
 // Reports is the V2 reporting area — a period + entity scoped rollup of
 // the honest figures already established across Overview, Performance,
@@ -25,10 +26,12 @@ export function ReportsScreen() {
   const tasks = useAppStore((s) => s.tasks);
   const fundingRecords = useAppStore((s) => s.fundingRecords);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
+  const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const syncCampaignsFromApi = useAppStore((s) => s.syncCampaignsFromApi);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+  const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { isGroupView, selectedEntity, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
@@ -39,6 +42,11 @@ export function ReportsScreen() {
     syncWave1Performance();
     syncWave1Calls();
   }, [syncCampaignsFromApi, syncFundingRecordsFromApi, syncWave1Performance, syncWave1Calls]);
+
+  const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
+  useEffect(() => {
+    syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
   const periodLabel = PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? period;
@@ -60,6 +68,10 @@ export function ReportsScreen() {
   const marketingLeads = useMemo(() => sumLeads(periodCampaigns), [periodCampaigns]);
   const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
   const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
+  const websiteUsers = useMemo(
+    () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
+    [ga4Traffic, isGroupView, selectedEntity]
+  );
 
   // Funding has no genuine date field this app can honestly match against
   // the global Period selector (funding.period is a free-text label like
@@ -82,13 +94,15 @@ export function ReportsScreen() {
     [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const ga4Configured = wave1Performance?.configured === true;
-  const ga4HasErrors = (wave1Performance?.errors?.length ?? 0) > 0;
+  // GA4 freshness reflects the general website-traffic source this page
+  // uses (ga4Traffic), not the separate campaign-scoped Wave 1 GA4 query.
+  const ga4Configured = ga4Traffic?.configured === true;
+  const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
   const infinityConfigured = wave1Performance?.infinityConfigured === true;
 
   const freshnessEntries: FreshnessEntry[] = [
     ga4Configured
-      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : 'Connected' }
+      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : 'Live' }
       : { label: 'GA4', status: 'not-connected', detail: 'Not connected' },
     infinityConfigured
       ? { label: 'Infinity (Calls)', status: 'live', detail: 'Connected' }
@@ -105,7 +119,9 @@ export function ReportsScreen() {
         title: 'Marketing Performance',
         columns: ['Metric', 'Value', 'Detail'],
         rows: [
-          ['Website Users', 'Not connected', 'Awaiting GA4 integration'],
+          websiteUsers.status === 'available'
+            ? ['Website Users', websiteUsers.activeUsers!, websiteUsers.subtitle]
+            : ['Website Users', 'Not connected', websiteUsers.subtitle],
           ['Enquiries', enquiriesTotal, 'Manually logged per campaign'],
           ['Marketing Leads', marketingLeads, 'Manually logged, not yet CRM-linked'],
           ['Marketing Spend', currency(marketingSpend), 'Manually logged campaign spend'],
@@ -127,7 +143,9 @@ export function ReportsScreen() {
         title: 'Channel Summary',
         columns: ['Channel', 'Value', 'Detail'],
         rows: [
-          ['Website', 'Not connected', 'Awaiting GA4 integration'],
+          websiteUsers.status === 'available'
+            ? ['Website', `${websiteUsers.activeUsers} users`, websiteUsers.subtitle]
+            : ['Website', 'Not connected', websiteUsers.subtitle],
           emailSnapshot
             ? ['Email', emailSnapshot.hasOpenData ? `${emailSnapshot.opens} opens` : `${emailSnapshot.sends} sends logged`, `${emailSnapshot.sends} sends logged`]
             : ['Email', 'Not connected', 'No Campaign Monitor sends logged'],
@@ -184,7 +202,12 @@ export function ReportsScreen() {
         <div className="mb-8">
           <h2 className="v2-section-title">Marketing Performance</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard title="Website Users" status="not-connected" subtitle="Awaiting GA4 integration" />
+            <KpiCard
+              title="Website Users"
+              value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
+              status={websiteUsers.status}
+              subtitle={websiteUsers.subtitle}
+            />
             <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged per campaign" />
             <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" accent="var(--v2-green)" />
             <KpiCard title="Marketing Spend" value={currency(marketingSpend)} subtitle="Manually logged campaign spend" />
@@ -212,7 +235,13 @@ export function ReportsScreen() {
         <div className="mb-8">
           <h2 className="v2-section-title">Channel Summary</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            <KpiCard title="Website" status="not-connected" subtitle="Awaiting GA4 integration" size="compact" />
+            <KpiCard
+              title="Website"
+              value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
+              status={websiteUsers.status}
+              subtitle={websiteUsers.subtitle}
+              size="compact"
+            />
             {emailSnapshot ? (
               <KpiCard
                 title="Email"

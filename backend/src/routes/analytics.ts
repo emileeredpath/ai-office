@@ -6,8 +6,23 @@ import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js
 // Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
 
-router.get('/ga4', async (_req: Request, res: Response) => {
-  const result = await getBrandTraffic();
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// General GA4 website traffic (V2 Overview/Performance/Reports — see
+// getBrandTraffic's own doc comment). startDate/endDate represent the
+// caller's resolved calendar period (e.g. the frontend's global Period
+// selector) — this route never approximates a period with a rolling day
+// count. Both are optional and must be provided together; if either is
+// missing or malformed, falls back to the service's own month-to-date
+// default rather than erroring, since a slightly-wrong default is safer
+// than breaking the page. "All time" should be passed explicitly as an
+// early fixed date (see GA4_EARLIEST_SUPPORTED_DATE in services/ga4.ts)
+// rather than an unbounded range.
+router.get('/ga4', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await getBrandTraffic(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 
