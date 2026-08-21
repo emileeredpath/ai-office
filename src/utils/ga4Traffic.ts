@@ -81,8 +81,8 @@ export function getWebsiteUsers(
   const totalCount = GROUP_AGGREGATE_BRANDS.length;
   const subtitle =
     configuredCount < totalCount
-      ? `Combined users across ${configuredCount} of ${totalCount} configured GA4 properties`
-      : 'Combined users across all configured GA4 properties';
+      ? `Combined GA4 active users across ${configuredCount} of ${totalCount} websites`
+      : `Combined GA4 active users across ${totalCount} websites`;
 
   return { status: 'available', activeUsers, sessions, subtitle };
 }
