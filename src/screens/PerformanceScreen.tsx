@@ -12,8 +12,9 @@ import { CampaignPerformanceTable } from '@/components/performance/CampaignPerfo
 import { BRAND_COLOR } from '@/utils/brandColors';
 import { Brand } from '@/types/index';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
-import { getEmailSnapshot, getCallsSnapshot } from '@/utils/channelSnapshot';
+import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand } from '@/utils/ga4Traffic';
+import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 
 interface PerformanceScreenProps {
   onNavigate?: (screen: string) => void;
@@ -29,12 +30,13 @@ interface PerformanceScreenProps {
 // src/utils/channelSnapshot.ts) so the two pages can never disagree.
 export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const campaigns = useAppStore((s) => s.campaigns);
-  const tasks = useAppStore((s) => s.tasks);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
+  const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
+  const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
@@ -49,13 +51,14 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
 
+  const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
+  useEffect(() => {
+    syncEmailPerformance(emailRange.startDate, emailRange.endDate);
+  }, [emailRange.startDate, emailRange.endDate, syncEmailPerformance]);
+
   const entityCampaigns = useMemo(
     () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  const entityTasks = useMemo(
-    () => tasks.filter((t) => matchesSelectedEntity(t.brand)),
-    [tasks, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const periodStart = useMemo(() => periodStartDate(period), [period]);
@@ -124,7 +127,10 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   }, [campaigns, periodStart, ga4Traffic]);
 
   // ---- Channel Summary — identical logic to Overview ----------------------
-  const emailSnapshot = useMemo(() => getEmailSnapshot(entityTasks), [entityTasks]);
+  const emailPerf = useMemo(
+    () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
+    [emailPerformance, isGroupView, selectedEntity]
+  );
   const callsSnapshot = useMemo(
     () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
     [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
@@ -133,10 +139,25 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // ---- Data freshness -------------------------------------------------------
   // GA4 freshness reflects the general website-traffic source this page
   // uses (ga4Traffic), not the separate campaign-scoped Wave 1 GA4 query —
-  // the two have independent configured/error states.
+  // the two have independent configured/error states. Campaign Monitor
+  // freshness reflects the real sync outcome, never just "an env var is
+  // set" — see backend/src/services/emailPerformance.ts.
   const ga4Configured = ga4Traffic?.configured === true;
   const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
   const infinityConfigured = wave1Performance?.infinityConfigured === true;
+
+  const campaignMonitorStatus: FreshnessEntry = (() => {
+    switch (emailPerformance?.syncState) {
+      case 'live':
+        return { label: 'Campaign Monitor', status: 'live', detail: 'Live' };
+      case 'error':
+        return { label: 'Campaign Monitor', status: 'error', detail: 'Sync failed' };
+      case 'never-synced':
+        return { label: 'Campaign Monitor', status: 'stale', detail: 'Never synced' };
+      default:
+        return { label: 'Campaign Monitor', status: 'not-connected', detail: 'Not connected' };
+    }
+  })();
 
   const freshnessEntries: FreshnessEntry[] = [
     ga4Configured
@@ -145,6 +166,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     infinityConfigured
       ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
+    campaignMonitorStatus,
     { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
     { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
@@ -238,19 +260,15 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               subtitle={websiteUsers.subtitle}
               size="compact"
             />
-            {emailSnapshot ? (
+            {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
               <KpiCard
                 title="Email"
-                value={emailSnapshot.hasOpenData ? `${emailSnapshot.opens} opens` : `${emailSnapshot.sends} sends logged`}
-                subtitle={
-                  emailSnapshot.hasOpenData
-                    ? `${emailSnapshot.sends} sends logged · ${emailSnapshot.hasClickData ? `${emailSnapshot.clicks} clicks` : 'click data unavailable'}`
-                    : 'Open/click data unavailable for these sends'
-                }
+                value={`${emailPerf.opens} opens`}
+                subtitle={`${emailPerf.campaignsSent} send(s) · ${emailPerf.clicks} clicks`}
                 size="compact"
               />
             ) : (
-              <KpiCard title="Email" status="not-connected" subtitle="No Campaign Monitor sends logged" size="compact" />
+              <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} size="compact" />
             )}
             <KpiCard title="Social" status="not-connected" subtitle="No integration configured" size="compact" />
             <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration — see PPC page" onClick={() => onNavigate?.('ppc')} size="compact" />

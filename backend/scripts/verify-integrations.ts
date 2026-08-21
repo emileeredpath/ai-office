@@ -63,7 +63,7 @@ const cmEndpointCheck = {
   name: 'Campaign Monitor Routes',
   status: 'PASS' as const,
   message: 'Routes defined',
-  details: 'POST /api/campaign-monitor/sync (requires edit), POST /api/campaign-monitor/seed-test-data (public)',
+  details: 'POST /api/campaign-monitor/sync (requires edit), GET /api/analytics/campaign-monitor (requires session)',
 };
 results.push(cmEndpointCheck);
 console.log(

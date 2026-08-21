@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getBrandTraffic } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
+import { getEmailPerformance } from '../services/emailPerformance.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
@@ -23,6 +24,26 @@ router.get('/ga4', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getBrandTraffic(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Real Campaign Monitor email performance (V2 Overview/Performance/Reports
+// — see getEmailPerformance's own doc comment). Same startDate/endDate
+// contract as /ga4 above: a genuine resolved calendar period, never a
+// rolling-day approximation. Falls back to month-to-date if the range is
+// missing or malformed.
+router.get('/campaign-monitor', (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  let startDate = rawStart;
+  let endDate = rawEnd;
+  if (!validRange) {
+    const now = new Date();
+    endDate = now.toISOString().slice(0, 10);
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  }
+  const result = getEmailPerformance(startDate as string, endDate as string);
   res.json(result);
 });
 

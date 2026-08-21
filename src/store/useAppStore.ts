@@ -22,6 +22,7 @@ import {
 import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
 import { apiFetch } from '@/services/apiConfig';
 import { fetchGa4Traffic, type Ga4TrafficResponse } from '@/services/ga4Api';
+import { fetchEmailPerformance, type EmailPerformanceResponse } from '@/services/emailPerformanceApi';
 
 export interface Wave1CallData {
   id: string;
@@ -90,6 +91,12 @@ interface AppState {
   ga4Traffic: Ga4TrafficResponse | null;
   ga4TrafficSyncing: boolean;
 
+  // Real Campaign Monitor email performance (V2 Overview/Performance/
+  // Reports) — a read-only rollup already restricted server-side to
+  // source === 'campaign-monitor'. See src/utils/emailPerformance.ts.
+  emailPerformance: EmailPerformanceResponse | null;
+  emailPerformanceSyncing: boolean;
+
   // Funding & Rewards records
   fundingRecords: FundingRecord[];
 
@@ -122,6 +129,10 @@ interface AppState {
   // General GA4 website traffic, for the resolved date range the caller
   // (Overview/Performance/Reports) wants — see resolveGa4DateRange().
   syncGa4Traffic: (startDate: string, endDate: string) => Promise<void>;
+
+  // Real Campaign Monitor email performance, for the resolved date range
+  // the caller wants — see resolveEmailDateRange().
+  syncEmailPerformance: (startDate: string, endDate: string) => Promise<void>;
 
   // Funding & Rewards
   syncFundingRecordsFromApi: () => Promise<void>;
@@ -202,6 +213,8 @@ export const useAppStore = create<AppState>((set, get) => {
     wave1Syncing: false,
     ga4Traffic: null,
     ga4TrafficSyncing: false,
+    emailPerformance: null,
+    emailPerformanceSyncing: false,
     fundingRecords: [],
     auditLog: [],
 
@@ -566,6 +579,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('GA4 traffic sync error:', err);
         set({ ga4TrafficSyncing: false });
+      }
+    },
+
+    syncEmailPerformance: async (startDate: string, endDate: string) => {
+      set({ emailPerformanceSyncing: true });
+      try {
+        const data = await fetchEmailPerformance(startDate, endDate);
+        set({ emailPerformance: data, emailPerformanceSyncing: false });
+      } catch (err) {
+        console.error('Campaign Monitor email performance sync error:', err);
+        set({ emailPerformanceSyncing: false });
       }
     },
 

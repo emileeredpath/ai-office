@@ -1,4 +1,4 @@
-import { Task, Campaign, Brand } from '@/types/index';
+import { Campaign, Brand } from '@/types/index';
 import { isWave1Campaign } from '@/utils/wave1';
 import type { Wave1PerformanceData } from '@/store/useAppStore';
 
@@ -6,29 +6,14 @@ import type { Wave1PerformanceData } from '@/store/useAppStore';
 // and Performance's "Channel Summary" — pure extraction of the logic that
 // previously lived inline in HomeScreen, so the two pages read the exact
 // same real figures and can never disagree.
-
-export interface EmailSnapshot {
-  sends: number;
-  opens: number;
-  clicks: number;
-  hasOpenData: boolean;
-  hasClickData: boolean;
-}
-
-// Email: derived from real email-send tasks (Campaign Monitor sync writes
-// these) if any exist; otherwise honestly "Not connected".
-export function getEmailSnapshot(tasks: Task[]): EmailSnapshot | null {
-  const emailSendTasks = tasks.filter((t) => t.type === 'email-send');
-  if (emailSendTasks.length === 0) return null;
-  // `opens`/`clicks` are null (not 0) on a send until Campaign Monitor's
-  // engagement sync actually populates them — treating null as 0 would
-  // silently claim "0 opens" when open data was never reported at all.
-  const hasOpenData = emailSendTasks.some((t) => t.opens != null);
-  const hasClickData = emailSendTasks.some((t) => t.clicks != null);
-  const totalOpens = emailSendTasks.reduce((sum, t) => sum + (t.opens || 0), 0);
-  const totalClicks = emailSendTasks.reduce((sum, t) => sum + (t.clicks || 0), 0);
-  return { sends: emailSendTasks.length, opens: totalOpens, clicks: totalClicks, hasOpenData, hasClickData };
-}
+//
+// Email figures used to live here too (getEmailSnapshot), but the Campaign
+// Monitor V2 audit found it summed every email-send task regardless of
+// `source` — silently blending real Campaign Monitor sends with seed/test
+// fixture rows, and never respecting the Period selector. Email now has
+// its own shared layer, src/utils/emailPerformance.ts, backed by a
+// read-only endpoint that only ever returns source === 'campaign-monitor'
+// rows for a genuine calendar date range.
 
 export interface CallsSnapshot {
   totalCalls: number;

@@ -19,11 +19,11 @@ Both services are implemented in the backend but require configuration via envir
 - Deduplicates using `externalId` (Campaign Monitor ID)
 
 ### Files
-- **Service:** `backend/src/services/campaignMonitor.ts` (lines 1-273)
+- **Service:** `backend/src/services/campaignMonitor.ts` — the sync itself (writes email-send tasks with `source: 'campaign-monitor'`)
 - **Route:** `backend/src/routes/campaignMonitor.ts`
   - `POST /api/campaign-monitor/sync` — manual trigger (requires edit access)
-  - `POST /api/campaign-monitor/seed-test-data` — populate test data
-- **Scheduler:** `backend/src/server.ts` (lines 172-185)
+- **V2 reporting:** `backend/src/services/emailPerformance.ts` + `GET /api/analytics/campaign-monitor?startDate&endDate` — read-only, entity/period-filterable rollup consumed by Overview/Performance/Reports. Only reads rows with `source = 'campaign-monitor'`; any `seed`/`test-seed` rows in the database are structurally excluded, never shown.
+- **Scheduler:** `backend/src/server.ts`
 
 ### Required Environment Variables
 

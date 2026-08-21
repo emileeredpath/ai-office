@@ -91,6 +91,13 @@ function extractCost(summary: CmCampaignSummary | null): number | null {
   return typeof value === 'number' ? value : null;
 }
 
+// Campaign Monitor's documented v3.x summary schema always returns both
+// TotalOpened and UniqueOpened as distinct fields (confirmed against CM's
+// published API docs — see the Campaign Monitor V2 audit). "opens" here is
+// explicitly TotalOpened, never a silent fallback to UniqueOpened under the
+// same label — the two mean different things and must not be blended.
+// Clicks has only one documented field (no separate unique-clicks value),
+// so it's captured as-is with no ambiguity to resolve.
 function extractMetrics(summary: CmCampaignSummary | null, recipients: number | null): {
   opens: number | null;
   clicks: number | null;
@@ -103,7 +110,7 @@ function extractMetrics(summary: CmCampaignSummary | null, recipients: number | 
     return { opens: null, clicks: null, openRate: null, clickRate: null, bounces: null, unsubscribes: null };
   }
 
-  const opens = summary.TotalOpened ?? summary.UniqueOpened ?? null;
+  const opens = typeof summary.TotalOpened === 'number' ? summary.TotalOpened : null;
   const clicks = summary.Clicks ?? null;
   const finalRecipients = recipients ?? summary.Recipients ?? null;
   const openRate = opens && finalRecipients && finalRecipients > 0 ? (opens / finalRecipients) * 100 : null;

@@ -9,13 +9,14 @@ import { KpiCard } from '@/components/common/KpiCard';
 import { MarketingFunnel, type FunnelStage } from '@/components/common/MarketingFunnel';
 import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataFreshnessBar';
 import { BrandBadge } from '@/components/common/BrandBadge';
-import { formatDate, formatDateShort, timeAgo } from '@/utils/dateUtils';
+import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMarketingEvents } from '@/utils/marketingEvents';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
-import { getEmailSnapshot, getCallsSnapshot } from '@/utils/channelSnapshot';
+import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers } from '@/utils/ga4Traffic';
+import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
@@ -62,11 +63,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const auditLog = useAppStore((s) => s.auditLog);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
+  const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
+  const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const selectTask = useAppStore((s) => s.selectTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { isEditor } = useAuth();
@@ -84,6 +87,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   useEffect(() => {
     syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
+
+  const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
+  useEffect(() => {
+    syncEmailPerformance(emailRange.startDate, emailRange.endDate);
+  }, [emailRange.startDate, emailRange.endDate, syncEmailPerformance]);
 
   const today = new Date();
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -297,14 +305,20 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   }, [entityCampaigns]);
 
   // ---- Channel Snapshot ---------------------------------------------------
-  // Email: derived from real email-send tasks (Campaign Monitor sync writes
-  // these) if any exist; otherwise honestly "Not connected". Social and PPC
-  // have no real data source at all — the PPC page (rebuilt honestly in a
-  // later phase) is itself all "Not connected" today too, awaiting Google
-  // Ads. Calls use the real Infinity wave1Performance response when
-  // configured. Shared with Performance's Channel Summary via
-  // src/utils/channelSnapshot.ts so the two pages can never disagree.
-  const emailSnapshot = useMemo(() => getEmailSnapshot(entityTasks), [entityTasks]);
+  // Email: real Campaign Monitor data only (source === 'campaign-monitor',
+  // enforced server-side — see src/utils/emailPerformance.ts), genuinely
+  // entity- and period-filtered; otherwise honestly "Not connected". Social
+  // and PPC have no real data source at all — the PPC page (rebuilt
+  // honestly in a later phase) is itself all "Not connected" today too,
+  // awaiting Google Ads. Calls use the real Infinity wave1Performance
+  // response when configured. Email and Calls are shared with Performance's
+  // Channel Summary via src/utils/emailPerformance.ts and
+  // src/utils/channelSnapshot.ts respectively, so the two pages can never
+  // disagree.
+  const emailPerf = useMemo(
+    () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
+    [emailPerformance, isGroupView, selectedEntity]
+  );
   const callsSnapshot = useMemo(
     () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
     [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
@@ -332,7 +346,23 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // never be conflated into one misleading "Live"/"Not connected" signal.
   const ga4Configured = ga4Traffic?.configured === true;
   const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
-  const campaignMonitorSyncEntry = auditLog.find((e) => e.resourceType === 'campaign_monitor');
+  // Campaign Monitor freshness reflects the real sync outcome (syncState
+  // comes from the backend's own audit_log of past sync attempts — see
+  // backend/src/services/emailPerformance.ts) — never just "an env var is
+  // set" or "a sync was attempted at some point", which is what this used
+  // to do before the Campaign Monitor V2 audit.
+  const campaignMonitorStatus: FreshnessEntry = (() => {
+    switch (emailPerformance?.syncState) {
+      case 'live':
+        return { label: 'Campaign Monitor', status: 'live', detail: 'Live' };
+      case 'error':
+        return { label: 'Campaign Monitor', status: 'error', detail: 'Sync failed' };
+      case 'never-synced':
+        return { label: 'Campaign Monitor', status: 'stale', detail: 'Never synced' };
+      default:
+        return { label: 'Campaign Monitor', status: 'not-connected', detail: 'Not connected' };
+    }
+  })();
 
   const freshnessEntries: FreshnessEntry[] = [
     ga4Configured
@@ -341,9 +371,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     infinityConfigured
       ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
-    campaignMonitorSyncEntry
-      ? { label: 'Campaign Monitor', status: 'live', detail: `Updated ${timeAgo(campaignMonitorSyncEntry.createdAt)}` }
-      : { label: 'Campaign Monitor', status: 'not-connected', detail: 'No confirmed sync yet' },
+    campaignMonitorStatus,
     { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
     { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
@@ -574,19 +602,15 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               subtitle={websiteUsers.subtitle}
               size="compact"
             />
-            {emailSnapshot ? (
+            {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
               <KpiCard
                 title="Email"
-                value={emailSnapshot.hasOpenData ? `${emailSnapshot.opens} opens` : `${emailSnapshot.sends} sends logged`}
-                subtitle={
-                  emailSnapshot.hasOpenData
-                    ? `${emailSnapshot.sends} sends logged · ${emailSnapshot.hasClickData ? `${emailSnapshot.clicks} clicks` : 'click data unavailable'}`
-                    : 'Open/click data unavailable for these sends'
-                }
+                value={`${emailPerf.opens} opens`}
+                subtitle={`${emailPerf.campaignsSent} send(s) · ${emailPerf.clicks} clicks`}
                 size="compact"
               />
             ) : (
-              <KpiCard title="Email" status="not-connected" subtitle="No Campaign Monitor sends logged" size="compact" />
+              <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} size="compact" />
             )}
             <KpiCard title="Social" status="not-connected" subtitle="No integration configured" size="compact" />
             <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" onClick={() => onNavigate?.('ppc')} size="compact" />

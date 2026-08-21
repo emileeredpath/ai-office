@@ -3,6 +3,7 @@ import type { EntitySelection } from '@/contexts/EntityContext';
 import type { Period } from '@/contexts/PeriodContext';
 import { periodStartDate } from '@/contexts/PeriodContext';
 import type { Ga4TrafficResponse } from '@/services/ga4Api';
+import { GROUP_AGGREGATE_BRANDS } from '@/utils/groupEntities';
 
 // GA4's own earliest supported date for the Analytics Data API — mirrors
 // GA4_EARLIEST_SUPPORTED_DATE in backend/src/services/ga4.ts. Used as the
@@ -27,14 +28,6 @@ export function resolveGa4DateRange(period: Period, now: Date = new Date()): { s
     endDate: toIsoDate(now),
   };
 }
-
-// The four entities GA4 traffic is combined across at "MTech Group" level
-// in Phase 1 — deliberately just the brands the V2 entity selector
-// actually exposes. mtech's and idaro's GA4 properties (if ever
-// configured) are out of scope for this phase's group aggregate, even
-// though the backend supports both — this is a frontend scoping decision,
-// not a backend limitation.
-const GROUP_AGGREGATE_BRANDS: Brand[] = ['brentwood', 'radio-links', 'capcom', 'ircl'];
 
 export interface WebsiteUsersInfo {
   status: 'available' | 'not-connected';
