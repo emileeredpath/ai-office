@@ -211,8 +211,14 @@ export function InfinityTrackingScreen() {
                     <tbody>
                       {topLandingPages.rows.map((row) => (
                         <tr key={row.url}>
-                          <td className="text-text-primary text-xs" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.url}>
-                            {row.label}
+                          <td className="text-text-primary text-xs" style={{ maxWidth: 320 }} title={row.url}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</div>
+                            <div
+                              className="text-text-secondary"
+                              style={{ fontSize: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}
+                            >
+                              {row.url}
+                            </div>
                           </td>
                           <td style={{ textAlign: 'right' }}>{row.calls}</td>
                           <td style={{ textAlign: 'right' }}>{row.answered}</td>

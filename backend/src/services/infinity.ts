@@ -12,10 +12,18 @@
 //   - Answered/missed: `callStage === 'bridge'` means the call connected to
 //     a person — confirmed against real responses. `callState` (e.g.
 //     NORMAL_CLEARING_A/B) is a hangup-reason code, not an answered signal,
-//     and is not used for this. Connected-call duration is the numeric
+//     and is not used for this. Connected-call duration is the
 //     `bridgeDuration` field (seconds) — averaged across answered calls
 //     only, never across all calls. `callDuration` (ring + connected) is
 //     kept on the record but not used for this metric.
+//   - Duration fields (`callDuration`, `bridgeDuration`, `ringTime`) are
+//     confirmed real as numeric strings (e.g. "145"), not JSON numbers —
+//     diagnosed after live MTech Group Average Call Duration showed 0s
+//     despite 72 answered calls. A strict `typeof === 'number'` guard was
+//     silently discarding every real value to null (then `?? 0` averaged
+//     to zero). See parseDurationField/toCallRecord — both numbers and
+//     numeric strings are accepted; genuinely invalid/blank values stay
+//     null and are never coerced to 0.
 //   - Pagination: confirmed real (limit/offset both honoured; a 30-day,
 //     125-row window was not truncated at limit=1000). No pagination loop
 //     is implemented yet — add one if a single window is ever observed at
@@ -132,9 +140,12 @@ interface RawCallRow {
   href?: string;
   dialledPhoneNumber?: string;
   customerPhoneNumber?: string;
-  callDuration?: number;
-  bridgeDuration?: number;
-  ringTime?: number;
+  // Confirmed real shape: numeric strings (e.g. "145"), not JSON numbers —
+  // typed for both since Infinity's own serialization isn't guaranteed
+  // stable across accounts.
+  callDuration?: number | string;
+  bridgeDuration?: number | string;
+  ringTime?: number | string;
   callStage?: string;
   callState?: string;
   callDirection?: string;
@@ -167,6 +178,22 @@ function parseNdjson(text: string): RawCallRow[] {
   return rows;
 }
 
+// Accepts a genuine number or a numeric string (Infinity's real shape for
+// callDuration/bridgeDuration/ringTime — confirmed via live diagnostic).
+// Anything else — undefined, blank, non-numeric text, NaN — stays null.
+// Never coerced to 0: a missing duration is not the same claim as a real
+// zero-second call.
+function parseDurationField(value: number | string | undefined): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function toCallRecord(row: RawCallRow): InfinityCallRecord {
   const dgrpName = row.dgrpName ?? null;
   return {
@@ -179,9 +206,9 @@ function toCallRecord(row: RawCallRow): InfinityCallRecord {
     src: row.src ?? null,
     dialledPhoneNumber: row.dialledPhoneNumber ?? null,
     customerPhoneNumber: row.customerPhoneNumber ?? null,
-    callDuration: typeof row.callDuration === 'number' ? row.callDuration : null,
-    bridgeDuration: typeof row.bridgeDuration === 'number' ? row.bridgeDuration : null,
-    ringTime: typeof row.ringTime === 'number' ? row.ringTime : null,
+    callDuration: parseDurationField(row.callDuration),
+    bridgeDuration: parseDurationField(row.bridgeDuration),
+    ringTime: parseDurationField(row.ringTime),
     callStage: row.callStage ?? null,
     callState: row.callState ?? null,
     callDirection: row.callDirection ?? null,
