@@ -119,6 +119,11 @@ export interface Task {
   // Monitor's campaign ID for an email-send) — already transmitted by the
   // backend, just not previously declared on this type.
   externalId: string | null;
+  // Where this task came from: 'campaign-monitor' for a genuine synced
+  // send, 'seed'/'test-seed' for fixture data, or null for a manually
+  // created task. Already transmitted by the backend — see
+  // backend/src/db/taskRepository.ts.
+  source: string | null;
 }
 
 export interface CampaignResults {

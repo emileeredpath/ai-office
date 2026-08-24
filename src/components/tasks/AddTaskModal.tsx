@@ -60,6 +60,7 @@ export function AddTaskModal({ onClose }: AddTaskModalProps) {
       bounces: null,
       unsubscribes: null,
       externalId: null,
+      source: null,
     };
 
     setIsSaving(true);

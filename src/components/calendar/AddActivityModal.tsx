@@ -71,6 +71,7 @@ export function AddActivityModal({ defaultDate, onClose }: AddActivityModalProps
       bounces: null,
       unsubscribes: null,
       externalId: null,
+      source: null,
     };
 
     setIsSaving(true);

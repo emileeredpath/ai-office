@@ -84,7 +84,14 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   };
 
   const campaignTasks = useMemo(() => (campaign ? tasks.filter((t) => t.campaignId === campaign.id) : []), [tasks, campaign]);
-  const emailSends = useMemo(() => campaignTasks.filter((t) => t.type === 'email-send'), [campaignTasks]);
+  // Content tab shows genuine Campaign Monitor sends only — source ===
+  // 'campaign-monitor' — never 'seed'/'test-seed' fixture rows, matching
+  // the same honesty guarantee the Performance tab's Email Performance
+  // section already has.
+  const emailSends = useMemo(
+    () => campaignTasks.filter((t) => t.type === 'email-send' && t.source === 'campaign-monitor'),
+    [campaignTasks]
+  );
 
   const campaignActivity = useMemo(() => {
     if (!campaign) return [];
