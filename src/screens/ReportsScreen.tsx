@@ -9,7 +9,7 @@ import { CampaignPerformanceTable } from '@/components/performance/CampaignPerfo
 import { ReportExportButtons } from '@/components/reports/ReportExportButtons';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { buildReportCsv, downloadCsv, type ReportCsvSection } from '@/utils/reportExport';
-import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic, getSocialNetworkBreakdown, getSocialTopLandingPages } from '@/utils/ga4Traffic';
+import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import { resolveCallDateRange, getCallPerformance, getCallSourceBreakdown, getPpcAssistedCalls } from '@/utils/callPerformance';
 
@@ -90,18 +90,19 @@ export function ReportsScreen() {
     () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
     [ga4Traffic, isGroupView, selectedEntity]
   );
+  // Compact summary only — the full by-source/landing-page breakdown now
+  // lives on the dedicated Social page (src/screens/SocialScreen.tsx),
+  // reading the same getSocialTraffic() so the two can never disagree.
   const socialTraffic = useMemo(
     () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
     [ga4SocialTraffic, isGroupView, selectedEntity]
   );
-  const socialByNetwork = useMemo(
-    () => getSocialNetworkBreakdown(ga4SocialTraffic, isGroupView, selectedEntity),
-    [ga4SocialTraffic, isGroupView, selectedEntity]
-  );
-  const socialTopLandingPages = useMemo(
-    () => getSocialTopLandingPages(ga4SocialTraffic, isGroupView, selectedEntity, 10),
-    [ga4SocialTraffic, isGroupView, selectedEntity]
-  );
+  // websiteUsers.subtitle is written for Website Users ("...active users
+  // across N websites") and reused verbatim for the Sessions card, which
+  // is wrong — Sessions isn't a user count. Same source data, correct
+  // wording for this specific card only.
+  const sessionsSubtitle =
+    websiteUsers.status === 'available' ? websiteUsers.subtitle.replace('active users', 'sessions') : websiteUsers.subtitle;
 
   // Funding has no genuine date field this app can honestly match against
   // the global Period selector (funding.period is a free-text label like
@@ -211,8 +212,16 @@ export function ReportsScreen() {
             ? ['Website Users', websiteUsers.activeUsers!, websiteUsers.subtitle]
             : ['Website Users', 'Not connected', websiteUsers.subtitle],
           websiteUsers.status === 'available'
-            ? ['Sessions', websiteUsers.sessions!, websiteUsers.subtitle]
-            : ['Sessions', 'Not connected', websiteUsers.subtitle],
+            ? ['Sessions', websiteUsers.sessions!, sessionsSubtitle]
+            : ['Sessions', 'Not connected', sessionsSubtitle],
+        ],
+      },
+      {
+        // Compact summary only — full by-source/landing-page breakdown is
+        // on the dedicated Social page, not duplicated in this CSV.
+        title: 'Social',
+        columns: ['Metric', 'Value', 'Detail'],
+        rows: [
           socialTraffic.status === 'available'
             ? ['Social Sessions', socialTraffic.sessions!, socialTraffic.subtitle]
             : ['Social Sessions', 'Not connected', socialTraffic.subtitle],
@@ -232,22 +241,6 @@ export function ReportsScreen() {
             ? ['Paid Social Users', socialTraffic.paidUsers!, socialTraffic.subtitle]
             : ['Paid Social Users', 'Not connected', socialTraffic.subtitle],
         ],
-      },
-      {
-        title: 'Social Traffic by Source',
-        columns: ['Source', 'Sessions', 'Users'],
-        rows:
-          socialByNetwork.status === 'available' && socialByNetwork.rows.length > 0
-            ? socialByNetwork.rows.map((r) => [r.source, r.sessions, r.users])
-            : [['Not connected', '', socialByNetwork.subtitle]],
-      },
-      {
-        title: 'Top Landing Pages from Social',
-        columns: ['Landing Page', 'Sessions'],
-        rows:
-          socialTopLandingPages.status === 'available' && socialTopLandingPages.rows.length > 0
-            ? socialTopLandingPages.rows.map((r) => [r.landingPage, r.sessions])
-            : [['Not connected', socialTopLandingPages.subtitle]],
       },
       {
         title: 'Email',
@@ -398,17 +391,22 @@ export function ReportsScreen() {
               title="Sessions"
               value={websiteUsers.status === 'available' ? websiteUsers.sessions : undefined}
               status={websiteUsers.status}
-              subtitle={websiteUsers.subtitle}
+              subtitle={sessionsSubtitle}
               size="compact"
             />
           </div>
+        </div>
 
-          <h3 className="text-sm font-semibold text-text-primary mb-2 mt-6">Social Traffic</h3>
+        {/* Social — compact summary only; the full breakdown (by source,
+            top landing pages) lives on the dedicated Social page so
+            Website and Social read as clearly separate channels here. */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">Social</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Real GA4 website traffic attributed to Organic/Paid Social — sessions and users only. Impressions, reach,
-            engagement, and followers are platform-side metrics GA4 can't see and are not shown here.
+            Real GA4 website traffic attributed to Organic/Paid Social. See the Social page for the full breakdown by
+            source and landing page.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               title="Social Sessions"
               value={socialTraffic.status === 'available' ? socialTraffic.sessions : undefined}
@@ -438,82 +436,6 @@ export function ReportsScreen() {
               size="compact"
             />
           </div>
-
-          <h4 className="text-sm font-semibold text-text-primary mb-2">Social Traffic by Source</h4>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Raw GA4 sessionSource (referring domain) — GA4 doesn't provide a canonical platform name, so sources are
-            shown exactly as reported, not relabelled.
-          </p>
-          {socialByNetwork.status === 'available' ? (
-            socialByNetwork.rows.length > 0 ? (
-              <div className="card p-0 mb-4">
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table w-full text-sm" style={{ minWidth: 420 }}>
-                    <thead>
-                      <tr>
-                        <th>Source</th>
-                        <th style={{ textAlign: 'right' }}>Sessions</th>
-                        <th style={{ textAlign: 'right' }}>Users</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {socialByNetwork.rows.map((row) => (
-                        <tr key={row.source}>
-                          <td className="text-text-primary">{row.source}</td>
-                          <td style={{ textAlign: 'right' }}>{row.sessions}</td>
-                          <td style={{ textAlign: 'right' }}>{row.users}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <p className="v2-not-connected-text mb-4" style={{ padding: '1.5rem' }}>No social traffic in the selected period.</p>
-            )
-          ) : (
-            <div className="card p-4 mb-4">
-              <p className="text-sm text-text-secondary">{socialByNetwork.subtitle}</p>
-            </div>
-          )}
-
-          <h4 className="text-sm font-semibold text-text-primary mb-2">Top Landing Pages from Social</h4>
-          {socialTopLandingPages.status === 'available' ? (
-            socialTopLandingPages.rows.length > 0 ? (
-              <div className="card p-0">
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table w-full text-sm" style={{ minWidth: 420 }}>
-                    <thead>
-                      <tr>
-                        <th>Landing Page</th>
-                        <th style={{ textAlign: 'right' }}>Sessions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {socialTopLandingPages.rows.map((row) => (
-                        <tr key={row.landingPage}>
-                          <td
-                            className="text-text-primary text-xs"
-                            style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={row.landingPage}
-                          >
-                            {row.landingPage}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>{row.sessions}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No social landing pages recorded in the selected period.</p>
-            )
-          ) : (
-            <div className="card p-4">
-              <p className="text-sm text-text-secondary">{socialTopLandingPages.subtitle}</p>
-            </div>
-          )}
         </div>
 
         {/* Email */}
