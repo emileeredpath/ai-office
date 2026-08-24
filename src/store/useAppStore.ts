@@ -21,7 +21,7 @@ import {
 } from '@/services/fundingRecordsApi';
 import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
 import { apiFetch } from '@/services/apiConfig';
-import { fetchGa4Traffic, type Ga4TrafficResponse } from '@/services/ga4Api';
+import { fetchGa4Traffic, type Ga4TrafficResponse, fetchGa4SocialTraffic, type Ga4SocialTrafficResponse } from '@/services/ga4Api';
 import { fetchEmailPerformance, type EmailPerformanceResponse } from '@/services/emailPerformanceApi';
 import { fetchInfinityCalls, type InfinityCallsResponse } from '@/services/infinityCallsApi';
 
@@ -92,6 +92,13 @@ interface AppState {
   ga4Traffic: Ga4TrafficResponse | null;
   ga4TrafficSyncing: boolean;
 
+  // GA4 Social Traffic (Phase 1) — a separate query/response from
+  // ga4Traffic above, never derived from or feeding into it, so Website
+  // Users/Sessions there are provably unaffected by this addition. See
+  // src/utils/ga4Traffic.ts for how pages derive social figures from this.
+  ga4SocialTraffic: Ga4SocialTrafficResponse | null;
+  ga4SocialTrafficSyncing: boolean;
+
   // Real Campaign Monitor email performance (V2 Overview/Performance/
   // Reports) — a read-only rollup already restricted server-side to
   // source === 'campaign-monitor'. See src/utils/emailPerformance.ts.
@@ -136,6 +143,7 @@ interface AppState {
   // General GA4 website traffic, for the resolved date range the caller
   // (Overview/Performance/Reports) wants — see resolveGa4DateRange().
   syncGa4Traffic: (startDate: string, endDate: string) => Promise<void>;
+  syncGa4SocialTraffic: (startDate: string, endDate: string) => Promise<void>;
 
   // Real Campaign Monitor email performance, for the resolved date range
   // the caller wants — see resolveEmailDateRange().
@@ -224,6 +232,8 @@ export const useAppStore = create<AppState>((set, get) => {
     wave1Syncing: false,
     ga4Traffic: null,
     ga4TrafficSyncing: false,
+    ga4SocialTraffic: null,
+    ga4SocialTrafficSyncing: false,
     emailPerformance: null,
     emailPerformanceSyncing: false,
     infinityCalls: null,
@@ -592,6 +602,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('GA4 traffic sync error:', err);
         set({ ga4TrafficSyncing: false });
+      }
+    },
+
+    syncGa4SocialTraffic: async (startDate: string, endDate: string) => {
+      set({ ga4SocialTrafficSyncing: true });
+      try {
+        const data = await fetchGa4SocialTraffic(startDate, endDate);
+        set({ ga4SocialTraffic: data, ga4SocialTrafficSyncing: false });
+      } catch (err) {
+        console.error('GA4 social traffic sync error:', err);
+        set({ ga4SocialTrafficSyncing: false });
       }
     },
 

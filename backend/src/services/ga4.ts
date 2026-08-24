@@ -151,6 +151,194 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Social Traffic (Phase 1) — website sessions/users GA4 attributes to
+// social, using GA4's own standard channel classification. This is a
+// second, separate query per property from runReport() above — it never
+// touches or reinterprets the existing Website Users/Sessions figures,
+// so that path is provably unaffected by this addition.
+//
+// sessionDefaultChannelGroup is GA4's own rules-based classification —
+// "Organic Social" and "Paid Social" are real, standard values it
+// assigns, not something this app invents or guesses. Its accuracy for
+// a given site still depends on that site's own UTM/referrer tagging
+// being correct (e.g. a paid social ad needs utm_medium=cpc/paid or GA4
+// won't classify it as Paid Social) — a real caveat, not a reason to
+// avoid using GA4's own classification.
+//
+// sessionSource is used for the "by network" breakdown. GA4 does not
+// provide a canonical "LinkedIn"/"Facebook"/"Instagram" dimension — only
+// the raw referring domain (e.g. "l.facebook.com", "linkedin.com",
+// "l.instagram.com"). Those raw values are surfaced as-is, never
+// relabelled or bucketed into a platform name GA4 itself doesn't
+// provide — the same "never invent a classification" rule already
+// applied to Infinity's chType handling.
+const SOCIAL_CHANNEL_GROUPS = new Set(['Organic Social', 'Paid Social']);
+
+export interface SocialNetworkRow {
+  source: string;
+  sessions: number;
+  users: number;
+}
+
+export interface SocialLandingPageRow {
+  landingPage: string;
+  sessions: number;
+}
+
+export interface BrandSocialTraffic {
+  brand: Brand;
+  sessions: number;
+  users: number;
+  organicSessions: number;
+  organicUsers: number;
+  paidSessions: number;
+  paidUsers: number;
+  byNetwork: SocialNetworkRow[];
+  topLandingPages: SocialLandingPageRow[];
+}
+
+export interface Ga4SocialResult {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  brands: BrandSocialTraffic[];
+  configuredBrands: Brand[];
+  errors: string[];
+}
+
+interface SocialReportRow {
+  channelGroup: string;
+  source: string;
+  landingPage: string;
+  sessions: number;
+  users: number;
+}
+
+async function runSocialReport(propertyId: string, token: string, startDate: string, endDate: string): Promise<SocialReportRow[]> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [
+        { name: 'sessionDefaultChannelGroup' },
+        { name: 'sessionSource' },
+        { name: 'landingPage' },
+      ],
+      metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+      limit: 100000,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 social runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as {
+    rows?: Array<{ dimensionValues: { value: string }[]; metricValues: { value: string }[] }>;
+  };
+  const rows = json.rows || [];
+  return rows.map((row) => ({
+    channelGroup: row.dimensionValues[0]?.value ?? '',
+    source: row.dimensionValues[1]?.value ?? '',
+    landingPage: row.dimensionValues[2]?.value ?? '',
+    sessions: Number(row.metricValues[0]?.value ?? 0),
+    users: Number(row.metricValues[1]?.value ?? 0),
+  }));
+}
+
+function summarizeSocialRows(rows: SocialReportRow[]): Omit<BrandSocialTraffic, 'brand'> {
+  const socialRows = rows.filter((r) => SOCIAL_CHANNEL_GROUPS.has(r.channelGroup));
+
+  let sessions = 0;
+  let users = 0;
+  let organicSessions = 0;
+  let organicUsers = 0;
+  let paidSessions = 0;
+  let paidUsers = 0;
+  const networkTotals = new Map<string, { sessions: number; users: number }>();
+  const landingPageTotals = new Map<string, number>();
+
+  for (const row of socialRows) {
+    sessions += row.sessions;
+    users += row.users;
+    if (row.channelGroup === 'Organic Social') {
+      organicSessions += row.sessions;
+      organicUsers += row.users;
+    } else {
+      paidSessions += row.sessions;
+      paidUsers += row.users;
+    }
+
+    const net = networkTotals.get(row.source) ?? { sessions: 0, users: 0 };
+    net.sessions += row.sessions;
+    net.users += row.users;
+    networkTotals.set(row.source, net);
+
+    if (row.landingPage) {
+      landingPageTotals.set(row.landingPage, (landingPageTotals.get(row.landingPage) ?? 0) + row.sessions);
+    }
+  }
+
+  const byNetwork: SocialNetworkRow[] = Array.from(networkTotals.entries())
+    .map(([source, v]) => ({ source, sessions: v.sessions, users: v.users }))
+    .sort((a, b) => b.sessions - a.sessions);
+
+  const topLandingPages: SocialLandingPageRow[] = Array.from(landingPageTotals.entries())
+    .map(([landingPage, s]) => ({ landingPage, sessions: s }))
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, 10);
+
+  return { sessions, users, organicSessions, organicUsers, paidSessions, paidUsers, byNetwork, topLandingPages };
+}
+
+// Same per-property loop and honesty rules as getBrandTraffic() — only
+// entities with a configured GA4 property are queried; a brand with a
+// genuinely zero social sessions this period is distinguishable from a
+// brand with no GA4 property at all via configuredBrands, exactly as
+// getBrandTraffic() already does for Website Users/Sessions.
+export async function getSocialTraffic(startDate?: string, endDate?: string): Promise<Ga4SocialResult> {
+  const errors: string[] = [];
+  const configuredBrands = (Object.keys(PROPERTY_ID_ENV) as Brand[]).filter(
+    (brand) => !!process.env[PROPERTY_ID_ENV[brand] as string]
+  );
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || configuredBrands.length === 0) {
+    return {
+      configured: false,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      brands: [],
+      configuredBrands: [],
+      errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to get access token:', msg);
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, brands: [], configuredBrands, errors: [msg] };
+  }
+
+  const brands: BrandSocialTraffic[] = [];
+  for (const brand of configuredBrands) {
+    const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string;
+    try {
+      const rows = await runSocialReport(propertyId, token, range.startDate, range.endDate);
+      brands.push({ brand, ...summarizeSocialRows(rows) });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[ga4] failed to fetch social traffic for ${brand}:`, msg);
+      errors.push(`${brand}: ${msg}`);
+    }
+  }
+
+  return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, errors };
+}
+
 export interface Wave1PerformanceMetrics {
   clicks: number;
   pageViews: number;

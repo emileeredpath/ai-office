@@ -15,7 +15,7 @@ import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/camp
 import { getMarketingEvents } from '@/utils/marketingEvents';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { getCallsSnapshot } from '@/utils/channelSnapshot';
-import { resolveGa4DateRange, getWebsiteUsers } from '@/utils/ga4Traffic';
+import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
@@ -63,12 +63,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const auditLog = useAppStore((s) => s.auditLog);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
+  const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
+  const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const selectTask = useAppStore((s) => s.selectTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
@@ -87,6 +89,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   useEffect(() => {
     syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
+  useEffect(() => {
+    syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -149,6 +154,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const websiteUsers = useMemo(
     () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
     [ga4Traffic, isGroupView, selectedEntity]
+  );
+  const socialTraffic = useMemo(
+    () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
+    [ga4SocialTraffic, isGroupView, selectedEntity]
   );
   const funnelStages: FunnelStage[] = [
     {
@@ -308,9 +317,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   // Email: real Campaign Monitor data only (source === 'campaign-monitor',
   // enforced server-side — see src/utils/emailPerformance.ts), genuinely
   // entity- and period-filtered; otherwise honestly "Not connected". Social
-  // and PPC have no real data source at all — the PPC page (rebuilt
-  // honestly in a later phase) is itself all "Not connected" today too,
-  // awaiting Google Ads. Calls use the real Infinity wave1Performance
+  // is real GA4 website traffic attributed to Organic/Paid Social (see
+  // src/utils/ga4Traffic.ts's getSocialTraffic) — sessions/users only,
+  // never platform-side metrics like impressions/reach/followers, which
+  // still require a real Hootsuite/platform integration. PPC has no real
+  // data source at all — the PPC page (rebuilt honestly in a later phase)
+  // is itself all "Not connected" today too, awaiting Google Ads. Calls
+  // use the real Infinity wave1Performance
   // response when configured. Email and Calls are shared with Performance's
   // Channel Summary via src/utils/emailPerformance.ts and
   // src/utils/channelSnapshot.ts respectively, so the two pages can never
@@ -612,7 +625,16 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             ) : (
               <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} size="compact" />
             )}
-            <KpiCard title="Social" status="not-connected" subtitle="No integration configured" size="compact" />
+            {socialTraffic.status === 'available' ? (
+              <KpiCard
+                title="Social"
+                value={`${socialTraffic.sessions} sessions`}
+                subtitle={`${socialTraffic.users} users · GA4 website traffic from social`}
+                size="compact"
+              />
+            ) : (
+              <KpiCard title="Social" status="not-connected" subtitle={socialTraffic.subtitle} size="compact" />
+            )}
             <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" onClick={() => onNavigate?.('ppc')} size="compact" />
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} size="compact" />

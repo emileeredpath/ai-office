@@ -9,7 +9,7 @@ import { CampaignPerformanceTable } from '@/components/performance/CampaignPerfo
 import { ReportExportButtons } from '@/components/reports/ReportExportButtons';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { buildReportCsv, downloadCsv, type ReportCsvSection } from '@/utils/reportExport';
-import { resolveGa4DateRange, getWebsiteUsers } from '@/utils/ga4Traffic';
+import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic, getSocialNetworkBreakdown, getSocialTopLandingPages } from '@/utils/ga4Traffic';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import { resolveCallDateRange, getCallPerformance, getCallSourceBreakdown, getPpcAssistedCalls } from '@/utils/callPerformance';
 
@@ -30,6 +30,7 @@ export function ReportsScreen() {
   const fundingRecords = useAppStore((s) => s.fundingRecords);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
+  const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const infinityCalls = useAppStore((s) => s.infinityCalls);
   const syncCampaignsFromApi = useAppStore((s) => s.syncCampaignsFromApi);
@@ -37,6 +38,7 @@ export function ReportsScreen() {
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
+  const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
@@ -54,6 +56,9 @@ export function ReportsScreen() {
   useEffect(() => {
     syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Traffic]);
+  useEffect(() => {
+    syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -84,6 +89,18 @@ export function ReportsScreen() {
   const websiteUsers = useMemo(
     () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
     [ga4Traffic, isGroupView, selectedEntity]
+  );
+  const socialTraffic = useMemo(
+    () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
+    [ga4SocialTraffic, isGroupView, selectedEntity]
+  );
+  const socialByNetwork = useMemo(
+    () => getSocialNetworkBreakdown(ga4SocialTraffic, isGroupView, selectedEntity),
+    [ga4SocialTraffic, isGroupView, selectedEntity]
+  );
+  const socialTopLandingPages = useMemo(
+    () => getSocialTopLandingPages(ga4SocialTraffic, isGroupView, selectedEntity, 10),
+    [ga4SocialTraffic, isGroupView, selectedEntity]
   );
 
   // Funding has no genuine date field this app can honestly match against
@@ -196,7 +213,41 @@ export function ReportsScreen() {
           websiteUsers.status === 'available'
             ? ['Sessions', websiteUsers.sessions!, websiteUsers.subtitle]
             : ['Sessions', 'Not connected', websiteUsers.subtitle],
+          socialTraffic.status === 'available'
+            ? ['Social Sessions', socialTraffic.sessions!, socialTraffic.subtitle]
+            : ['Social Sessions', 'Not connected', socialTraffic.subtitle],
+          socialTraffic.status === 'available'
+            ? ['Social Users', socialTraffic.users!, socialTraffic.subtitle]
+            : ['Social Users', 'Not connected', socialTraffic.subtitle],
+          socialTraffic.status === 'available'
+            ? ['Organic Social Sessions', socialTraffic.organicSessions!, socialTraffic.subtitle]
+            : ['Organic Social Sessions', 'Not connected', socialTraffic.subtitle],
+          socialTraffic.status === 'available'
+            ? ['Organic Social Users', socialTraffic.organicUsers!, socialTraffic.subtitle]
+            : ['Organic Social Users', 'Not connected', socialTraffic.subtitle],
+          socialTraffic.status === 'available'
+            ? ['Paid Social Sessions', socialTraffic.paidSessions!, socialTraffic.subtitle]
+            : ['Paid Social Sessions', 'Not connected', socialTraffic.subtitle],
+          socialTraffic.status === 'available'
+            ? ['Paid Social Users', socialTraffic.paidUsers!, socialTraffic.subtitle]
+            : ['Paid Social Users', 'Not connected', socialTraffic.subtitle],
         ],
+      },
+      {
+        title: 'Social Traffic by Source',
+        columns: ['Source', 'Sessions', 'Users'],
+        rows:
+          socialByNetwork.status === 'available' && socialByNetwork.rows.length > 0
+            ? socialByNetwork.rows.map((r) => [r.source, r.sessions, r.users])
+            : [['Not connected', '', socialByNetwork.subtitle]],
+      },
+      {
+        title: 'Top Landing Pages from Social',
+        columns: ['Landing Page', 'Sessions'],
+        rows:
+          socialTopLandingPages.status === 'available' && socialTopLandingPages.rows.length > 0
+            ? socialTopLandingPages.rows.map((r) => [r.landingPage, r.sessions])
+            : [['Not connected', socialTopLandingPages.subtitle]],
       },
       {
         title: 'Email',
@@ -351,6 +402,118 @@ export function ReportsScreen() {
               size="compact"
             />
           </div>
+
+          <h3 className="text-sm font-semibold text-text-primary mb-2 mt-6">Social Traffic</h3>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Real GA4 website traffic attributed to Organic/Paid Social — sessions and users only. Impressions, reach,
+            engagement, and followers are platform-side metrics GA4 can't see and are not shown here.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <KpiCard
+              title="Social Sessions"
+              value={socialTraffic.status === 'available' ? socialTraffic.sessions : undefined}
+              status={socialTraffic.status}
+              subtitle={socialTraffic.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Social Users"
+              value={socialTraffic.status === 'available' ? socialTraffic.users : undefined}
+              status={socialTraffic.status}
+              subtitle={socialTraffic.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Organic Social"
+              value={socialTraffic.status === 'available' ? `${socialTraffic.organicSessions} sessions` : undefined}
+              status={socialTraffic.status}
+              subtitle={socialTraffic.status === 'available' ? `${socialTraffic.organicUsers} users` : socialTraffic.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Paid Social"
+              value={socialTraffic.status === 'available' ? `${socialTraffic.paidSessions} sessions` : undefined}
+              status={socialTraffic.status}
+              subtitle={socialTraffic.status === 'available' ? `${socialTraffic.paidUsers} users` : socialTraffic.subtitle}
+              size="compact"
+            />
+          </div>
+
+          <h4 className="text-sm font-semibold text-text-primary mb-2">Social Traffic by Source</h4>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Raw GA4 sessionSource (referring domain) — GA4 doesn't provide a canonical platform name, so sources are
+            shown exactly as reported, not relabelled.
+          </p>
+          {socialByNetwork.status === 'available' ? (
+            socialByNetwork.rows.length > 0 ? (
+              <div className="card p-0 mb-4">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 420 }}>
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th style={{ textAlign: 'right' }}>Sessions</th>
+                        <th style={{ textAlign: 'right' }}>Users</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {socialByNetwork.rows.map((row) => (
+                        <tr key={row.source}>
+                          <td className="text-text-primary">{row.source}</td>
+                          <td style={{ textAlign: 'right' }}>{row.sessions}</td>
+                          <td style={{ textAlign: 'right' }}>{row.users}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text mb-4" style={{ padding: '1.5rem' }}>No social traffic in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4 mb-4">
+              <p className="text-sm text-text-secondary">{socialByNetwork.subtitle}</p>
+            </div>
+          )}
+
+          <h4 className="text-sm font-semibold text-text-primary mb-2">Top Landing Pages from Social</h4>
+          {socialTopLandingPages.status === 'available' ? (
+            socialTopLandingPages.rows.length > 0 ? (
+              <div className="card p-0">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 420 }}>
+                    <thead>
+                      <tr>
+                        <th>Landing Page</th>
+                        <th style={{ textAlign: 'right' }}>Sessions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {socialTopLandingPages.rows.map((row) => (
+                        <tr key={row.landingPage}>
+                          <td
+                            className="text-text-primary text-xs"
+                            style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={row.landingPage}
+                          >
+                            {row.landingPage}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{row.sessions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No social landing pages recorded in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{socialTopLandingPages.subtitle}</p>
+            </div>
+          )}
         </div>
 
         {/* Email */}
