@@ -8,17 +8,20 @@ import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataF
 import { CampaignPerformanceTable } from '@/components/performance/CampaignPerformanceTable';
 import { ReportExportButtons } from '@/components/reports/ReportExportButtons';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
-import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { buildReportCsv, downloadCsv, type ReportCsvSection } from '@/utils/reportExport';
 import { resolveGa4DateRange, getWebsiteUsers } from '@/utils/ga4Traffic';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
+import { resolveCallDateRange, getCallPerformance, getCallSourceBreakdown, getPpcAssistedCalls } from '@/utils/callPerformance';
 
 // Reports is the V2 reporting area — a period + entity scoped rollup of
 // the honest figures already established across Overview, Performance,
 // Funding and Call Tracking. It introduces no new data source of its
 // own: every real number here is computed with the exact same shared
-// utilities those pages use (campaignMetrics.ts, channelSnapshot.ts), so
-// this page can never disagree with them. The old campaign.conversions/
+// utilities those pages use (campaignMetrics.ts, ga4Traffic.ts,
+// emailPerformance.ts, callPerformance.ts), so this page can never
+// disagree with them. Calls figures read the real, entity/period-aware
+// Infinity layer (callPerformance.ts) — the same one Call Tracking uses —
+// not the legacy Wave 1 combined total. The old campaign.conversions/
 // engagement fields (mock-era, unused by any other V2 screen, not
 // editable anywhere in the UI) are removed outright, not replaced with
 // an estimate.
@@ -28,12 +31,14 @@ export function ReportsScreen() {
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
+  const infinityCalls = useAppStore((s) => s.infinityCalls);
   const syncCampaignsFromApi = useAppStore((s) => s.syncCampaignsFromApi);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
+  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { isGroupView, selectedEntity, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
@@ -54,6 +59,11 @@ export function ReportsScreen() {
   useEffect(() => {
     syncEmailPerformance(emailRange.startDate, emailRange.endDate);
   }, [emailRange.startDate, emailRange.endDate, syncEmailPerformance]);
+
+  const callRange = useMemo(() => resolveCallDateRange(period), [period]);
+  useEffect(() => {
+    syncInfinityCalls(callRange.startDate, callRange.endDate);
+  }, [callRange.startDate, callRange.endDate, syncInfinityCalls]);
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
   const periodLabel = PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? period;
@@ -95,10 +105,27 @@ export function ReportsScreen() {
     () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
     [emailPerformance, isGroupView, selectedEntity]
   );
-  const callsSnapshot = useMemo(
-    () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
-    [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Same real, entity/period-aware Infinity layer Call Tracking uses — no
+  // separate Wave 1 fallback. Reports can never disagree with Call
+  // Tracking about totals, source classification, or Capcom's unmapped
+  // status, because both read the exact same shared utility.
+  const callPerf = useMemo(
+    () => getCallPerformance(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
   );
+  const callSourceBreakdown = useMemo(
+    () => getCallSourceBreakdown(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
+  );
+  const ppcAssisted = useMemo(
+    () => getPpcAssistedCalls(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
+  );
+  const callsAnswerRate =
+    callPerf.status === 'available' && callPerf.totalCalls! > 0
+      ? Math.round((callPerf.answeredCalls! / callPerf.totalCalls!) * 100)
+      : null;
 
   // GA4 freshness reflects the general website-traffic source this page
   // uses (ga4Traffic), not the separate campaign-scoped Wave 1 GA4 query.
@@ -106,7 +133,8 @@ export function ReportsScreen() {
   // "an env var is set" — see backend/src/services/emailPerformance.ts.
   const ga4Configured = ga4Traffic?.configured === true;
   const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
-  const infinityConfigured = wave1Performance?.infinityConfigured === true;
+  const infinityConfigured = infinityCalls?.configured === true;
+  const infinityHasErrors = (infinityCalls?.errors?.length ?? 0) > 0;
 
   const campaignMonitorStatus: FreshnessEntry = (() => {
     switch (emailPerformance?.syncState) {
@@ -126,7 +154,7 @@ export function ReportsScreen() {
       ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : 'Live' }
       : { label: 'GA4', status: 'not-connected', detail: 'Not connected' },
     infinityConfigured
-      ? { label: 'Infinity (Calls)', status: 'live', detail: 'Connected' }
+      ? { label: 'Infinity (Calls)', status: infinityHasErrors ? 'error' : 'live', detail: infinityHasErrors ? 'Sync error' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
     campaignMonitorStatus,
     { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
@@ -138,7 +166,7 @@ export function ReportsScreen() {
   const handleExportCsv = () => {
     const sections: ReportCsvSection[] = [
       {
-        title: 'Marketing Performance',
+        title: 'Marketing Summary',
         columns: ['Metric', 'Value', 'Detail'],
         rows: [
           websiteUsers.status === 'available'
@@ -147,9 +175,6 @@ export function ReportsScreen() {
           ['Enquiries', enquiriesTotal, 'Manually logged per campaign'],
           ['Marketing Leads', marketingLeads, 'Manually logged, not yet CRM-linked'],
           ['Marketing Spend', currency(marketingSpend), 'Manually logged campaign spend'],
-          ['Opportunities', 'Not connected', 'Awaiting Acumatica integration'],
-          ['Pipeline', 'Not connected', 'Awaiting Acumatica integration'],
-          ['Won Revenue', 'Not connected', 'Awaiting Acumatica integration'],
         ],
       },
       {
@@ -162,21 +187,69 @@ export function ReportsScreen() {
         ],
       },
       {
-        title: 'Channel Summary',
-        columns: ['Channel', 'Value', 'Detail'],
+        title: 'Website',
+        columns: ['Metric', 'Value', 'Detail'],
         rows: [
           websiteUsers.status === 'available'
-            ? ['Website', `${websiteUsers.activeUsers} users`, websiteUsers.subtitle]
-            : ['Website', 'Not connected', websiteUsers.subtitle],
-          emailPerf.status === 'available' && emailPerf.campaignsSent! > 0
-            ? ['Email', `${emailPerf.opens} opens`, `${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients · ${emailPerf.clicks} clicks`]
-            : ['Email', 'Not connected', emailPerf.subtitle],
-          ['Social', 'Not connected', 'No integration configured'],
-          ['PPC', 'Not connected', 'Awaiting Google Ads integration'],
-          callsSnapshot
-            ? ['Calls', callsSnapshot.totalCalls, `${callsSnapshot.answeredCalls} answered — MTech Group only`]
-            : ['Calls', 'Not connected', isGroupView ? 'Awaiting Infinity integration' : 'Entity-level call attribution not available yet'],
+            ? ['Website Users', websiteUsers.activeUsers!, websiteUsers.subtitle]
+            : ['Website Users', 'Not connected', websiteUsers.subtitle],
+          websiteUsers.status === 'available'
+            ? ['Sessions', websiteUsers.sessions!, websiteUsers.subtitle]
+            : ['Sessions', 'Not connected', websiteUsers.subtitle],
         ],
+      },
+      {
+        title: 'Email',
+        columns: ['Metric', 'Value', 'Detail'],
+        rows:
+          emailPerf.status === 'available' && emailPerf.campaignsSent! > 0
+            ? [
+                ['Sends', emailPerf.campaignsSent!, emailPerf.subtitle],
+                ['Recipients', emailPerf.recipients!, emailPerf.subtitle],
+                ['Opens', emailPerf.opens!, emailPerf.subtitle],
+                ['Clicks', emailPerf.clicks!, emailPerf.subtitle],
+                ['Bounces', emailPerf.bounces!, emailPerf.subtitle],
+                ['Unsubscribes', emailPerf.unsubscribes!, emailPerf.subtitle],
+              ]
+            : [['Email', 'Not connected', emailPerf.subtitle]],
+      },
+      {
+        title: 'Calls',
+        columns: ['Metric', 'Value', 'Detail'],
+        rows: [
+          callPerf.status === 'available'
+            ? ['Total Calls', callPerf.totalCalls!, callPerf.subtitle]
+            : ['Total Calls', 'Not connected', callPerf.subtitle],
+          callPerf.status === 'available'
+            ? ['Answered', callPerf.answeredCalls!, callPerf.subtitle]
+            : ['Answered', 'Not connected', callPerf.subtitle],
+          callPerf.status === 'available'
+            ? ['Missed', callPerf.missedCalls!, callPerf.subtitle]
+            : ['Missed', 'Not connected', callPerf.subtitle],
+          callPerf.status === 'available' && callsAnswerRate !== null
+            ? ['Answer Rate', `${callsAnswerRate}%`, 'Answered ÷ Total Calls']
+            : ['Answer Rate', 'Not connected', callPerf.subtitle],
+          callPerf.status === 'available'
+            ? ['Average Call Duration', callPerf.avgDuration!, 'Across answered calls']
+            : ['Average Call Duration', 'Not connected', callPerf.subtitle],
+          ppcAssisted.status === 'available'
+            ? ['PPC-Assisted Calls', ppcAssisted.count, ppcAssisted.subtitle]
+            : ['PPC-Assisted Calls', 'Not connected', ppcAssisted.subtitle],
+        ],
+      },
+      {
+        title: 'Call Source Breakdown',
+        columns: ['Source', 'Calls', 'Answered', 'Missed', 'Answer Rate'],
+        rows:
+          callSourceBreakdown.status === 'available' && callSourceBreakdown.buckets.length > 0
+            ? callSourceBreakdown.buckets.map((b) => [
+                b.source,
+                b.calls,
+                b.answered,
+                b.missed,
+                b.answerRate != null ? `${b.answerRate}%` : '—',
+              ])
+            : [['Not connected', '', '', '', callSourceBreakdown.subtitle]],
       },
       {
         title: 'Campaign Summary',
@@ -189,6 +262,15 @@ export function ReportsScreen() {
           currency(c.spend || 0),
           c.valueGenerated != null ? currency(c.valueGenerated) : 'Not logged',
         ]),
+      },
+      {
+        title: 'Commercial',
+        columns: ['Metric', 'Value', 'Detail'],
+        rows: [
+          ['Opportunities', 'Not connected', 'Awaiting Acumatica integration'],
+          ['Pipeline', 'Not connected', 'Awaiting Acumatica integration'],
+          ['Won Revenue', 'Not connected', 'Awaiting Acumatica integration'],
+        ],
       },
     ];
 
@@ -220,9 +302,9 @@ export function ReportsScreen() {
           <DataFreshnessBar entries={freshnessEntries} />
         </div>
 
-        {/* Marketing Performance */}
+        {/* Marketing Summary */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Marketing Performance</h2>
+          <h2 className="v2-section-title">Marketing Summary</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               title="Website Users"
@@ -233,9 +315,6 @@ export function ReportsScreen() {
             <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged per campaign" />
             <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" accent="var(--v2-green)" />
             <KpiCard title="Marketing Spend" value={currency(marketingSpend)} subtitle="Manually logged campaign spend" />
-            <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
-            <KpiCard title="Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
-            <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
           </div>
         </div>
 
@@ -253,39 +332,135 @@ export function ReportsScreen() {
           </div>
         </div>
 
-        {/* Channel Summary */}
+        {/* Website */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Channel Summary</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+          <h2 className="v2-section-title">Website</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard
-              title="Website"
-              value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
+              title="Website Users"
+              value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
               status={websiteUsers.status}
               subtitle={websiteUsers.subtitle}
               size="compact"
             />
-            {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
-              <KpiCard
-                title="Email"
-                value={`${emailPerf.opens} opens`}
-                subtitle={`${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients · ${emailPerf.clicks} clicks`}
-                size="compact"
-              />
-            ) : (
-              <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} size="compact" />
-            )}
-            <KpiCard title="Social" status="not-connected" subtitle="No integration configured" size="compact" />
-            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" size="compact" />
-            {callsSnapshot ? (
-              <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered — MTech Group only`} size="compact" />
-            ) : (
-              <KpiCard title="Calls" status="not-connected" subtitle={isGroupView ? 'Awaiting Infinity integration' : 'Entity-level attribution not available yet'} size="compact" />
-            )}
+            <KpiCard
+              title="Sessions"
+              value={websiteUsers.status === 'available' ? websiteUsers.sessions : undefined}
+              status={websiteUsers.status}
+              subtitle={websiteUsers.subtitle}
+              size="compact"
+            />
           </div>
         </div>
 
+        {/* Email */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">Email</h2>
+          {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+              <KpiCard title="Sends" value={emailPerf.campaignsSent} subtitle={emailPerf.subtitle} size="compact" />
+              <KpiCard title="Recipients" value={emailPerf.recipients} subtitle={emailPerf.subtitle} size="compact" />
+              <KpiCard title="Opens" value={emailPerf.opens} subtitle={emailPerf.subtitle} size="compact" />
+              <KpiCard title="Clicks" value={emailPerf.clicks} subtitle={emailPerf.subtitle} size="compact" />
+              <KpiCard title="Bounces" value={emailPerf.bounces} subtitle={emailPerf.subtitle} size="compact" />
+              <KpiCard title="Unsubscribes" value={emailPerf.unsubscribes} subtitle={emailPerf.subtitle} size="compact" />
+            </div>
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{emailPerf.subtitle}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Calls */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">Calls</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-4">
+            <KpiCard
+              title="Total Calls"
+              value={callPerf.status === 'available' ? callPerf.totalCalls : undefined}
+              status={callPerf.status}
+              subtitle={callPerf.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Answered"
+              value={callPerf.status === 'available' ? callPerf.answeredCalls : undefined}
+              status={callPerf.status}
+              subtitle={callPerf.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Missed"
+              value={callPerf.status === 'available' ? callPerf.missedCalls : undefined}
+              status={callPerf.status}
+              subtitle={callPerf.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Answer Rate"
+              value={callPerf.status === 'available' && callsAnswerRate !== null ? `${callsAnswerRate}%` : undefined}
+              status={callPerf.status === 'available' && callsAnswerRate !== null ? 'available' : 'not-connected'}
+              subtitle={callPerf.status === 'available' ? 'Answered ÷ Total Calls' : callPerf.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Average Call Duration"
+              value={callPerf.status === 'available' ? callPerf.avgDuration : undefined}
+              status={callPerf.status}
+              subtitle={callPerf.status === 'available' ? 'Across answered calls' : callPerf.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="PPC-Assisted Calls"
+              value={ppcAssisted.status === 'available' ? ppcAssisted.count : undefined}
+              status={ppcAssisted.status}
+              subtitle={ppcAssisted.subtitle}
+              size="compact"
+            />
+          </div>
+
+          <h3 className="text-sm font-semibold text-text-primary mb-2">Call Source Breakdown</h3>
+          {callSourceBreakdown.status === 'available' ? (
+            callSourceBreakdown.buckets.length > 0 ? (
+              <div className="card p-0">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 480 }}>
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th style={{ textAlign: 'right' }}>Calls</th>
+                        <th style={{ textAlign: 'right' }}>Answered</th>
+                        <th style={{ textAlign: 'right' }}>Missed</th>
+                        <th style={{ textAlign: 'right' }}>Answer Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {callSourceBreakdown.buckets.map((bucket) => (
+                        <tr key={bucket.source}>
+                          <td className="text-text-primary">{bucket.source}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.calls}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.answered}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.missed}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.answerRate != null ? `${bucket.answerRate}%` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No calls in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{callSourceBreakdown.subtitle}</p>
+            </div>
+          )}
+        </div>
+
         {/* Campaign Summary */}
-        <div className="mb-4">
+        <div className="mb-8">
           <h2 className="v2-section-title">Campaign Summary</h2>
           <div className="card" style={{ padding: 0 }}>
             <CampaignPerformanceTable
@@ -294,6 +469,16 @@ export function ReportsScreen() {
               showEntityColumn={isGroupView}
               onSelectCampaign={(id) => selectCampaign(id, 'performance')}
             />
+          </div>
+        </div>
+
+        {/* Commercial */}
+        <div className="mb-4">
+          <h2 className="v2-section-title">Commercial</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
+            <KpiCard title="Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
+            <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
           </div>
         </div>
       </div>
