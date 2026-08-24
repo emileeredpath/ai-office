@@ -264,7 +264,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               <KpiCard
                 title="Email"
                 value={`${emailPerf.opens} opens`}
-                subtitle={`${emailPerf.campaignsSent} send(s) · ${emailPerf.clicks} clicks`}
+                subtitle={`${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients · ${emailPerf.clicks} clicks`}
                 size="compact"
               />
             ) : (

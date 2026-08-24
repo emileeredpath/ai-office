@@ -30,6 +30,13 @@ export interface EmailCampaignRecord {
   clicks: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  // The real Campaign Monitor campaign ID (task.externalId) — useful for
+  // cross-checking a send directly in Campaign Monitor's own UI.
+  campaignMonitorId: string | null;
+  // The dashboard campaign this send is linked to (task.campaignId), set
+  // only by the existing sync's name-based matching — never inferred here.
+  // Null means genuinely unlinked; Campaign Detail must never guess a link.
+  dashboardCampaignId: string | null;
 }
 
 export type CampaignMonitorSyncState = 'live' | 'error' | 'never-synced' | 'not-configured';
@@ -104,6 +111,8 @@ export function getEmailPerformance(startDate: string, endDate: string): EmailPe
       clicks: task.clicks,
       bounces: task.bounces,
       unsubscribes: task.unsubscribes,
+      campaignMonitorId: task.externalId,
+      dashboardCampaignId: task.campaignId,
     });
   }
 

@@ -11,6 +11,8 @@ export interface EmailCampaignRecord {
   clicks: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  campaignMonitorId: string | null;
+  dashboardCampaignId: string | null;
 }
 
 export type CampaignMonitorSyncState = 'live' | 'error' | 'never-synced' | 'not-configured';

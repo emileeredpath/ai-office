@@ -169,7 +169,7 @@ export function ReportsScreen() {
             ? ['Website', `${websiteUsers.activeUsers} users`, websiteUsers.subtitle]
             : ['Website', 'Not connected', websiteUsers.subtitle],
           emailPerf.status === 'available' && emailPerf.campaignsSent! > 0
-            ? ['Email', `${emailPerf.opens} opens`, emailPerf.subtitle]
+            ? ['Email', `${emailPerf.opens} opens`, `${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients · ${emailPerf.clicks} clicks`]
             : ['Email', 'Not connected', emailPerf.subtitle],
           ['Social', 'Not connected', 'No integration configured'],
           ['PPC', 'Not connected', 'Awaiting Google Ads integration'],
@@ -268,7 +268,7 @@ export function ReportsScreen() {
               <KpiCard
                 title="Email"
                 value={`${emailPerf.opens} opens`}
-                subtitle={`${emailPerf.campaignsSent} send(s) · ${emailPerf.clicks} clicks`}
+                subtitle={`${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients · ${emailPerf.clicks} clicks`}
                 size="compact"
               />
             ) : (

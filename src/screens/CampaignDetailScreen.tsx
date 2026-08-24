@@ -368,11 +368,8 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
                     <tr>
                       <th>Send Name</th>
                       <th>Date</th>
-                      <th style={{ textAlign: 'right' }}>Recipients</th>
-                      <th style={{ textAlign: 'right' }}>Open %</th>
-                      <th style={{ textAlign: 'right' }}>Click %</th>
-                      <th style={{ textAlign: 'right' }}>Bounces</th>
-                      <th style={{ textAlign: 'right' }}>Unsubscribes</th>
+                      <th>Status</th>
+                      <th>Campaign Monitor Reference</th>
                       <th style={{ textAlign: 'right' }}>Cost (£)</th>
                     </tr>
                   </thead>
@@ -381,16 +378,16 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
                       <tr key={task.id}>
                         <td className="text-text-primary">{task.title}</td>
                         <td className="text-text-secondary">{task.deadline ? formatDateShort(task.deadline) : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{task.recipients ? task.recipients.toLocaleString() : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{task.openRate != null ? `${task.openRate.toFixed(1)}%` : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{task.clickRate != null ? `${task.clickRate.toFixed(1)}%` : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{task.bounces != null ? task.bounces.toLocaleString() : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{task.unsubscribes != null ? task.unsubscribes.toLocaleString() : '—'}</td>
+                        <td className="text-text-secondary capitalize">{task.status.replace(/-/g, ' ')}</td>
+                        <td className="text-text-secondary text-xs">{task.externalId ?? '—'}</td>
                         <td style={{ textAlign: 'right' }}>{task.cost != null ? task.cost.toFixed(2) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                <p className="text-xs text-text-secondary mt-2">
+                  Full send performance (recipients, opens, clicks, bounces, unsubscribes) is on the Performance tab.
+                </p>
               </div>
             ) : (
               <p className="v2-empty-state">No content sends logged for this campaign.</p>

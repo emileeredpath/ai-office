@@ -1,7 +1,7 @@
 import type { EntitySelection } from '@/contexts/EntityContext';
 import type { Period } from '@/contexts/PeriodContext';
 import { periodStartDate } from '@/contexts/PeriodContext';
-import type { EmailPerformanceResponse } from '@/services/emailPerformanceApi';
+import type { EmailCampaignRecord, EmailPerformanceResponse } from '@/services/emailPerformanceApi';
 import { GROUP_AGGREGATE_BRANDS } from '@/utils/groupEntities';
 
 function toIsoDate(d: Date): string {
@@ -75,4 +75,38 @@ export function getEmailPerformance(
         : `${campaignsSent} real Campaign Monitor send(s) for this entity`;
 
   return { status: 'available', campaignsSent, recipients, opens, clicks, bounces, unsubscribes, subtitle };
+}
+
+export interface CampaignEmailPerformanceInfo {
+  status: 'available' | 'not-connected';
+  sends: EmailCampaignRecord[];
+  subtitle: string;
+}
+
+// Send-level view for Campaign Detail → Performance — the single source of
+// truth for that page. Trusts only the dashboardCampaignId the existing
+// sync already persisted (task.campaignId, set by its name-based
+// matching); never fuzzy-matches or infers a link here. A campaign with
+// genuinely zero linked sends is a real, honest empty state — never
+// backfilled with similarly-named sends.
+export function getEmailPerformanceForCampaign(
+  data: EmailPerformanceResponse | null,
+  dashboardCampaignId: string
+): CampaignEmailPerformanceInfo {
+  if (!data || !data.configured) {
+    return { status: 'not-connected', sends: [], subtitle: 'Awaiting Campaign Monitor integration' };
+  }
+
+  const sends = data.campaigns
+    .filter((c) => c.dashboardCampaignId === dashboardCampaignId)
+    .sort((a, b) => (a.sentDate < b.sentDate ? 1 : -1));
+
+  return {
+    status: 'available',
+    sends,
+    subtitle:
+      sends.length > 0
+        ? `${sends.length} real Campaign Monitor send(s) linked to this campaign`
+        : 'No Campaign Monitor sends are linked to this campaign',
+  };
 }

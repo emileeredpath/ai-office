@@ -115,6 +115,10 @@ export interface Task {
   clickRate: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  // The external system's own reference for a synced task (e.g. Campaign
+  // Monitor's campaign ID for an email-send) — already transmitted by the
+  // backend, just not previously declared on this type.
+  externalId: string | null;
 }
 
 export interface CampaignResults {

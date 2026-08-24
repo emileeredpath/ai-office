@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Copy, Edit2, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Copy, Edit2, Trash2, Mail } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useAppStore } from '@/store/useAppStore';
 import { Campaign, TrackingLink, Brand } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { isWave1Campaign } from '@/utils/wave1';
+import { getEmailPerformanceForCampaign, resolveEmailDateRange } from '@/utils/emailPerformance';
+import { formatDateShort } from '@/utils/dateUtils';
 
 interface CampaignPerformanceTabProps {
   campaign: Campaign;
@@ -33,11 +35,28 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+  const emailPerformance = useAppStore((s) => s.emailPerformance);
+  const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
 
   useEffect(() => {
     syncWave1Performance();
     syncWave1Calls();
   }, [syncWave1Performance, syncWave1Calls]);
+
+  // Campaign Detail isn't scoped by the global Period selector — a
+  // campaign's real sends can predate or outlast any period window, so
+  // this always looks across everything currently synced (same "All time"
+  // range the Period selector itself uses elsewhere) rather than
+  // approximating from the campaign's own start/end dates.
+  useEffect(() => {
+    const { startDate, endDate } = resolveEmailDateRange('all-time');
+    syncEmailPerformance(startDate, endDate);
+  }, [syncEmailPerformance]);
+
+  const emailPerf = useMemo(
+    () => getEmailPerformanceForCampaign(emailPerformance, campaign.id),
+    [emailPerformance, campaign.id]
+  );
 
   const [trackingLinkForm, setTrackingLinkForm] = useState(EMPTY_LINK_FORM);
   const [editingTrackingLink, setEditingTrackingLink] = useState<string | null>(null);
@@ -156,6 +175,65 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
           </div>
         </div>
       )}
+
+      {/* Email Performance — the single source of truth for this campaign's
+          send-level email data. Only genuine source: 'campaign-monitor'
+          sends whose dashboardCampaignId already matches this campaign
+          (set by the existing sync's name-based matching) ever appear here
+          — never a fuzzy/similarly-named send. Duplicated Open %/Click %/
+          Bounces/Unsubscribes were removed from the Content tab so this is
+          the only place those figures come from. */}
+      <div>
+        <h3 className="v2-section-title">Email Performance</h3>
+        {emailPerf.status === 'available' && emailPerf.sends.length > 0 ? (
+          <div className="card p-4">
+            <div className="overflow-x-auto">
+              <table className="table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Send Name</th>
+                    <th>Date</th>
+                    <th style={{ textAlign: 'right' }}>Recipients</th>
+                    <th style={{ textAlign: 'right' }}>Opens</th>
+                    <th style={{ textAlign: 'right' }}>Clicks</th>
+                    <th style={{ textAlign: 'right' }}>Bounces</th>
+                    <th style={{ textAlign: 'right' }}>Unsubscribes</th>
+                    <th>Campaign Monitor ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {emailPerf.sends.map((send) => (
+                    <tr key={send.taskId}>
+                      <td className="text-text-primary">{send.campaignName}</td>
+                      <td className="text-text-secondary">{formatDateShort(send.sentDate)}</td>
+                      <td style={{ textAlign: 'right' }}>{send.recipients != null ? send.recipients.toLocaleString() : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{send.opens != null ? send.opens.toLocaleString() : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{send.clicks != null ? send.clicks.toLocaleString() : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{send.bounces != null ? send.bounces.toLocaleString() : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{send.unsubscribes != null ? send.unsubscribes.toLocaleString() : '—'}</td>
+                      <td className="text-text-secondary text-xs">{send.campaignMonitorId ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="card p-4">
+            <div className="v2-crm-empty">
+              <Mail size={28} color="var(--v2-grey)" />
+              <p className="v2-crm-empty-title">
+                {emailPerf.status === 'not-connected' ? 'Campaign Monitor is not connected' : 'No Campaign Monitor sends are linked to this campaign'}
+              </p>
+              <p className="v2-crm-empty-subtitle">
+                {emailPerf.status === 'not-connected'
+                  ? 'Email performance will appear here once Campaign Monitor is configured.'
+                  : "Sends are linked automatically by the existing Campaign Monitor sync. If a real send for this campaign isn't showing, its name may not have matched — this is never guessed here."}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Tracking links */}
       <div>
