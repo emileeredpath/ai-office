@@ -8,7 +8,13 @@ import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataF
 import { CallAttributionJourney } from '@/components/calls/CallAttributionJourney';
 import { CallOverTimePanel } from '@/components/calls/CallOverTimePanel';
 import { CallLogTable } from '@/components/calls/CallLogTable';
-import { resolveCallDateRange, getCallPerformance } from '@/utils/callPerformance';
+import {
+  resolveCallDateRange,
+  getCallPerformance,
+  getCallSourceBreakdown,
+  getTopLandingPages,
+  getPpcAssistedCalls,
+} from '@/utils/callPerformance';
 
 // Call Tracking — a commercial attribution page for marketing-generated
 // calls, not just a call log. Uses the real, entity-attributed Infinity
@@ -40,6 +46,19 @@ export function InfinityTrackingScreen() {
   );
   const showRealTotals = callPerf.status === 'available';
   const calls = callPerf.calls ?? [];
+
+  const sourceBreakdown = useMemo(
+    () => getCallSourceBreakdown(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
+  );
+  const topLandingPages = useMemo(
+    () => getTopLandingPages(infinityCalls, isGroupView, selectedEntity, 10),
+    [infinityCalls, isGroupView, selectedEntity]
+  );
+  const ppcAssisted = useMemo(
+    () => getPpcAssistedCalls(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
+  );
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
@@ -117,7 +136,102 @@ export function InfinityTrackingScreen() {
               subtitle={showRealTotals ? 'Across all connected calls' : callPerf.subtitle}
               size="compact"
             />
+            <KpiCard
+              title="PPC-Assisted Calls"
+              value={ppcAssisted.status === 'available' ? ppcAssisted.count : undefined}
+              status={ppcAssisted.status}
+              subtitle={ppcAssisted.status === 'available' ? ppcAssisted.subtitle : ppcAssisted.subtitle}
+              size="compact"
+            />
           </div>
+        </div>
+
+        {/* Call Source Breakdown */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">Call Source Breakdown</h2>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Based on Infinity's own chType field. Calls with no recognised source are shown as Unclassified — never
+            assumed Direct.
+          </p>
+          {sourceBreakdown.status === 'available' ? (
+            sourceBreakdown.buckets.length > 0 ? (
+              <div className="card p-0">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 560 }}>
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th style={{ textAlign: 'right' }}>Calls</th>
+                        <th style={{ textAlign: 'right' }}>Answered</th>
+                        <th style={{ textAlign: 'right' }}>Missed</th>
+                        <th style={{ textAlign: 'right' }}>Answer Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sourceBreakdown.buckets.map((bucket) => (
+                        <tr key={bucket.source}>
+                          <td className="text-text-primary">{bucket.source}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.calls}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.answered}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.missed}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.answerRate != null ? `${bucket.answerRate}%` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No calls in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{sourceBreakdown.subtitle}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Top Landing Pages */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">Top Landing Pages</h2>
+          {topLandingPages.status === 'available' ? (
+            topLandingPages.rows.length > 0 ? (
+              <div className="card p-0">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 640 }}>
+                    <thead>
+                      <tr>
+                        <th>Landing Page</th>
+                        <th style={{ textAlign: 'right' }}>Calls</th>
+                        <th style={{ textAlign: 'right' }}>Answered</th>
+                        <th style={{ textAlign: 'right' }}>Missed</th>
+                        <th style={{ textAlign: 'right' }}>Answer Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topLandingPages.rows.map((row) => (
+                        <tr key={row.url}>
+                          <td className="text-text-primary text-xs" style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.url}>
+                            {row.label}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{row.calls}</td>
+                          <td style={{ textAlign: 'right' }}>{row.answered}</td>
+                          <td style={{ textAlign: 'right' }}>{row.missed}</td>
+                          <td style={{ textAlign: 'right' }}>{row.answerRate != null ? `${row.answerRate}%` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No calls with a recorded landing page in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{topLandingPages.subtitle}</p>
+            </div>
+          )}
         </div>
 
         {/* Attribution journey */}

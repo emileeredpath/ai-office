@@ -26,6 +26,10 @@ export interface InfinityCallRecord {
   campaign: string | null;
   adGroup: string | null;
   ppcAssisted: boolean | null;
+  // Retained for future use — confirmed populated, not surfaced yet.
+  href: string | null;
+  pub: string | null;
+  dom: string | null;
 }
 
 export interface InfinityCallsResponse {

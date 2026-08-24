@@ -20,6 +20,14 @@
 //     125-row window was not truncated at limit=1000). No pagination loop
 //     is implemented yet — add one if a single window is ever observed at
 //     exactly 1000 rows, which would indicate real truncation.
+//   - Marketing attribution (Phase 2): `chType` is the confirmed real
+//     source-classification field — 'ppc'/'seo'/'direct'/'ref' are the
+//     only confirmed values (mapped in src/utils/callPerformance.ts on the
+//     frontend); anything else, including blank, is genuinely
+//     Unclassified, never guessed as Direct. `ppcAssisted` is confirmed
+//     real but serialized as 1/0, not a JSON boolean — see toCallRecord.
+//     `campaign`/`adGroup`/`keywordRef` were confirmed blank in real
+//     records during this audit and are deliberately not surfaced.
 //
 // Entity attribution: the account's one IGRP (id set via INFINITY_IGRP_ID)
 // contains calls for multiple MTech entities, distinguished by each call's
@@ -88,7 +96,13 @@ export interface InfinityCallRecord {
   pageTitle: string | null;
   campaign: string | null;
   adGroup: string | null;
+  // Confirmed real, populated as 1/0 (not a JSON boolean) — see toCallRecord.
   ppcAssisted: boolean | null;
+  // Retained for future use per the Phase 2 audit — confirmed populated,
+  // not surfaced in the UI yet.
+  href: string | null;
+  pub: string | null;
+  dom: string | null;
 }
 
 // Confirmed against real responses: a call reaching the "bridge" stage is
@@ -129,7 +143,11 @@ interface RawCallRow {
   pageTitle?: string;
   campaign?: string;
   adGroup?: string;
-  ppcAssisted?: boolean;
+  // Confirmed real shape: 1/0, not a JSON boolean — typed for both since
+  // Infinity's own serialization isn't guaranteed stable across accounts.
+  ppcAssisted?: boolean | number;
+  pub?: string;
+  dom?: string;
 }
 
 // The calls report returns one JSON object per line, not a JSON array or
@@ -172,7 +190,17 @@ function toCallRecord(row: RawCallRow): InfinityCallRecord {
     pageTitle: row.pageTitle ?? null,
     campaign: row.campaign ?? null,
     adGroup: row.adGroup ?? null,
-    ppcAssisted: typeof row.ppcAssisted === 'boolean' ? row.ppcAssisted : null,
+    // Real data is 1/0, not a JSON boolean — a plain `typeof === 'boolean'`
+    // check would silently read every real row as null. Handle both shapes.
+    ppcAssisted:
+      typeof row.ppcAssisted === 'number'
+        ? row.ppcAssisted === 1
+        : typeof row.ppcAssisted === 'boolean'
+          ? row.ppcAssisted
+          : null,
+    href: row.href ?? null,
+    pub: row.pub ?? null,
+    dom: row.dom ?? null,
   };
 }
 

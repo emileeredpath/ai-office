@@ -43,10 +43,13 @@ interface CallLogTableProps {
 // The V2 call log carries the full future column set, but only populates
 // what real Infinity data genuinely supports today. Entity is real for
 // calls whose dgrpName has a confirmed mapping (Brentwood, Radio Links,
-// Irish Radio); Source and Landing Page are real wherever Infinity
-// reported them. Campaign, Qualified, Lead, Opportunity, Pipeline Value
-// and Won Revenue stay "Not connected" — no defensible Infinity-side
-// campaign identifier exists yet, and CRM attribution doesn't exist at all.
+// Irish Radio); Source shows the readable chName (e.g. "Paid Search"),
+// falling back to the raw src value only if chName is genuinely blank on
+// that call. Landing Page is real wherever Infinity reported it.
+// Campaign, Qualified, Lead, Opportunity, Pipeline Value and Won Revenue
+// stay "Not connected" — no defensible Infinity-side campaign identifier
+// exists yet (campaign/adGroup/keywordRef were confirmed blank in real
+// records during the Phase 2 audit), and CRM attribution doesn't exist.
 export function CallLogTable({ calls, infinityConfigured, showRealTotals }: CallLogTableProps) {
   if (!infinityConfigured) {
     return (
@@ -134,7 +137,7 @@ export function CallLogTable({ calls, infinityConfigured, showRealTotals }: Call
                 <td className="text-xs text-text-secondary">{call.customerPhoneNumber || '—'}</td>
                 <td>{call.brand ? <BrandBadge brand={call.brand} /> : <NotAvailable label="Not confirmed" />}</td>
                 <td><NotAvailable /></td>
-                <td>{call.src || <NotAvailable />}</td>
+                <td>{call.chName || call.src || <NotAvailable />}</td>
                 <td className="text-xs text-text-secondary" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {call.landingPageUrl || <NotAvailable />}
                 </td>
