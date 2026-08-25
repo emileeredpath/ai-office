@@ -303,4 +303,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_documents_entity_record ON documents(entity_type, record_id);
 `);
 
+// Microsoft Graph OAuth token storage (Microsoft To Do integration) — a
+// singleton row (id is always 'default'), since only one individual
+// Microsoft account (Emilee's) connects here, unlike the shared
+// edit/view session model used for the dashboard's own password wall.
+// Delegated tokens genuinely rotate (access tokens expire hourly,
+// refresh tokens are re-issued on use) so — unlike Google Ads' static
+// env-var refresh token — these must be persisted and updated in place,
+// never just read once from env. See backend/src/services/msGraphAuth.ts.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS microsoft_graph_tokens (
+    id TEXT PRIMARY KEY,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    account_email TEXT,
+    connected_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+`);
+
 export default db;

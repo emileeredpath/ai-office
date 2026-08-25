@@ -15,6 +15,7 @@ import analyticsRouter from './routes/analytics.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
 import authRouter from './routes/auth.js';
+import msGraphRouter from './routes/msGraph.js';
 import { requireSession } from './middleware/session.js';
 import { initMarketingTables } from './db/marketingRepository.js';
 import { syncCampaignMonitor } from './services/campaignMonitor.js';
@@ -82,6 +83,14 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // Login, logout, and session check are unauthenticated by definition.
 app.use('/api/auth', authRouter);
+
+// Microsoft Graph (Microsoft To Do) connect/callback/status/disconnect —
+// mounted separately so /callback lands at exactly the redirect URI
+// registered in Entra: /api/auth/microsoft/callback. Each route applies
+// its own requireSession/requireEdit internally (the callback itself
+// can't require a session up front — Microsoft is the one redirecting
+// the browser here — so it verifies the OAuth state cookie instead).
+app.use('/api/auth/microsoft', msGraphRouter);
 
 // Everything else under /api/ requires a signed-in session (Emilee = edit,
 // John = view) — no session, no data, even if you hit the API directly.

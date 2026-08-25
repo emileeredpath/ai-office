@@ -16,7 +16,10 @@ interface SessionEntry {
 // again, not data loss (all real data lives in the database).
 const sessions = new Map<string, SessionEntry>();
 
-function parseCookies(header: string | undefined): Record<string, string> {
+// Exported for other cookie-setting flows outside the session model itself
+// (e.g. the Microsoft OAuth CSRF state cookie) — same minimal parser, no
+// need for a second implementation.
+export function parseCookies(header: string | undefined): Record<string, string> {
   const cookies: Record<string, string> = {};
   if (!header) return cookies;
   for (const part of header.split(';')) {
