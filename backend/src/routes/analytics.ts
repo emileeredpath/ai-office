@@ -4,6 +4,7 @@ import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance } from '../services/emailPerformance.js';
 import { fetchInfinityCalls } from '../services/infinity.js';
+import { getGoogleAdsPerformance } from '../services/googleAds.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
@@ -53,6 +54,19 @@ router.get('/ga4-enquiries', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getEnquiries(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Google Ads (Phase 1) — real campaign performance for Brentwood and Radio
+// Links only (see getGoogleAdsPerformance's own doc comment). A fully
+// separate integration from GA4/GA4 Enquiries above — Google Ads
+// "conversions" is never presented as equivalent to GA4 Enquiries. Same
+// startDate/endDate contract as every other analytics route.
+router.get('/google-ads', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await getGoogleAdsPerformance(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 
