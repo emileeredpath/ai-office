@@ -22,7 +22,7 @@
 import type { Brand } from '../types.js';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_ADS_API_VERSION = 'v19';
+const GOOGLE_ADS_API_VERSION = 'v25';
 const API_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
 
 // Which env var holds each brand's Google Ads customer ID. Only entities
