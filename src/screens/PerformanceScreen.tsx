@@ -14,6 +14,7 @@ import { Brand } from '@/types/index';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand, getSocialTraffic } from '@/utils/ga4Traffic';
+import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 
 interface PerformanceScreenProps {
@@ -33,11 +34,13 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
+  const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
+  const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
@@ -55,6 +58,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   useEffect(() => {
     syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
+  useEffect(() => {
+    syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -83,6 +89,10 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const socialTraffic = useMemo(
     () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
     [ga4SocialTraffic, isGroupView, selectedEntity]
+  );
+  const ga4EnquiriesInfo = useMemo(
+    () => getEnquiries(ga4Enquiries, isGroupView, selectedEntity),
+    [ga4Enquiries, isGroupView, selectedEntity]
   );
 
   // ---- Leads by Brand (group) / Leads by Campaign (single entity) --------
@@ -207,6 +217,12 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             subtitle={websiteUsers.subtitle}
           />
           <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged per campaign" />
+          <KpiCard
+            title="GA4 Enquiries"
+            value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
+            status={ga4EnquiriesInfo.status}
+            subtitle={ga4EnquiriesInfo.status === 'available' ? 'Verified GA4 key events — a website action, not a qualified lead' : ga4EnquiriesInfo.subtitle}
+          />
           <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" accent="var(--v2-green)" />
           <KpiCard title="Marketing Spend" value={`£${Math.round(marketingSpend).toLocaleString()}`} subtitle="Manually logged campaign spend" onClick={() => onNavigate?.('campaigns')} />
           <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />

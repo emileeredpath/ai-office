@@ -10,6 +10,7 @@ import { ReportExportButtons } from '@/components/reports/ReportExportButtons';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { buildReportCsv, downloadCsv, type ReportCsvSection } from '@/utils/reportExport';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
+import { getEnquiries, getEnquiriesByChannel, getEnquiriesBySource } from '@/utils/ga4Enquiries';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import { resolveCallDateRange, getCallPerformance, getCallSourceBreakdown, getPpcAssistedCalls } from '@/utils/callPerformance';
 
@@ -31,6 +32,7 @@ export function ReportsScreen() {
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
+  const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const infinityCalls = useAppStore((s) => s.infinityCalls);
   const syncCampaignsFromApi = useAppStore((s) => s.syncCampaignsFromApi);
@@ -39,6 +41,7 @@ export function ReportsScreen() {
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
+  const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
@@ -59,6 +62,9 @@ export function ReportsScreen() {
   useEffect(() => {
     syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
+  useEffect(() => {
+    syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -103,6 +109,19 @@ export function ReportsScreen() {
   // wording for this specific card only.
   const sessionsSubtitle =
     websiteUsers.status === 'available' ? websiteUsers.subtitle.replace('active users', 'sessions') : websiteUsers.subtitle;
+
+  const ga4EnquiriesInfo = useMemo(
+    () => getEnquiries(ga4Enquiries, isGroupView, selectedEntity),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const enquiriesByChannel = useMemo(
+    () => getEnquiriesByChannel(ga4Enquiries, isGroupView, selectedEntity),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const enquiriesBySource = useMemo(
+    () => getEnquiriesBySource(ga4Enquiries, isGroupView, selectedEntity, 10),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
 
   // Funding has no genuine date field this app can honestly match against
   // the global Period selector (funding.period is a free-text label like
@@ -241,6 +260,43 @@ export function ReportsScreen() {
             ? ['Paid Social Users', socialTraffic.paidUsers!, socialTraffic.subtitle]
             : ['Paid Social Users', 'Not connected', socialTraffic.subtitle],
         ],
+      },
+      {
+        title: 'Website Enquiries',
+        columns: ['Metric', 'Value', 'Detail'],
+        rows: [
+          ga4EnquiriesInfo.status === 'available'
+            ? ['GA4 Enquiries', ga4EnquiriesInfo.total!, ga4EnquiriesInfo.subtitle]
+            : ['GA4 Enquiries', 'Not connected', ga4EnquiriesInfo.subtitle],
+          ga4EnquiriesInfo.form.status === 'available'
+            ? ['Form Enquiries', ga4EnquiriesInfo.form.value!, ga4EnquiriesInfo.form.subtitle]
+            : ['Form Enquiries', 'Not connected', ga4EnquiriesInfo.form.subtitle],
+          ga4EnquiriesInfo.phone.status === 'available'
+            ? ['Phone Enquiries', ga4EnquiriesInfo.phone.value!, ga4EnquiriesInfo.phone.subtitle]
+            : ['Phone Enquiries', 'Not connected', ga4EnquiriesInfo.phone.subtitle],
+          ga4EnquiriesInfo.email.status === 'available'
+            ? ['Email Enquiries', ga4EnquiriesInfo.email.value!, ga4EnquiriesInfo.email.subtitle]
+            : ['Email Enquiries', 'Not connected', ga4EnquiriesInfo.email.subtitle],
+          ga4EnquiriesInfo.livechat.status === 'available'
+            ? ['Live Chat Enquiries', ga4EnquiriesInfo.livechat.value!, ga4EnquiriesInfo.livechat.subtitle]
+            : ['Live Chat Enquiries', 'Not connected', ga4EnquiriesInfo.livechat.subtitle],
+        ],
+      },
+      {
+        title: 'Enquiries by Channel',
+        columns: ['Channel', 'Enquiries'],
+        rows:
+          enquiriesByChannel.status === 'available' && enquiriesByChannel.buckets.length > 0
+            ? enquiriesByChannel.buckets.map((b) => [b.channelGroup, b.count])
+            : [['Not connected', enquiriesByChannel.subtitle]],
+      },
+      {
+        title: 'Enquiries by Source',
+        columns: ['Source', 'Enquiries'],
+        rows:
+          enquiriesBySource.status === 'available' && enquiriesBySource.rows.length > 0
+            ? enquiriesBySource.rows.map((r) => [r.source, r.count])
+            : [['Not connected', enquiriesBySource.subtitle]],
       },
       {
         title: 'Email',
@@ -436,6 +492,125 @@ export function ReportsScreen() {
               size="compact"
             />
           </div>
+        </div>
+
+        {/* Website Enquiries — real, verified GA4 key events only. A
+            website action, never a qualified marketing lead, CRM
+            opportunity, or revenue figure. */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">Website Enquiries</h2>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Verified GA4 key events per entity — never a qualified marketing lead, CRM opportunity, or revenue figure.
+            An enquiry type shows "Not connected" where this entity has no verified event definition for it, never a
+            misleading 0.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-4">
+            <KpiCard
+              title="GA4 Enquiries"
+              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
+              status={ga4EnquiriesInfo.status}
+              subtitle={ga4EnquiriesInfo.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Form Enquiries"
+              value={ga4EnquiriesInfo.form.status === 'available' ? ga4EnquiriesInfo.form.value : undefined}
+              status={ga4EnquiriesInfo.form.status}
+              subtitle={ga4EnquiriesInfo.form.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Phone Enquiries"
+              value={ga4EnquiriesInfo.phone.status === 'available' ? ga4EnquiriesInfo.phone.value : undefined}
+              status={ga4EnquiriesInfo.phone.status}
+              subtitle={ga4EnquiriesInfo.phone.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Email Enquiries"
+              value={ga4EnquiriesInfo.email.status === 'available' ? ga4EnquiriesInfo.email.value : undefined}
+              status={ga4EnquiriesInfo.email.status}
+              subtitle={ga4EnquiriesInfo.email.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Live Chat Enquiries"
+              value={ga4EnquiriesInfo.livechat.status === 'available' ? ga4EnquiriesInfo.livechat.value : undefined}
+              status={ga4EnquiriesInfo.livechat.status}
+              subtitle={ga4EnquiriesInfo.livechat.subtitle}
+              size="compact"
+            />
+          </div>
+
+          <h4 className="text-sm font-semibold text-text-primary mb-2">Enquiries by Channel</h4>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            GA4's own sessionDefaultChannelGroup — only channels GA4 actually returns are shown.
+          </p>
+          {enquiriesByChannel.status === 'available' ? (
+            enquiriesByChannel.buckets.length > 0 ? (
+              <div className="card p-0 mb-4">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 360 }}>
+                    <thead>
+                      <tr>
+                        <th>Channel</th>
+                        <th style={{ textAlign: 'right' }}>Enquiries</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enquiriesByChannel.buckets.map((bucket) => (
+                        <tr key={bucket.channelGroup}>
+                          <td className="text-text-primary">{bucket.channelGroup}</td>
+                          <td style={{ textAlign: 'right' }}>{bucket.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text mb-4" style={{ padding: '1.5rem' }}>No enquiries in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4 mb-4">
+              <p className="text-sm text-text-secondary">{enquiriesByChannel.subtitle}</p>
+            </div>
+          )}
+
+          <h4 className="text-sm font-semibold text-text-primary mb-2">Enquiries by Source</h4>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            GA4's raw sessionSource — shown exactly as reported, never relabelled into an invented platform name.
+          </p>
+          {enquiriesBySource.status === 'available' ? (
+            enquiriesBySource.rows.length > 0 ? (
+              <div className="card p-0">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 360 }}>
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th style={{ textAlign: 'right' }}>Enquiries</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enquiriesBySource.rows.map((row) => (
+                        <tr key={row.source}>
+                          <td className="text-text-primary">{row.source}</td>
+                          <td style={{ textAlign: 'right' }}>{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No enquiries in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{enquiriesBySource.subtitle}</p>
+            </div>
+          )}
         </div>
 
         {/* Email */}

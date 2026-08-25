@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getBrandTraffic, getSocialTraffic } from '../services/ga4.js';
+import { getBrandTraffic, getSocialTraffic, getEnquiries } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance } from '../services/emailPerformance.js';
@@ -39,6 +39,20 @@ router.get('/ga4-social', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getSocialTraffic(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// GA4 Enquiries (Phase 1) — real, verified key events only (see
+// getEnquiries's own doc comment for exactly which events, per brand,
+// and why). A separate query from /ga4 and /ga4-social above — never
+// touches or reuses either endpoint's response. Same startDate/endDate
+// contract (genuine resolved calendar period; falls back to
+// month-to-date if missing/malformed).
+router.get('/ga4-enquiries', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await getEnquiries(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 

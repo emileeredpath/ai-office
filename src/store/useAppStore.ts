@@ -21,7 +21,14 @@ import {
 } from '@/services/fundingRecordsApi';
 import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
 import { apiFetch } from '@/services/apiConfig';
-import { fetchGa4Traffic, type Ga4TrafficResponse, fetchGa4SocialTraffic, type Ga4SocialTrafficResponse } from '@/services/ga4Api';
+import {
+  fetchGa4Traffic,
+  type Ga4TrafficResponse,
+  fetchGa4SocialTraffic,
+  type Ga4SocialTrafficResponse,
+  fetchGa4Enquiries,
+  type Ga4EnquiriesResponse,
+} from '@/services/ga4Api';
 import { fetchEmailPerformance, type EmailPerformanceResponse } from '@/services/emailPerformanceApi';
 import { fetchInfinityCalls, type InfinityCallsResponse } from '@/services/infinityCallsApi';
 
@@ -99,6 +106,14 @@ interface AppState {
   ga4SocialTraffic: Ga4SocialTrafficResponse | null;
   ga4SocialTrafficSyncing: boolean;
 
+  // GA4 Enquiries (Phase 1) — real, verified key events only, a separate
+  // query/response from both ga4Traffic and ga4SocialTraffic above. See
+  // src/utils/ga4Enquiries.ts for how pages derive enquiry figures from
+  // this, and backend/src/services/ga4.ts's getEnquiries for exactly
+  // which event names are used per brand and why.
+  ga4Enquiries: Ga4EnquiriesResponse | null;
+  ga4EnquiriesSyncing: boolean;
+
   // Real Campaign Monitor email performance (V2 Overview/Performance/
   // Reports) — a read-only rollup already restricted server-side to
   // source === 'campaign-monitor'. See src/utils/emailPerformance.ts.
@@ -144,6 +159,7 @@ interface AppState {
   // (Overview/Performance/Reports) wants — see resolveGa4DateRange().
   syncGa4Traffic: (startDate: string, endDate: string) => Promise<void>;
   syncGa4SocialTraffic: (startDate: string, endDate: string) => Promise<void>;
+  syncGa4Enquiries: (startDate: string, endDate: string) => Promise<void>;
 
   // Real Campaign Monitor email performance, for the resolved date range
   // the caller wants — see resolveEmailDateRange().
@@ -234,6 +250,8 @@ export const useAppStore = create<AppState>((set, get) => {
     ga4TrafficSyncing: false,
     ga4SocialTraffic: null,
     ga4SocialTrafficSyncing: false,
+    ga4Enquiries: null,
+    ga4EnquiriesSyncing: false,
     emailPerformance: null,
     emailPerformanceSyncing: false,
     infinityCalls: null,
@@ -613,6 +631,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('GA4 social traffic sync error:', err);
         set({ ga4SocialTrafficSyncing: false });
+      }
+    },
+
+    syncGa4Enquiries: async (startDate: string, endDate: string) => {
+      set({ ga4EnquiriesSyncing: true });
+      try {
+        const data = await fetchGa4Enquiries(startDate, endDate);
+        set({ ga4Enquiries: data, ga4EnquiriesSyncing: false });
+      } catch (err) {
+        console.error('GA4 enquiries sync error:', err);
+        set({ ga4EnquiriesSyncing: false });
       }
     },
 

@@ -6,6 +6,7 @@ import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { KpiCard } from '@/components/common/KpiCard';
 import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataFreshnessBar';
 import { resolveGa4DateRange, getSocialTraffic, getSocialNetworkBreakdown, getSocialTopLandingPages } from '@/utils/ga4Traffic';
+import { getSocialEnquiries, getSocialEnquiriesBySource } from '@/utils/ga4Enquiries';
 
 // Social — Phase 1. Every real figure here is genuine GA4 website traffic
 // attributed to Organic/Paid Social (see src/utils/ga4Traffic.ts), read
@@ -20,6 +21,8 @@ import { resolveGa4DateRange, getSocialTraffic, getSocialNetworkBreakdown, getSo
 export function SocialScreen() {
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
+  const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
+  const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
   const { isGroupView, selectedEntity } = useEntity();
   const { period } = usePeriod();
 
@@ -27,6 +30,9 @@ export function SocialScreen() {
   useEffect(() => {
     syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
+  useEffect(() => {
+    syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
 
   const socialTraffic = useMemo(
     () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
@@ -40,6 +46,23 @@ export function SocialScreen() {
     () => getSocialTopLandingPages(ga4SocialTraffic, isGroupView, selectedEntity, 10),
     [ga4SocialTraffic, isGroupView, selectedEntity]
   );
+  const socialEnquiries = useMemo(
+    () => getSocialEnquiries(ga4Enquiries, isGroupView, selectedEntity),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const socialEnquiriesBySource = useMemo(
+    () => getSocialEnquiriesBySource(ga4Enquiries, isGroupView, selectedEntity, 10),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  // Social Enquiry Rate = Social GA4 Enquiries ÷ Social Sessions × 100 —
+  // both genuine GA4 figures, only computed when both sides are real.
+  const socialEnquiryRate =
+    socialTraffic.status === 'available' &&
+    socialTraffic.sessions! > 0 &&
+    socialEnquiries.status === 'available' &&
+    socialEnquiries.total !== undefined
+      ? Math.round((socialEnquiries.total / socialTraffic.sessions!) * 1000) / 10
+      : null;
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
@@ -144,6 +167,77 @@ export function SocialScreen() {
           ) : (
             <div className="card p-4">
               <p className="text-sm text-text-secondary">{socialByNetwork.subtitle}</p>
+            </div>
+          )}
+        </div>
+
+        {/* GA4 Enquiries from Social */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">GA4 Enquiries from Social</h2>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Verified GA4 key events (see Reports → Website Enquiries) restricted to Organic/Paid Social sessions — a
+            website action, not a qualified marketing lead.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <KpiCard
+              title="GA4 Enquiries from Social"
+              value={socialEnquiries.status === 'available' ? socialEnquiries.total : undefined}
+              status={socialEnquiries.status}
+              subtitle={socialEnquiries.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Social Enquiry Rate"
+              value={socialEnquiryRate !== null ? `${socialEnquiryRate}%` : undefined}
+              status={socialEnquiryRate !== null ? 'available' : 'not-connected'}
+              subtitle={socialEnquiryRate !== null ? 'GA4 Enquiries from Social ÷ Social Sessions' : socialEnquiries.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Organic Social Enquiries"
+              value={socialEnquiries.status === 'available' ? socialEnquiries.organic : undefined}
+              status={socialEnquiries.status}
+              subtitle={socialEnquiries.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Paid Social Enquiries"
+              value={socialEnquiries.status === 'available' ? socialEnquiries.paid : undefined}
+              status={socialEnquiries.status}
+              subtitle={socialEnquiries.subtitle}
+              size="compact"
+            />
+          </div>
+
+          <h4 className="text-sm font-semibold text-text-primary mb-2">Enquiries from Social by Source</h4>
+          {socialEnquiriesBySource.status === 'available' ? (
+            socialEnquiriesBySource.rows.length > 0 ? (
+              <div className="card p-0">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table w-full text-sm" style={{ minWidth: 360 }}>
+                    <thead>
+                      <tr>
+                        <th>Source</th>
+                        <th style={{ textAlign: 'right' }}>Enquiries</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {socialEnquiriesBySource.rows.map((row) => (
+                        <tr key={row.source}>
+                          <td className="text-text-primary">{row.source}</td>
+                          <td style={{ textAlign: 'right' }}>{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No social enquiries in the selected period.</p>
+            )
+          ) : (
+            <div className="card p-4">
+              <p className="text-sm text-text-secondary">{socialEnquiriesBySource.subtitle}</p>
             </div>
           )}
         </div>

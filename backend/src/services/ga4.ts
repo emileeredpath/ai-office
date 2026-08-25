@@ -8,11 +8,15 @@
 // (see wave_1_performance_metrics for the one GA4 path that IS persisted —
 // the separate, campaign-scoped Wave 1 integration below, untouched here).
 //
-// IMPORTANT — untested against a real account from this environment: no
-// GA4_SERVICE_ACCOUNT_JSON or GA4_PROPERTY_ID_* vars exist here, and this
-// sandbox can't reach Google's APIs anyway. The JWT signing and Analytics
-// Data API request shapes follow Google's documented service-account flow,
-// but verify against a real property once configured.
+// IMPORTANT — the Website Traffic/Social Traffic paths below are untested
+// against a real account from this environment: no GA4_SERVICE_ACCOUNT_JSON
+// or GA4_PROPERTY_ID_* vars exist here, and this sandbox can't reach
+// Google's APIs anyway. The JWT signing and Analytics Data API request
+// shapes follow Google's documented service-account flow. GA4 Enquiries
+// (see getEnquiries below) IS confirmed against the real account — every
+// event name it queries was verified live via the Key Events screen and a
+// 28-day diagnostic query run by the user against production, not derived
+// or assumed in this sandbox.
 import { createSign } from 'crypto';
 import type { Brand } from '../types.js';
 
@@ -332,6 +336,245 @@ export async function getSocialTraffic(startDate?: string, endDate?: string): Pr
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[ga4] failed to fetch social traffic for ${brand}:`, msg);
+      errors.push(`${brand}: ${msg}`);
+    }
+  }
+
+  return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, errors };
+}
+
+// ---------------------------------------------------------------------
+// GA4 Enquiries (Phase 1) — real, verified key events only.
+//
+// Every event name below was confirmed live, per property, against the
+// real GA4 account (see conversation history — not re-derived here): the
+// Key Events screen for each property, then a 28-day live diagnostic
+// query confirming actual counts and — critically for Brentwood — that
+// `generate_lead` is a rollup event that fires alongside the specific
+// ones, never an independent action. Proof: on every sampled date,
+// generate_lead's count equalled the exact sum of generate_lead_form +
+// generate_lead_phone + generate_lead_email + generate_lead_livechat
+// (e.g. 2026-08-05: 7 = 6 phone + 1 form). `generate_lead` is therefore
+// kept ONLY as a rollupTotal cross-check field and is never summed
+// alongside the specific four — doing so would double-count every real
+// enquiry.
+//
+// No brand not listed here (mtech, idaro) has a confirmed enquiry
+// definition — they are excluded entirely from this query, regardless
+// of whether their GA4 property is configured, rather than guessing
+// which of their key events (if any) represent a genuine enquiry.
+// Do not add a brand/event here without a live diagnostic confirming it.
+interface BrandEnquiryDefinition {
+  form?: string[];
+  phone?: string[];
+  email?: string[];
+  livechat?: string[];
+  // Rollup/cross-check event only — never included in any summed total.
+  rollup?: string;
+}
+
+const ENQUIRY_EVENTS_BY_BRAND: Partial<Record<Brand, BrandEnquiryDefinition>> = {
+  brentwood: {
+    form: ['generate_lead_form'],
+    phone: ['generate_lead_phone'],
+    email: ['generate_lead_email'],
+    livechat: ['generate_lead_livechat'],
+    rollup: 'generate_lead',
+  },
+  ircl: {
+    // IRCL's real event names — confirmed distinct from Brentwood's.
+    // No live-chat key event exists for IRCL. generate_lead_idaro,
+    // generate_lead_table_tap, and ads_conversion_Form_1 are confirmed
+    // real IRCL key events but were never verified as genuine enquiry
+    // signals (idaro's event returned zero rows and IDARO has no
+    // property of its own) — deliberately excluded.
+    form: ['generate_lead_contact'],
+    phone: ['generate_lead_phone'],
+    email: ['generate_lead_email'],
+  },
+  'radio-links': {
+    // Confirmed real event names for Radio Links — no email or
+    // live-chat key event exists for this property.
+    // enquiry__google_ads is a real, confirmed-excluded event: it had
+    // no activity in the live diagnostic and must stay separate unless
+    // a future check confirms it doesn't duplicate these two.
+    form: ['Contact us page form'],
+    phone: ['Telephone link click'],
+  },
+  capcom: {
+    // Confirmed real event names for Capcom. No live-chat key event.
+    form: ['ua_form_submit'],
+    phone: ['click_call'],
+    email: ['click_email'],
+  },
+};
+
+export type EnquiryType = 'form' | 'phone' | 'email' | 'livechat';
+
+export interface EnquiryTypeSourceRow {
+  type: EnquiryType;
+  channelGroup: string;
+  source: string;
+  count: number;
+}
+
+export interface BrandEnquiries {
+  brand: Brand;
+  // Sum of form + phone + email + livechat (whichever are tracked for
+  // this brand) — never includes rollupTotal.
+  total: number;
+  form: number | null;
+  phone: number | null;
+  email: number | null;
+  livechat: number | null;
+  // generate_lead-style cross-check only, null if this brand has no
+  // confirmed rollup event. Never added into `total`.
+  rollupTotal: number | null;
+  // One row per (type, channelGroup, source) with a nonzero real count —
+  // the shared basis every frontend channel/source breakdown aggregates
+  // from, so they can never disagree with each other or with `total`.
+  rows: EnquiryTypeSourceRow[];
+}
+
+export interface Ga4EnquiriesResult {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  brands: BrandEnquiries[];
+  // Brands with BOTH a confirmed enquiry definition AND a configured GA4
+  // property — deliberately a stricter set than Ga4Result/Ga4SocialResult's
+  // configuredBrands, since a brand with a configured property but no
+  // verified enquiry definition must never appear here at all (that would
+  // imply a guessed definition).
+  configuredBrands: Brand[];
+  errors: string[];
+}
+
+interface EnquiryReportRow {
+  eventName: string;
+  channelGroup: string;
+  source: string;
+  count: number;
+}
+
+async function runEnquiryReport(
+  propertyId: string,
+  token: string,
+  startDate: string,
+  endDate: string,
+  eventNames: string[]
+): Promise<EnquiryReportRow[]> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'eventName' }, { name: 'sessionDefaultChannelGroup' }, { name: 'sessionSource' }],
+      // eventCount, not conversions — the live 28-day diagnostic that
+      // proved generate_lead's rollup relationship was itself run on
+      // eventCount, so this stays consistent with the exact evidence
+      // that definition was verified against.
+      metrics: [{ name: 'eventCount' }],
+      dimensionFilter: { filter: { fieldName: 'eventName', inListFilter: { values: eventNames } } },
+      limit: 100000,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 enquiries runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as {
+    rows?: Array<{ dimensionValues: { value: string }[]; metricValues: { value: string }[] }>;
+  };
+  const rows = json.rows || [];
+  return rows.map((row) => ({
+    eventName: row.dimensionValues[0]?.value ?? '',
+    channelGroup: row.dimensionValues[1]?.value ?? '',
+    source: row.dimensionValues[2]?.value ?? '',
+    count: Number(row.metricValues[0]?.value ?? 0),
+  }));
+}
+
+function summarizeEnquiryRows(def: BrandEnquiryDefinition, rows: EnquiryReportRow[]): Omit<BrandEnquiries, 'brand'> {
+  // Reverse-lookup: real event name -> its confirmed type for this brand.
+  const eventToType = new Map<string, EnquiryType>();
+  (['form', 'phone', 'email', 'livechat'] as EnquiryType[]).forEach((type) => {
+    (def[type] ?? []).forEach((name) => eventToType.set(name, type));
+  });
+
+  const totals: Record<EnquiryType, number | null> = {
+    form: def.form ? 0 : null,
+    phone: def.phone ? 0 : null,
+    email: def.email ? 0 : null,
+    livechat: def.livechat ? 0 : null,
+  };
+  let rollupTotal: number | null = def.rollup ? 0 : null;
+  const enquiryRows: EnquiryTypeSourceRow[] = [];
+
+  for (const row of rows) {
+    if (def.rollup && row.eventName === def.rollup) {
+      rollupTotal = (rollupTotal ?? 0) + row.count;
+      continue;
+    }
+    const type = eventToType.get(row.eventName);
+    if (!type) continue; // Defensive — shouldn't happen since the query filters to exactly these names.
+    totals[type] = (totals[type] ?? 0) + row.count;
+    enquiryRows.push({ type, channelGroup: row.channelGroup, source: row.source, count: row.count });
+  }
+
+  const total = (['form', 'phone', 'email', 'livechat'] as EnquiryType[]).reduce(
+    (sum, type) => sum + (totals[type] ?? 0),
+    0
+  );
+
+  return { total, form: totals.form, phone: totals.phone, email: totals.email, livechat: totals.livechat, rollupTotal, rows: enquiryRows };
+}
+
+// Same per-property loop and configured/not-connected honesty rules as
+// getBrandTraffic()/getSocialTraffic(), with one addition: a brand is
+// only queried if it also has a confirmed ENQUIRY_EVENTS_BY_BRAND entry.
+// A property that answers successfully with zero matching rows still
+// gets pushed to `brands` with real zero counts — a connected property
+// with no qualifying events this period is a genuine 0, never
+// "Not connected".
+export async function getEnquiries(startDate?: string, endDate?: string): Promise<Ga4EnquiriesResult> {
+  const errors: string[] = [];
+  const configuredBrands = (Object.keys(ENQUIRY_EVENTS_BY_BRAND) as Brand[]).filter(
+    (brand) => !!process.env[PROPERTY_ID_ENV[brand] as string]
+  );
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || configuredBrands.length === 0) {
+    return {
+      configured: false,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      brands: [],
+      configuredBrands: [],
+      errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to get access token:', msg);
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, brands: [], configuredBrands, errors: [msg] };
+  }
+
+  const brands: BrandEnquiries[] = [];
+  for (const brand of configuredBrands) {
+    const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string;
+    const def = ENQUIRY_EVENTS_BY_BRAND[brand] as BrandEnquiryDefinition;
+    const eventNames = [...(def.form ?? []), ...(def.phone ?? []), ...(def.email ?? []), ...(def.livechat ?? []), ...(def.rollup ? [def.rollup] : [])];
+    try {
+      const rows = await runEnquiryReport(propertyId, token, range.startDate, range.endDate, eventNames);
+      brands.push({ brand, ...summarizeEnquiryRows(def, rows) });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[ga4] failed to fetch enquiries for ${brand}:`, msg);
       errors.push(`${brand}: ${msg}`);
     }
   }

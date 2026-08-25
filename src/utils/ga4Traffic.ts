@@ -126,6 +126,11 @@ function emptySocialTotals() {
   return { sessions: 0, users: 0, organicSessions: 0, organicUsers: 0, paidSessions: 0, paidUsers: 0 };
 }
 
+// GA4's own two social channel-group values — exported so ga4Enquiries.ts
+// can filter enquiry rows down to "from Social" without redefining these
+// literals a second time.
+export const SOCIAL_CHANNEL_GROUPS = ['Organic Social', 'Paid Social'] as const;
+
 export function getSocialTraffic(
   ga4Social: Ga4SocialTrafficResponse | null,
   isGroupView: boolean,
