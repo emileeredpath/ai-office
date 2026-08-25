@@ -15,6 +15,7 @@ import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/uti
 import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
+import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 
 interface PerformanceScreenProps {
@@ -35,12 +36,14 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
   const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
@@ -61,6 +64,11 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   useEffect(() => {
     syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
+
+  const googleAdsRange = useMemo(() => resolveGoogleAdsDateRange(period), [period]);
+  useEffect(() => {
+    syncGoogleAdsPerformance(googleAdsRange.startDate, googleAdsRange.endDate);
+  }, [googleAdsRange.startDate, googleAdsRange.endDate, syncGoogleAdsPerformance]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -93,6 +101,10 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const ga4EnquiriesInfo = useMemo(
     () => getEnquiries(ga4Enquiries, isGroupView, selectedEntity),
     [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const googleAds = useMemo(
+    () => getGoogleAdsSummary(googleAdsPerformance, isGroupView, selectedEntity),
+    [googleAdsPerformance, isGroupView, selectedEntity]
   );
 
   // ---- Leads by Brand (group) / Leads by Campaign (single entity) --------
@@ -188,7 +200,13 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     campaignMonitorStatus,
     { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
-    { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
+    googleAdsPerformance?.configured === true
+      ? {
+          label: 'PPC (Google Ads)',
+          status: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'error' : 'live',
+          detail: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'Sync error' : 'Connected',
+        }
+      : { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
   ];
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
@@ -305,7 +323,17 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             ) : (
               <KpiCard title="Social" status="not-connected" subtitle={socialTraffic.subtitle} size="compact" />
             )}
-            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration — see PPC page" onClick={() => onNavigate?.('ppc')} size="compact" />
+            {googleAds.status === 'available' ? (
+              <KpiCard
+                title="PPC"
+                value={`£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                subtitle={`${googleAds.clicks} clicks · ${ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : 0} GA4 enquiries — see PPC page`}
+                onClick={() => onNavigate?.('ppc')}
+                size="compact"
+              />
+            ) : (
+              <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
+            )}
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered — see Call Tracking`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (

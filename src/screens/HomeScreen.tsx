@@ -16,6 +16,7 @@ import { getMarketingEvents } from '@/utils/marketingEvents';
 import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
 import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
+import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
@@ -64,6 +65,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const wave1Performance = useAppStore((s) => s.wave1Performance);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
@@ -71,6 +73,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const selectTask = useAppStore((s) => s.selectTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
@@ -92,6 +95,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   useEffect(() => {
     syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
+
+  const googleAdsRange = useMemo(() => resolveGoogleAdsDateRange(period), [period]);
+  useEffect(() => {
+    syncGoogleAdsPerformance(googleAdsRange.startDate, googleAdsRange.endDate);
+  }, [googleAdsRange.startDate, googleAdsRange.endDate, syncGoogleAdsPerformance]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -158,6 +166,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const socialTraffic = useMemo(
     () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
     [ga4SocialTraffic, isGroupView, selectedEntity]
+  );
+  const googleAds = useMemo(
+    () => getGoogleAdsSummary(googleAdsPerformance, isGroupView, selectedEntity),
+    [googleAdsPerformance, isGroupView, selectedEntity]
   );
   const funnelStages: FunnelStage[] = [
     {
@@ -387,7 +399,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     campaignMonitorStatus,
     { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
-    { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
+    googleAdsPerformance?.configured === true
+      ? {
+          label: 'PPC (Google Ads)',
+          status: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'error' : 'live',
+          detail: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'Sync error' : 'Connected',
+        }
+      : { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
   ];
 
   const dataUpdatedLabel = 'Live data — synced on page load';
@@ -635,7 +653,17 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             ) : (
               <KpiCard title="Social" status="not-connected" subtitle={socialTraffic.subtitle} size="compact" />
             )}
-            <KpiCard title="PPC" status="not-connected" subtitle="Awaiting Google Ads integration" onClick={() => onNavigate?.('ppc')} size="compact" />
+            {googleAds.status === 'available' ? (
+              <KpiCard
+                title="PPC"
+                value={`£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                subtitle={`${googleAds.clicks} clicks · real Google Ads spend`}
+                onClick={() => onNavigate?.('ppc')}
+                size="compact"
+              />
+            ) : (
+              <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
+            )}
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (

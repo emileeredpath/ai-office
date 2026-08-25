@@ -29,6 +29,7 @@ import {
   fetchGa4Enquiries,
   type Ga4EnquiriesResponse,
 } from '@/services/ga4Api';
+import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
 import { fetchEmailPerformance, type EmailPerformanceResponse } from '@/services/emailPerformanceApi';
 import { fetchInfinityCalls, type InfinityCallsResponse } from '@/services/infinityCallsApi';
 
@@ -114,6 +115,14 @@ interface AppState {
   ga4Enquiries: Ga4EnquiriesResponse | null;
   ga4EnquiriesSyncing: boolean;
 
+  // Google Ads (Phase 1) — real campaign performance for Brentwood and
+  // Radio Links only, a fully separate integration from GA4/GA4
+  // Enquiries above. See src/utils/googleAdsPerformance.ts for how
+  // pages derive figures from this, and backend/src/services/googleAds.ts
+  // for the confirmed-live auth/query shape.
+  googleAdsPerformance: GoogleAdsResponse | null;
+  googleAdsPerformanceSyncing: boolean;
+
   // Real Campaign Monitor email performance (V2 Overview/Performance/
   // Reports) — a read-only rollup already restricted server-side to
   // source === 'campaign-monitor'. See src/utils/emailPerformance.ts.
@@ -160,6 +169,7 @@ interface AppState {
   syncGa4Traffic: (startDate: string, endDate: string) => Promise<void>;
   syncGa4SocialTraffic: (startDate: string, endDate: string) => Promise<void>;
   syncGa4Enquiries: (startDate: string, endDate: string) => Promise<void>;
+  syncGoogleAdsPerformance: (startDate: string, endDate: string) => Promise<void>;
 
   // Real Campaign Monitor email performance, for the resolved date range
   // the caller wants — see resolveEmailDateRange().
@@ -252,6 +262,8 @@ export const useAppStore = create<AppState>((set, get) => {
     ga4SocialTrafficSyncing: false,
     ga4Enquiries: null,
     ga4EnquiriesSyncing: false,
+    googleAdsPerformance: null,
+    googleAdsPerformanceSyncing: false,
     emailPerformance: null,
     emailPerformanceSyncing: false,
     infinityCalls: null,
@@ -642,6 +654,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('GA4 enquiries sync error:', err);
         set({ ga4EnquiriesSyncing: false });
+      }
+    },
+
+    syncGoogleAdsPerformance: async (startDate: string, endDate: string) => {
+      set({ googleAdsPerformanceSyncing: true });
+      try {
+        const data = await fetchGoogleAdsPerformance(startDate, endDate);
+        set({ googleAdsPerformance: data, googleAdsPerformanceSyncing: false });
+      } catch (err) {
+        console.error('Google Ads performance sync error:', err);
+        set({ googleAdsPerformanceSyncing: false });
       }
     },
 

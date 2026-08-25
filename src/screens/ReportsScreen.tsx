@@ -11,6 +11,7 @@ import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/uti
 import { buildReportCsv, downloadCsv, type ReportCsvSection } from '@/utils/reportExport';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries, getEnquiriesByChannel, getEnquiriesBySource } from '@/utils/ga4Enquiries';
+import { resolveGoogleAdsDateRange, getGoogleAdsSummary, getCostPerGa4Enquiry } from '@/utils/googleAdsPerformance';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import { resolveCallDateRange, getCallPerformance, getCallSourceBreakdown, getPpcAssistedCalls } from '@/utils/callPerformance';
 
@@ -33,6 +34,7 @@ export function ReportsScreen() {
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const infinityCalls = useAppStore((s) => s.infinityCalls);
   const syncCampaignsFromApi = useAppStore((s) => s.syncCampaignsFromApi);
@@ -42,6 +44,7 @@ export function ReportsScreen() {
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
   const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
@@ -65,6 +68,11 @@ export function ReportsScreen() {
   useEffect(() => {
     syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
+
+  const googleAdsRange = useMemo(() => resolveGoogleAdsDateRange(period), [period]);
+  useEffect(() => {
+    syncGoogleAdsPerformance(googleAdsRange.startDate, googleAdsRange.endDate);
+  }, [googleAdsRange.startDate, googleAdsRange.endDate, syncGoogleAdsPerformance]);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -121,6 +129,14 @@ export function ReportsScreen() {
   const enquiriesBySource = useMemo(
     () => getEnquiriesBySource(ga4Enquiries, isGroupView, selectedEntity, 10),
     [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const googleAds = useMemo(
+    () => getGoogleAdsSummary(googleAdsPerformance, isGroupView, selectedEntity),
+    [googleAdsPerformance, isGroupView, selectedEntity]
+  );
+  const costPerGa4Enquiry = useMemo(
+    () => getCostPerGa4Enquiry(googleAdsPerformance, ga4Enquiries, isGroupView, selectedEntity),
+    [googleAdsPerformance, ga4Enquiries, isGroupView, selectedEntity]
   );
 
   // Funding has no genuine date field this app can honestly match against
@@ -195,7 +211,13 @@ export function ReportsScreen() {
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
     campaignMonitorStatus,
     { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
-    { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
+    googleAdsPerformance?.configured === true
+      ? {
+          label: 'PPC (Google Ads)',
+          status: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'error' : 'live',
+          detail: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'Sync error' : 'Connected',
+        }
+      : { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
   ];
 
   const currency = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -350,6 +372,36 @@ export function ReportsScreen() {
                 b.answerRate != null ? `${b.answerRate}%` : '—',
               ])
             : [['Not connected', '', '', '', callSourceBreakdown.subtitle]],
+      },
+      {
+        title: 'PPC / Google Ads',
+        columns: ['Metric', 'Value', 'Detail'],
+        rows: [
+          googleAds.status === 'available'
+            ? ['Spend', currency(googleAds.spend!), googleAds.subtitle]
+            : ['Spend', 'Not connected', googleAds.subtitle],
+          googleAds.status === 'available'
+            ? ['Impressions', googleAds.impressions!, googleAds.subtitle]
+            : ['Impressions', 'Not connected', googleAds.subtitle],
+          googleAds.status === 'available'
+            ? ['Clicks', googleAds.clicks!, googleAds.subtitle]
+            : ['Clicks', 'Not connected', googleAds.subtitle],
+          googleAds.status === 'available' && googleAds.ctr != null
+            ? ['CTR', `${googleAds.ctr}%`, 'Clicks ÷ Impressions']
+            : ['CTR', 'Not connected', googleAds.subtitle],
+          googleAds.status === 'available' && googleAds.averageCpc != null
+            ? ['Average CPC', currency(googleAds.averageCpc), 'Spend ÷ Clicks']
+            : ['Average CPC', 'Not connected', googleAds.subtitle],
+          googleAds.status === 'available'
+            ? ['Google Ads Conversions', googleAds.conversions!, googleAds.subtitle]
+            : ['Google Ads Conversions', 'Not connected', googleAds.subtitle],
+          googleAds.status === 'available' && googleAds.costPerConversion != null
+            ? ['Cost per Google Ads Conversion', currency(googleAds.costPerConversion), 'Spend ÷ Google Ads Conversions']
+            : ['Cost per Google Ads Conversion', 'Not connected', googleAds.subtitle],
+          costPerGa4Enquiry.status === 'available' && costPerGa4Enquiry.costPerEnquiry != null
+            ? ['Cost per GA4 Enquiry', currency(costPerGa4Enquiry.costPerEnquiry), costPerGa4Enquiry.subtitle]
+            : ['Cost per GA4 Enquiry', 'Not connected', costPerGa4Enquiry.subtitle],
+        ],
       },
       {
         title: 'Campaign Summary',
@@ -717,6 +769,82 @@ export function ReportsScreen() {
               <p className="text-sm text-text-secondary">{callSourceBreakdown.subtitle}</p>
             </div>
           )}
+        </div>
+
+        {/* PPC / Google Ads — real campaign performance for Brentwood and
+            Radio Links only; Google Ads Conversions and GA4 Enquiries stay
+            clearly separate, never merged into one figure. */}
+        <div className="mb-8">
+          <h2 className="v2-section-title">PPC / Google Ads</h2>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Real Google Ads performance for Brentwood and Radio Links. Google Ads Conversions is Google Ads' own
+            metric — a different measurement from GA4 Enquiries, never assumed equivalent.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+            <KpiCard
+              title="Spend"
+              value={googleAds.status === 'available' ? `£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Impressions"
+              value={googleAds.status === 'available' ? googleAds.impressions!.toLocaleString('en-GB') : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Clicks"
+              value={googleAds.status === 'available' ? googleAds.clicks!.toLocaleString('en-GB') : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="CTR"
+              value={googleAds.status === 'available' && googleAds.ctr != null ? `${googleAds.ctr}%` : undefined}
+              status={googleAds.status === 'available' && googleAds.ctr != null ? 'available' : 'not-connected'}
+              subtitle={googleAds.status === 'available' ? 'Clicks ÷ Impressions' : googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Average CPC"
+              value={googleAds.status === 'available' && googleAds.averageCpc != null ? `£${googleAds.averageCpc.toFixed(2)}` : undefined}
+              status={googleAds.status === 'available' && googleAds.averageCpc != null ? 'available' : 'not-connected'}
+              subtitle={googleAds.status === 'available' ? 'Spend ÷ Clicks' : googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Google Ads Conversions"
+              value={googleAds.status === 'available' ? googleAds.conversions : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Cost per Google Ads Conversion"
+              value={googleAds.status === 'available' && googleAds.costPerConversion != null ? `£${googleAds.costPerConversion.toFixed(2)}` : undefined}
+              status={googleAds.status === 'available' && googleAds.costPerConversion != null ? 'available' : 'not-connected'}
+              subtitle={googleAds.status === 'available' ? 'Spend ÷ Google Ads Conversions' : googleAds.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="GA4 Enquiries"
+              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
+              status={ga4EnquiriesInfo.status}
+              subtitle={ga4EnquiriesInfo.subtitle}
+              size="compact"
+            />
+            <KpiCard
+              title="Cost per GA4 Enquiry"
+              value={costPerGa4Enquiry.status === 'available' && costPerGa4Enquiry.costPerEnquiry != null ? `£${costPerGa4Enquiry.costPerEnquiry.toFixed(2)}` : undefined}
+              status={costPerGa4Enquiry.status === 'available' && costPerGa4Enquiry.costPerEnquiry != null ? 'available' : 'not-connected'}
+              subtitle={costPerGa4Enquiry.subtitle}
+              size="compact"
+            />
+          </div>
         </div>
 
         {/* Campaign Summary */}
