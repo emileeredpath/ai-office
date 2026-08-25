@@ -183,7 +183,7 @@ async function runCampaignQuery(
       'developer-token': developerToken,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query, pageSize: 1000 }),
+    body: JSON.stringify({ query }),
   });
 
   if (!res.ok) {
@@ -199,9 +199,12 @@ async function runCampaignQuery(
   const json = (await res.json()) as { results?: RawCampaignRow[] };
   return json.results || [];
 
-  // No pagination loop implemented yet — pageSize:1000 covers any
-  // realistic MTech-scale account's campaign count for a single date
-  // range. Add one if a response is ever observed with a nextPageToken.
+  // No pageSize is sent — confirmed live that v25's googleAds:search
+  // rejects any explicit page size with PAGE_SIZE_NOT_SUPPORTED ("Search
+  // Responses will have fixed page size of '10000' rows"). That fixed
+  // 10000-row page covers any realistic MTech-scale account's campaign
+  // count for a single date range; no pagination loop implemented yet —
+  // add one if a response is ever observed with a nextPageToken.
 }
 
 function summarizeCampaignRows(rows: RawCampaignRow[]): Omit<BrandGoogleAdsPerformance, 'brand'> {
