@@ -1,24 +1,28 @@
 // Google Ads integration — real campaign performance for the two accounts
-// currently connected (Brentwood, Radio Links), under the MTech Group
-// manager (MCC) account as the login customer. Capcom and Irish Radio have
-// no Google Ads account configured and are deliberately absent from
-// CUSTOMER_ID_ENV below — never guessed, never defaulted to the manager
-// account's own aggregate.
+// currently connected (Brentwood, Radio Links). Capcom and Irish Radio
+// have no Google Ads account configured and are deliberately absent from
+// CUSTOMER_ID_ENV below — never guessed, never defaulted to any other
+// account's aggregate.
 //
-// IMPORTANT — untested against the real accounts from this sandbox: no
-// GOOGLE_ADS_* vars exist here, and this sandbox has no route to Google's
-// live API. Unlike GA4's service-account JWT flow, this uses standard
-// OAuth2 refresh-token exchange (grant_type=refresh_token) plus a
-// developer token and a login-customer-id header for the manager account
-// — the request/response shapes below follow Google's documented REST API
-// but must be confirmed against a real account before this is trusted.
-// See the diagnostic script referenced in the PR/commit this file ships
-// with for how that confirmation was (or should be) done.
+// Auth: standard OAuth2 refresh-token exchange (grant_type=refresh_token)
+// plus a developer token — confirmed live against both real accounts (see
+// conversation history — not re-derived here). Both Brentwood and Radio
+// Links are queried DIRECTLY (their own customer ID, no login-customer-id
+// header) — confirmed live that sending login-customer-id on these
+// requests causes them to fail, since these are not sub-accounts of a
+// manager Brentwood/Radio Links must be accessed through. Do not add the
+// login-customer-id header back to runCampaignQuery without re-confirming
+// against a real account first. GOOGLE_ADS_LOGIN_CUSTOMER_ID is still
+// read from env and documented in .env.example for a future phase (e.g.
+// a genuine manager-account-only entity), but is not sent by anything in
+// this file today.
 //
-// API version: the URL path below is pinned to GOOGLE_ADS_API_VERSION.
-// Google deprecates versions on a roughly quarterly cadence; if a live
-// call returns an error naming a deprecated/unsupported version, update
-// this one constant — nothing else references the version number.
+// API version: the URL path below is pinned to GOOGLE_ADS_API_VERSION —
+// confirmed live as v25 (v19, this integration's original guess, was
+// already retired and returned a 404). Google deprecates versions on a
+// roughly quarterly cadence; if a live call ever returns an error naming
+// a deprecated/unsupported version again, update this one constant —
+// nothing else references the version number.
 import type { Brand } from '../types.js';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -147,9 +151,11 @@ interface RawCampaignRow {
 // No status filter is applied — every campaign with real metrics in this
 // range is returned with its genuine current status, never hidden or
 // silently excluded because it's paused/removed.
+//
+// Deliberately no login-customer-id header — confirmed live that Brentwood
+// and Radio Links are queried directly, and sending that header fails.
 async function runCampaignQuery(
   customerId: string,
-  loginCustomerId: string,
   token: string,
   developerToken: string,
   startDate: string,
@@ -175,7 +181,6 @@ async function runCampaignQuery(
     headers: {
       Authorization: `Bearer ${token}`,
       'developer-token': developerToken,
-      'login-customer-id': loginCustomerId,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query, pageSize: 1000 }),
@@ -257,7 +262,10 @@ export async function getGoogleAdsPerformance(startDate?: string, endDate?: stri
   );
   const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
 
-  const requiredEnvVars = ['GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_REFRESH_TOKEN', 'GOOGLE_ADS_LOGIN_CUSTOMER_ID'];
+  // GOOGLE_ADS_LOGIN_CUSTOMER_ID is intentionally not required here — it's
+  // read/documented for a future manager-account phase but isn't sent by
+  // runCampaignQuery today (see this file's header comment).
+  const requiredEnvVars = ['GOOGLE_ADS_CLIENT_ID', 'GOOGLE_ADS_CLIENT_SECRET', 'GOOGLE_ADS_DEVELOPER_TOKEN', 'GOOGLE_ADS_REFRESH_TOKEN'];
   const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
 
   if (missingEnvVars.length > 0 || configuredBrands.length === 0) {
@@ -278,13 +286,12 @@ export async function getGoogleAdsPerformance(startDate?: string, endDate?: stri
   }
 
   const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN as string;
-  const loginCustomerId = digitsOnly(process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID as string);
 
   const brands: BrandGoogleAdsPerformance[] = [];
   for (const brand of configuredBrands) {
     const customerId = digitsOnly(process.env[CUSTOMER_ID_ENV[brand] as string] as string);
     try {
-      const rows = await runCampaignQuery(customerId, loginCustomerId, token, developerToken, range.startDate, range.endDate);
+      const rows = await runCampaignQuery(customerId, token, developerToken, range.startDate, range.endDate);
       brands.push({ brand, ...summarizeCampaignRows(rows) });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
