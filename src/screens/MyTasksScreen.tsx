@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { TaskRow } from '@/components/tasks/TaskRow';
 import { AddTaskModal } from '@/components/tasks/AddTaskModal';
@@ -118,13 +118,28 @@ export function MyTasksScreen() {
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-text-primary">My Tasks</h1>
-          {isEditor && (
-            <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
-              <Plus size={18} />
-              Add task
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            <a
+              href="https://to-do.office.com/tasks/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary flex items-center gap-2"
+            >
+              <ExternalLink size={18} />
+              Open Microsoft To Do
+            </a>
+            {isEditor && (
+              <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
+                <Plus size={18} />
+                Add task
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Personal tasks live in Microsoft To Do — this page only tracks
+            tasks native to the Marketing Hub itself (campaign deadlines,
+            content/calendar items, internal reminders). No sync exists. */}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-4 gap-4 mb-4">
