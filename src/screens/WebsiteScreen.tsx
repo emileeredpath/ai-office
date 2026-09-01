@@ -105,7 +105,10 @@ export function WebsiteScreen() {
           <h2 className="v2-section-title">Organic Search Performance</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Real Google Search Console data — searches that brought people to the website. A separate measurement
-            from GA4 Enquiries below; a Search Console click never implies an enquiry happened.
+            from GA4 Enquiries below; a Search Console click never implies an enquiry happened. Search Console
+            typically takes 2–3 days to index and report a given day's data, so very recent dates (including "This
+            month" in the first few days of a new month) can genuinely show little or nothing yet — that's a real
+            reporting lag, not a broken connection. Try "This quarter" or "This year" to see recent activity.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
