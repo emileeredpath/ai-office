@@ -30,6 +30,7 @@ import {
   type Ga4EnquiriesResponse,
 } from '@/services/ga4Api';
 import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
+import { fetchSearchConsolePerformance, type SearchConsoleResponse } from '@/services/searchConsoleApi';
 import { fetchEmailPerformance, type EmailPerformanceResponse } from '@/services/emailPerformanceApi';
 import { fetchInfinityCalls, type InfinityCallsResponse } from '@/services/infinityCallsApi';
 
@@ -123,6 +124,16 @@ interface AppState {
   googleAdsPerformance: GoogleAdsResponse | null;
   googleAdsPerformanceSyncing: boolean;
 
+  // Search Console (Phase 1) — real organic search performance for the
+  // entities with a verified property, a fully separate integration from
+  // GA4/GA4 Enquiries/Google Ads above. See src/utils/searchConsole.ts for
+  // how pages derive figures from this, and
+  // backend/src/services/searchConsole.ts for the confirmed auth/query
+  // shape (reuses the GA4 service account with its own webmasters.readonly
+  // scope).
+  searchConsolePerformance: SearchConsoleResponse | null;
+  searchConsolePerformanceSyncing: boolean;
+
   // Real Campaign Monitor email performance (V2 Overview/Performance/
   // Reports) — a read-only rollup already restricted server-side to
   // source === 'campaign-monitor'. See src/utils/emailPerformance.ts.
@@ -170,6 +181,7 @@ interface AppState {
   syncGa4SocialTraffic: (startDate: string, endDate: string) => Promise<void>;
   syncGa4Enquiries: (startDate: string, endDate: string) => Promise<void>;
   syncGoogleAdsPerformance: (startDate: string, endDate: string) => Promise<void>;
+  syncSearchConsolePerformance: (startDate: string, endDate: string) => Promise<void>;
 
   // Real Campaign Monitor email performance, for the resolved date range
   // the caller wants — see resolveEmailDateRange().
@@ -264,6 +276,8 @@ export const useAppStore = create<AppState>((set, get) => {
     ga4EnquiriesSyncing: false,
     googleAdsPerformance: null,
     googleAdsPerformanceSyncing: false,
+    searchConsolePerformance: null,
+    searchConsolePerformanceSyncing: false,
     emailPerformance: null,
     emailPerformanceSyncing: false,
     infinityCalls: null,
@@ -665,6 +679,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('Google Ads performance sync error:', err);
         set({ googleAdsPerformanceSyncing: false });
+      }
+    },
+
+    syncSearchConsolePerformance: async (startDate: string, endDate: string) => {
+      set({ searchConsolePerformanceSyncing: true });
+      try {
+        const data = await fetchSearchConsolePerformance(startDate, endDate);
+        set({ searchConsolePerformance: data, searchConsolePerformanceSyncing: false });
+      } catch (err) {
+        console.error('Search Console performance sync error:', err);
+        set({ searchConsolePerformanceSyncing: false });
       }
     },
 

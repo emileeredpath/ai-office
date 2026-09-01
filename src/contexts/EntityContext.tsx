@@ -4,15 +4,20 @@ import { Brand } from '@/types/index';
 // Global entity selector — Phase 1A. Filters by the existing `brand` column
 // already present on campaigns/tasks/funding records; no schema change.
 // 'all' represents "MTech Group" — the combined, unfiltered view across every
-// brand (including any brand not in ENTITY_OPTIONS below, e.g. 'idaro').
+// brand (including any brand not in ENTITY_OPTIONS below).
 export type EntitySelection = 'all' | Brand;
 
+// 'idaro' is individually selectable (Search Console Phase 1 gave it a
+// real, entity-attributable data source) but stays out of every V2
+// group-level total — see groupEntities.ts's GROUP_AGGREGATE_BRANDS,
+// which is deliberately not the same list as this one.
 export const ENTITY_OPTIONS: { value: EntitySelection; label: string }[] = [
   { value: 'all', label: 'MTech Group' },
   { value: 'brentwood', label: 'Brentwood' },
   { value: 'radio-links', label: 'Radio Links' },
   { value: 'capcom', label: 'Capcom' },
   { value: 'ircl', label: 'Irish Radio' },
+  { value: 'idaro', label: 'IDARO' },
 ];
 
 interface EntityContextType {

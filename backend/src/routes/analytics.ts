@@ -5,6 +5,7 @@ import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js
 import { getEmailPerformance } from '../services/emailPerformance.js';
 import { fetchInfinityCalls } from '../services/infinity.js';
 import { getGoogleAdsPerformance } from '../services/googleAds.js';
+import { getSearchConsolePerformance } from '../services/searchConsole.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
@@ -67,6 +68,21 @@ router.get('/google-ads', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getGoogleAdsPerformance(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Search Console (Phase 1) — real organic search performance (clicks,
+// impressions, CTR, average position, top queries, top landing pages) for
+// the entities with a verified Search Console property (see
+// getSearchConsolePerformance's own doc comment). A fully separate
+// integration from GA4/GA4 Enquiries/Google Ads above — never implies a
+// Search Console click caused a GA4 Enquiry. Same startDate/endDate
+// contract as every other analytics route.
+router.get('/search-console', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await getSearchConsolePerformance(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 
