@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { getSession, login as loginRequest, logout as logoutRequest, type SessionRole } from '@/services/authApi';
+import { onSessionExpired } from '@/services/apiConfig';
 import { useAppStore } from '@/store/useAppStore';
 
 interface AuthContextType {
@@ -25,6 +26,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         useAppStore.getState().syncCampaignsFromApi();
       }
     });
+  }, []);
+
+  // A 401 from any protected route (not just the initial check above)
+  // means the backend no longer recognises this session — most commonly a
+  // Railway redeploy clearing the in-memory session store. Drop straight
+  // back to signed-out so LoginGate shows the password screen again,
+  // rather than leaving stale "signed in" UI in front of data that can no
+  // longer load.
+  useEffect(() => {
+    onSessionExpired(() => {
+      setRole(null);
+      setStatus('signed-out');
+    });
+    return () => onSessionExpired(null);
   }, []);
 
   const login = useCallback(async (password: string) => {

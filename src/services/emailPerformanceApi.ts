@@ -75,3 +75,38 @@ export async function fetchTopLinksForSend(campaignMonitorId: string): Promise<T
   }
   return body;
 }
+
+// Manual sync trigger (Email page's "Sync now" button) — mirrors the
+// backend's real SyncResult shape exactly (backend/src/services/
+// campaignMonitor.ts's SyncResult) so the UI reports genuine
+// fetched/created/updated counts and any real Campaign Monitor error
+// strings, never an invented summary. Edit-role only — the backend route
+// is behind requireEdit, so a view-only session gets a 403 here.
+export interface CampaignMonitorSyncResult {
+  success: boolean;
+  message: string;
+  clientsProcessed: number;
+  campaignsSeen: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export async function triggerCampaignMonitorSync(sinceDays: number): Promise<CampaignMonitorSyncResult> {
+  const response = await apiFetch(`/api/campaign-monitor/sync?sinceDays=${sinceDays}`, { method: 'POST' });
+  const body = (await response.json().catch(() => ({}))) as Partial<CampaignMonitorSyncResult>;
+  if (!response.ok) {
+    throw new ApiError(body.message ?? `Campaign Monitor sync failed (${response.status}).`, response.status);
+  }
+  return {
+    success: body.success ?? false,
+    message: body.message ?? '',
+    clientsProcessed: body.clientsProcessed ?? 0,
+    campaignsSeen: body.campaignsSeen ?? 0,
+    created: body.created ?? 0,
+    updated: body.updated ?? 0,
+    skipped: body.skipped ?? 0,
+    errors: body.errors ?? [],
+  };
+}

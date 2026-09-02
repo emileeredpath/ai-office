@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
@@ -9,6 +10,8 @@ import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataF
 import { SendDetailPanel } from '@/components/email/SendDetailPanel';
 import { resolveEmailDateRange, getEmailHeadlineMetrics, getEmailSends } from '@/utils/emailPerformance';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
+import { triggerCampaignMonitorSync, type CampaignMonitorSyncResult } from '@/services/emailPerformanceApi';
+import { ApiError } from '@/services/apiConfig';
 import {
   getEducationSends,
   getEducationSummary,
@@ -96,11 +99,35 @@ export function EmailScreen() {
   const syncEducationCampaignAttribution = useAppStore((s) => s.syncEducationCampaignAttribution);
   const { isGroupView, selectedEntity } = useEntity();
   const { period } = usePeriod();
+  const { isEditor } = useAuth();
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
     syncEmailPerformance(emailRange.startDate, emailRange.endDate);
   }, [emailRange.startDate, emailRange.endDate, syncEmailPerformance]);
+
+  // Manual "Sync now" — calls the real Campaign Monitor sync (backend
+  // requireEdit route), then re-fetches this page's own read layer so the
+  // numbers reflect whatever the sync genuinely found. Never invents a
+  // result — cmSyncResult/cmSyncError below are always exactly what the
+  // backend returned.
+  const [cmSyncing, setCmSyncing] = useState(false);
+  const [cmSyncResult, setCmSyncResult] = useState<CampaignMonitorSyncResult | null>(null);
+  const [cmSyncError, setCmSyncError] = useState<string | null>(null);
+  const handleSyncNow = async () => {
+    setCmSyncing(true);
+    setCmSyncError(null);
+    try {
+      const result = await triggerCampaignMonitorSync(30);
+      setCmSyncResult(result);
+      await syncEmailPerformance(emailRange.startDate, emailRange.endDate);
+    } catch (err) {
+      setCmSyncResult(null);
+      setCmSyncError(err instanceof ApiError ? err.message : 'Sync failed — could not reach the AI Office backend.');
+    } finally {
+      setCmSyncing(false);
+    }
+  };
 
   const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
   useEffect(() => {
@@ -190,7 +217,25 @@ export function EmailScreen() {
           <PeriodSelector />
         </div>
 
-        <DataFreshnessBar entries={freshnessEntries} />
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <DataFreshnessBar entries={freshnessEntries} />
+          {isEditor && (
+            <button type="button" className="btn btn-secondary text-sm" onClick={handleSyncNow} disabled={cmSyncing}>
+              <RefreshCw size={14} className={cmSyncing ? 'animate-spin' : ''} style={{ marginRight: 6 }} />
+              {cmSyncing ? 'Syncing…' : 'Sync now'}
+            </button>
+          )}
+        </div>
+        {cmSyncResult && (
+          <p className="text-xs text-text-secondary mb-6">
+            Campaign Monitor sync: {cmSyncResult.campaignsSeen} send(s) seen, {cmSyncResult.created} new,{' '}
+            {cmSyncResult.updated} updated, {cmSyncResult.skipped} skipped.
+            {cmSyncResult.errors.length > 0 && (
+              <span style={{ color: 'var(--v2-red)' }}> {cmSyncResult.errors.length} error(s): {cmSyncResult.errors.join('; ')}</span>
+            )}
+          </p>
+        )}
+        {cmSyncError && <p className="text-xs mb-6" style={{ color: 'var(--v2-red)' }}>{cmSyncError}</p>}
 
         {/* Headline metrics */}
         <div className="mb-8">

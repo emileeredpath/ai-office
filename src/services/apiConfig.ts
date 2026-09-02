@@ -11,6 +11,21 @@ export class ApiError extends Error {
   }
 }
 
+// Backend sessions are in-memory only (see backend/src/middleware/
+// session.ts) — a redeploy wipes them, so a previously-issued session
+// cookie can go from valid to unrecognised with no client-side signal.
+// Every protected route uses the same requireSession middleware, so any
+// 401 from anywhere except the auth endpoints themselves (login/me/logout
+// manage their own state directly) means the session is genuinely gone
+// server-side. AuthProvider registers a listener here so it can drop the
+// app back to the login screen immediately, instead of the UI silently
+// continuing to look "signed in" while every real request 401s.
+let sessionExpiredListener: (() => void) | null = null;
+
+export function onSessionExpired(listener: (() => void) | null) {
+  sessionExpiredListener = listener;
+}
+
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   let response: Response;
   try {
@@ -24,6 +39,9 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     });
   } catch {
     throw new ApiError('Could not reach the AI Office backend. Check your connection.');
+  }
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    sessionExpiredListener?.();
   }
   return response;
 }
