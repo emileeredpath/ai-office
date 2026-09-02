@@ -8,6 +8,15 @@ function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Display-only rounding for every email performance percentage (Delivery
+// Rate, Unique Open Rate, Click Rate, CTOR, Bounce Rate, Unsubscribe
+// Rate). The underlying values themselves stay full-precision floats
+// wherever they're stored or summed (see educationCampaign.ts's
+// buildRollupRow) — this only formats what's rendered.
+export function formatPercent(value: number | null | undefined): string {
+  return value != null ? `${value.toFixed(1)}%` : '—';
+}
+
 // A long-past sentinel for "All time" — unlike GA4 Phase 1's floor (the
 // GA4 Data API's own documented earliest supported date), Campaign Monitor
 // has no equivalent honest floor to cite: the sync has only ever pulled

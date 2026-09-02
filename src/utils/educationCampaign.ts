@@ -188,9 +188,14 @@ export interface EducationWebsiteAttribution {
 
 // Downstream GA4 attribution for the Education campaign — real sessions
 // (and, only where a verified GA4 Enquiry definition exists, real
-// enquiries) from links tagged utm_source=campaign_monitor&utm_medium=
-// email&utm_campaign=education_2026. Never infers a lead/opportunity/
-// revenue stage — those require Acumatica, not connected. Same
+// enquiries) identified by Campaign Monitor's own automatic GA link
+// tagging: sessionSource "Campaign Monitor Email", sessionMedium "email",
+// sessionCampaignName containing "education" (see
+// backend/src/services/ga4.ts's EDUCATION_UTM_FILTER — corrected from an
+// earlier, wrong assumption of utm_source=campaign_monitor&utm_campaign=
+// education_2026, which never matched live traffic). Never infers a
+// lead/opportunity/revenue stage — those require Acumatica, not
+// connected. Same
 // deliberate no-GROUP_AGGREGATE_BRANDS-filter reasoning as
 // getEducationSends above: every configured brand's sessions count
 // toward "MTech Group," including `mtech` (the umbrella site new

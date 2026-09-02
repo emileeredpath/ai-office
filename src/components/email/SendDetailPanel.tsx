@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { fetchTopLinksForSend, type EmailCampaignRecord, type TopLinkRow } from '@/services/emailPerformanceApi';
 import { BRAND_LABEL } from '@/utils/brandColors';
+import { formatPercent } from '@/utils/emailPerformance';
 
 interface SendDetailPanelProps {
   send: EmailCampaignRecord;
@@ -29,8 +30,8 @@ function ComparisonRow({ label, thisValue, avgValue }: { label: string; thisValu
   return (
     <tr>
       <td className="text-text-primary">{label}</td>
-      <td style={{ textAlign: 'right' }}>{thisValue != null ? `${thisValue}%` : '—'}</td>
-      <td style={{ textAlign: 'right' }}>{avgValue != null ? `${avgValue}%` : '—'}</td>
+      <td style={{ textAlign: 'right' }}>{formatPercent(thisValue)}</td>
+      <td style={{ textAlign: 'right' }}>{formatPercent(avgValue)}</td>
     </tr>
   );
 }
@@ -101,12 +102,17 @@ export function SendDetailPanel({ send, educationAverage, onClose }: SendDetailP
         <div className="grid grid-cols-3 gap-4 mb-6">
           <Stat label="Recipients" value={send.recipients?.toLocaleString('en-GB') ?? '—'} />
           <Stat label="Delivered" value={send.delivered != null ? send.delivered.toLocaleString('en-GB') : '—'} />
-          <Stat label="Delivery Rate" value={send.deliveryRate != null ? `${send.deliveryRate}%` : '—'} />
+          <Stat label="Delivery Rate" value={formatPercent(send.deliveryRate)} />
           <Stat label="Unique Opens" value={send.uniqueOpens != null ? send.uniqueOpens.toLocaleString('en-GB') : '—'} />
-          <Stat label="Unique Open Rate" value={send.uniqueOpenRate != null ? `${send.uniqueOpenRate}%` : '—'} />
+          <Stat label="Unique Open Rate" value={formatPercent(send.uniqueOpenRate)} />
+          {/* Campaign Monitor's summary Clicks field is documented as a
+              unique-clicking-subscriber count but that's unconfirmed
+              against this live account — shown as a raw count/rate only,
+              never as a clean unique-basis Click-to-Open Rate. See
+              backend/src/services/campaignMonitor.ts's CmCampaignSummary
+              comment. */}
           <Stat label="Clicks" value={send.clicks?.toLocaleString('en-GB') ?? '—'} />
-          <Stat label="Click Rate" value={send.clickRate != null ? `${send.clickRate}%` : '—'} />
-          <Stat label="Click-to-Open Rate" value={send.clickToOpenRate != null ? `${send.clickToOpenRate}%` : '—'} />
+          <Stat label="Click Rate" value={formatPercent(send.clickRate)} />
           <Stat label="Bounces" value={send.bounces?.toLocaleString('en-GB') ?? '—'} />
           <Stat label="Unsubscribes" value={send.unsubscribes?.toLocaleString('en-GB') ?? '—'} />
         </div>

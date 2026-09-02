@@ -8,7 +8,7 @@ import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { KpiCard } from '@/components/common/KpiCard';
 import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataFreshnessBar';
 import { SendDetailPanel } from '@/components/email/SendDetailPanel';
-import { resolveEmailDateRange, getEmailHeadlineMetrics, getEmailSends } from '@/utils/emailPerformance';
+import { resolveEmailDateRange, getEmailHeadlineMetrics, getEmailSends, formatPercent } from '@/utils/emailPerformance';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { triggerCampaignMonitorSync, type CampaignMonitorSyncResult } from '@/services/emailPerformanceApi';
 import { ApiError } from '@/services/apiConfig';
@@ -59,7 +59,6 @@ function RollupTable({ title, rows }: { title: string; rows: EducationRollupRow[
                 <th style={{ textAlign: 'right' }}>Delivery Rate</th>
                 <th style={{ textAlign: 'right' }}>Unique Open Rate</th>
                 <th style={{ textAlign: 'right' }}>Click Rate</th>
-                <th style={{ textAlign: 'right' }}>Click-to-Open Rate</th>
               </tr>
             </thead>
             <tbody>
@@ -68,10 +67,9 @@ function RollupTable({ title, rows }: { title: string; rows: EducationRollupRow[
                   <td className="text-text-primary">{row.label}</td>
                   <td style={{ textAlign: 'right' }}>{row.sends}</td>
                   <td style={{ textAlign: 'right' }}>{row.recipients.toLocaleString('en-GB')}</td>
-                  <td style={{ textAlign: 'right' }}>{row.deliveryRate != null ? `${row.deliveryRate}%` : '—'}</td>
-                  <td style={{ textAlign: 'right' }}>{row.uniqueOpenRate != null ? `${row.uniqueOpenRate}%` : '—'}</td>
-                  <td style={{ textAlign: 'right' }}>{row.clickRate != null ? `${row.clickRate}%` : '—'}</td>
-                  <td style={{ textAlign: 'right' }}>{row.clickToOpenRate != null ? `${row.clickToOpenRate}%` : '—'}</td>
+                  <td style={{ textAlign: 'right' }}>{formatPercent(row.deliveryRate)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatPercent(row.uniqueOpenRate)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatPercent(row.clickRate)}</td>
                 </tr>
               ))}
             </tbody>
@@ -244,16 +242,21 @@ export function EmailScreen() {
             <KpiCard title="Emails Sent" value={headline.status === 'available' ? headline.campaignsSent : undefined} status={headline.status} subtitle={headline.subtitle} />
             <KpiCard title="Total Recipients" value={headline.status === 'available' ? headline.recipients?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} />
             <KpiCard title="Delivered" value={headline.status === 'available' ? headline.delivered?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} />
-            <KpiCard title="Delivery Rate" value={headline.status === 'available' && headline.deliveryRate != null ? `${headline.deliveryRate}%` : undefined} status={headline.status === 'available' && headline.deliveryRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} />
+            <KpiCard title="Delivery Rate" value={headline.status === 'available' && headline.deliveryRate != null ? formatPercent(headline.deliveryRate) : undefined} status={headline.status === 'available' && headline.deliveryRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} />
             <KpiCard title="Unique Opens" value={headline.status === 'available' ? headline.uniqueOpens?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-green)" />
-            <KpiCard title="Unique Open Rate" value={headline.status === 'available' && headline.uniqueOpenRate != null ? `${headline.uniqueOpenRate}%` : undefined} status={headline.status === 'available' && headline.uniqueOpenRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-green)" />
+            <KpiCard title="Unique Open Rate" value={headline.status === 'available' && headline.uniqueOpenRate != null ? formatPercent(headline.uniqueOpenRate) : undefined} status={headline.status === 'available' && headline.uniqueOpenRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-green)" />
+            {/* Campaign Monitor's summary Clicks field is documented as a
+                unique-clicking-subscriber count, but that's unconfirmed
+                against this live account (see backend/src/services/
+                campaignMonitor.ts's CmCampaignSummary comment) — shown as
+                a raw count/rate with that caveat, never as a clean
+                unique-basis KPI. */}
             <KpiCard title="Clicks" value={headline.status === 'available' ? headline.clicks?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle="Campaign Monitor's Clicks field — documented as unique clicking subscribers, not yet confirmed against this live account" accent="var(--v2-green)" />
-            <KpiCard title="Click Rate" value={headline.status === 'available' && headline.clickRate != null ? `${headline.clickRate}%` : undefined} status={headline.status === 'available' && headline.clickRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-green)" />
-            <KpiCard title="Click-to-Open Rate" value={headline.status === 'available' && headline.clickToOpenRate != null ? `${headline.clickToOpenRate}%` : undefined} status={headline.status === 'available' && headline.clickToOpenRate != null ? 'available' : 'not-connected'} subtitle="Clicks ÷ unique opens — only meaningful if Clicks is genuinely unique-subscriber-based; verify Clicks ≤ Unique Opens on real data" />
+            <KpiCard title="Click Rate" value={headline.status === 'available' && headline.clickRate != null ? formatPercent(headline.clickRate) : undefined} status={headline.status === 'available' && headline.clickRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-green)" />
             <KpiCard title="Bounces" value={headline.status === 'available' ? headline.bounces?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-orange)" />
-            <KpiCard title="Bounce Rate" value={headline.status === 'available' && headline.bounceRate != null ? `${headline.bounceRate}%` : undefined} status={headline.status === 'available' && headline.bounceRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-orange)" />
+            <KpiCard title="Bounce Rate" value={headline.status === 'available' && headline.bounceRate != null ? formatPercent(headline.bounceRate) : undefined} status={headline.status === 'available' && headline.bounceRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-orange)" />
             <KpiCard title="Unsubscribes" value={headline.status === 'available' ? headline.unsubscribes?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-red)" />
-            <KpiCard title="Unsubscribe Rate" value={headline.status === 'available' && headline.unsubscribeRate != null ? `${headline.unsubscribeRate}%` : undefined} status={headline.status === 'available' && headline.unsubscribeRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-red)" />
+            <KpiCard title="Unsubscribe Rate" value={headline.status === 'available' && headline.unsubscribeRate != null ? formatPercent(headline.unsubscribeRate) : undefined} status={headline.status === 'available' && headline.unsubscribeRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-red)" />
           </div>
         </div>
 
@@ -302,7 +305,6 @@ export function EmailScreen() {
                       <th style={{ textAlign: 'right' }}>Open Rate</th>
                       <th style={{ textAlign: 'right' }}>Clicks</th>
                       <th style={{ textAlign: 'right' }}>Click Rate</th>
-                      <th style={{ textAlign: 'right' }}>CTOR</th>
                       <th style={{ textAlign: 'right' }}>Bounces</th>
                       <th style={{ textAlign: 'right' }}>Unsubs</th>
                       <th>Status</th>
@@ -311,10 +313,20 @@ export function EmailScreen() {
                   <tbody>
                     {filteredSends.map((send) => (
                       <tr key={send.taskId} onClick={() => setSelectedSend(send)} style={{ cursor: 'pointer' }}>
-                        <td className="text-text-primary">
-                          {send.campaignName}
+                        <td className="text-text-primary" title={send.campaignName}>
+                          <div
+                            style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              maxWidth: 260,
+                            }}
+                          >
+                            {send.campaignName}
+                          </div>
                           {send.isTest && (
-                            <span className="text-xs" style={{ marginLeft: 6, color: 'var(--v2-orange)', fontWeight: 600 }}>
+                            <span className="text-xs" style={{ color: 'var(--v2-orange)', fontWeight: 600 }}>
                               TEST
                             </span>
                           )}
@@ -328,10 +340,9 @@ export function EmailScreen() {
                         <td style={{ textAlign: 'right' }}>{send.recipients?.toLocaleString('en-GB') ?? '—'}</td>
                         <td style={{ textAlign: 'right' }}>{send.delivered != null ? send.delivered.toLocaleString('en-GB') : '—'}</td>
                         <td style={{ textAlign: 'right' }}>{send.uniqueOpens != null ? send.uniqueOpens.toLocaleString('en-GB') : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{send.uniqueOpenRate != null ? `${send.uniqueOpenRate}%` : '—'}</td>
+                        <td style={{ textAlign: 'right' }}>{formatPercent(send.uniqueOpenRate)}</td>
                         <td style={{ textAlign: 'right' }}>{send.clicks?.toLocaleString('en-GB') ?? '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{send.clickRate != null ? `${send.clickRate}%` : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{send.clickToOpenRate != null ? `${send.clickToOpenRate}%` : '—'}</td>
+                        <td style={{ textAlign: 'right' }}>{formatPercent(send.clickRate)}</td>
                         <td style={{ textAlign: 'right' }}>{send.bounces?.toLocaleString('en-GB') ?? '—'}</td>
                         <td style={{ textAlign: 'right' }}>{send.unsubscribes?.toLocaleString('en-GB') ?? '—'}</td>
                         <td className="text-text-secondary text-xs">Sent</td>
@@ -398,10 +409,11 @@ export function EmailScreen() {
         <div className="mb-4">
           <h2 className="v2-section-title">Website Activity from Education 2026 Emails</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Real GA4 sessions and (where a verified GA4 Enquiry definition exists) enquiries from links tagged
-            utm_source=campaign_monitor, utm_medium=email, utm_campaign=education_2026 — a separate, independently
-            measured source from the Campaign Monitor figures above. Calls (Infinity) and revenue (Acumatica, not
-            connected) are not shown here — only stages currently backed by genuine data.
+            Real GA4 sessions and (where a verified GA4 Enquiry definition exists) enquiries identified by Campaign
+            Monitor's own automatic link tagging — session source "Campaign Monitor Email", session medium "email",
+            and a session campaign name containing "education" — a separate, independently measured source from the
+            Campaign Monitor figures above. Calls (Infinity) and revenue (Acumatica, not connected) are not shown
+            here — only stages currently backed by genuine data.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
             <KpiCard title="Website Sessions" value={websiteAttribution.status === 'available' ? websiteAttribution.sessions.toLocaleString('en-GB') : undefined} status={websiteAttribution.status} subtitle={websiteAttribution.subtitle} />
