@@ -261,21 +261,30 @@ const ENTITY_CODES: Record<string, Brand> = {
 //     the four known ones can't be safely attributed and is excluded.
 //  2. Geography: an exact, case-insensitive match for "Scotland",
 //     "Northern Ireland", or "Republic of Ireland" anywhere in the free
-//     text. Found ⇒ this is real, confirmed new-prospect outreach ⇒
-//     audienceType = "New" (not a guess — this is exactly how the real
-//     Education sends already going out are named).
+//     text. Geography identifies WHICH region this send targets — it is
+//     a separate dimension from audience source and is NEVER used to
+//     infer New vs Existing (a future Scotland send could just as easily
+//     be existing-customer data).
 //  3. No geography match, but the word "Education" appears anywhere in
-//     the free text ⇒ existing-customer segment ⇒ audienceType =
-//     "Existing". This is the forward-looking convention for the
-//     not-yet-sent Brentwood/Radio Links/Capcom/Irish Radio
-//     existing-data sends — see this file's exported
-//     EDUCATION_NAMING_GUIDANCE for the exact text shown to the user.
+//     the free text ⇒ still counts as Education campaign membership.
 //  4. Neither a geography nor "Education" ⇒ not an Education send at all
 //     (e.g. "MTech BC - Newsletter August") ⇒ excluded, never guessed.
 //  5. Primary/Secondary: an exact, case-insensitive whole-word match
 //     anywhere in the free text. If geography or "Education" matched but
 //     no level is found, the send is logged and excluded rather than
 //     guessed — a real naming gap to fix, not something to silently bucket.
+//  6. Audience source (New prospect vs Existing data) — resolved in this
+//     order, never inferred from geography:
+//       a. An exact, case-insensitive match against
+//          EDUCATION_KNOWN_NEW_PROSPECT_SENDS — the six real sends
+//          already confirmed (2026-09) as genuine new-prospect data.
+//          A small, explicit, easy-to-extend stored list, not a rule.
+//       b. An explicit "New" or "Existing" whole-word token anywhere in
+//          the free text (e.g. "MTech BC - Scotland Primary Schools
+//          New") — the forward-looking convention for every future send.
+//       c. Otherwise: "Unclassified" — never guessed. Surfaced clearly
+//          on the Email page so it can be corrected (add the token, or
+//          ask for it to be added to the known-sends list).
 //
 // A send that doesn't match ANY of this still syncs normally as a regular
 // email-send (visible on the Email page's individual-send table) — it's
@@ -284,21 +293,36 @@ const EDUCATION_CAMPAIGN_GROUP = 'education_2026';
 const EDUCATION_GEOGRAPHIES = ['Republic of Ireland', 'Northern Ireland', 'Scotland'];
 const EDUCATION_LEVELS = ['Primary', 'Secondary'];
 
-// Shown to the user (via the Email page) as guidance for existing-customer
-// Education sends, where audienceType can't be inferred from a geography
-// token the way new-prospect sends can.
+// Explicit, deterministic mapping — the only sends currently trusted as
+// "New" purely by name, because they've been individually confirmed, not
+// because of any pattern in the name itself. Exact match (case-
+// insensitive) against the full Campaign Monitor campaign name. Add to
+// this list only for a specific send that's been confirmed, never as a
+// general rule.
+const EDUCATION_KNOWN_NEW_PROSPECT_SENDS = [
+  'MTech BC - Scotland Primary Schools',
+  'MTech BC - Scotland Secondary Schools',
+  'MTech IRCL - Northern Ireland Primary Schools',
+  'MTech IRCL - Northern Ireland Secondary Schools',
+  'MTech IRCL - Republic of Ireland Primary Schools',
+  'MTech IRCL - Republic of Ireland Secondary Schools',
+].map((name) => name.toLowerCase());
+
+// Shown to the user (via the Email page) as guidance for classifying
+// audience source going forward.
 export const EDUCATION_NAMING_GUIDANCE =
-  'For existing-customer Education sends (Brentwood/Radio Links/Capcom/Irish Radio), include the word "Education" and Primary or Secondary in the Campaign Monitor send name alongside your usual "MTech <CODE> -" prefix — e.g. "MTech BC - Education Primary Schools". Brand and level are then read automatically; audience type is set to Existing for this branch since these go to your existing customer lists. A send with neither a recognised geography nor the word "Education" is never guessed into the campaign — it stays a regular send.';
+  'Audience source (New prospect vs Existing data) is never inferred from geography alone — they\'re separate dimensions. Include an explicit "New" or "Existing" word in the Campaign Monitor send name (e.g. "MTech BC - Scotland Primary Schools New" or "MTech BC - Education Primary Schools Existing"), alongside your usual "MTech <CODE> -" prefix, a recognised geography or the word "Education", and Primary/Secondary. The six sends already confirmed as new-prospect data (Scotland/Northern Ireland/Republic of Ireland, sent September 2026) are recognised by an explicit stored list and don\'t need renaming. Any Education send that can\'t be confidently classified shows as "Unclassified" on the Email page rather than being guessed — send the exact name to have it added to the mapping, or add a New/Existing token.';
 
 interface EducationSegment {
   campaignGroup: string;
-  geography: string | null; // set only for a new-prospect geography segment
+  geography: string | null; // set only for a recognised-geography segment
   audienceLevel: string;
-  audienceType: 'New' | 'Existing';
+  audienceType: 'New' | 'Existing' | 'Unclassified';
 }
 
 export function parseEducationSegment(campaignName: string): EducationSegment | null {
-  const match = campaignName.trim().match(/^MTech\s+(\w+)\s*-\s*(.+)$/i);
+  const trimmedName = campaignName.trim();
+  const match = trimmedName.match(/^MTech\s+(\w+)\s*-\s*(.+)$/i);
   if (!match) return null;
   const code = match[1].toUpperCase();
   if (!ENTITY_CODES[code]) return null; // unknown code — brand can't be safely attributed
@@ -316,11 +340,25 @@ export function parseEducationSegment(campaignName: string): EducationSegment | 
     return null;
   }
 
+  let audienceType: 'New' | 'Existing' | 'Unclassified';
+  if (EDUCATION_KNOWN_NEW_PROSPECT_SENDS.includes(trimmedName.toLowerCase())) {
+    audienceType = 'New';
+  } else if (/\bnew\b/i.test(rest)) {
+    audienceType = 'New';
+  } else if (/\bexisting\b/i.test(rest)) {
+    audienceType = 'Existing';
+  } else {
+    audienceType = 'Unclassified';
+    console.warn(
+      `[campaign-monitor] "${campaignName}" is an Education send but audience source (New/Existing) can't be determined — shown as Unclassified. See EDUCATION_NAMING_GUIDANCE.`
+    );
+  }
+
   return {
     campaignGroup: EDUCATION_CAMPAIGN_GROUP,
     geography,
     audienceLevel: level,
-    audienceType: geography ? 'New' : 'Existing',
+    audienceType,
   };
 }
 

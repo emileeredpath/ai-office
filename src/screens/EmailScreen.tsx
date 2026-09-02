@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod } from '@/contexts/PeriodContext';
@@ -17,6 +18,7 @@ import {
   getEducationRollupByBrand,
   getEducationOverallAverage,
   getEducationWebsiteAttribution,
+  getUnclassifiedEducationSends,
   type EducationRollupRow,
 } from '@/utils/educationCampaign';
 import type { EmailCampaignRecord } from '@/services/emailPerformanceApi';
@@ -30,6 +32,12 @@ type AudienceTypeFilter = 'all' | 'New' | 'Existing';
 function formatDateShort(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+// Mirrors backend/src/services/campaignMonitor.ts's exported
+// EDUCATION_NAMING_GUIDANCE — kept in sync manually since the frontend
+// can't import backend source directly.
+const EDUCATION_NAMING_GUIDANCE =
+  'Include an explicit "New" or "Existing" word in the Campaign Monitor send name (e.g. "MTech BC - Scotland Primary Schools New") — geography alone is never used to infer audience source.';
 
 function RollupTable({ title, rows }: { title: string; rows: EducationRollupRow[] }) {
   if (rows.length === 0) return null;
@@ -144,6 +152,7 @@ export function EmailScreen() {
   const rollupByAudienceType = useMemo(() => getEducationRollupByAudienceType(educationSends), [educationSends]);
   const rollupByBrand = useMemo(() => getEducationRollupByBrand(educationSends), [educationSends]);
   const educationAverage = useMemo(() => getEducationOverallAverage(educationSends), [educationSends]);
+  const unclassifiedSends = useMemo(() => getUnclassifiedEducationSends(educationSends), [educationSends]);
 
   const websiteAttribution = useMemo(
     () => getEducationWebsiteAttribution(educationCampaignAttribution, isGroupView, selectedEntity),
@@ -292,6 +301,26 @@ export function EmailScreen() {
             {educationSummary.unmatchedCount > 0 &&
               ` — ${educationSummary.unmatchedCount} Education-named send(s) didn't match the naming convention and are excluded from this roll-up (still visible above as regular sends).`}
           </p>
+          {unclassifiedSends.length > 0 && (
+            <div className="card mb-6" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={18} color="var(--v2-orange)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <p className="text-sm font-semibold text-text-primary mb-1">
+                    {unclassifiedSends.length} Education send{unclassifiedSends.length === 1 ? '' : 's'} need audience-source classification
+                  </p>
+                  <p className="text-xs text-text-secondary mb-2">
+                    Campaign and level are known, but New prospect vs Existing data couldn't be determined — never guessed. {EDUCATION_NAMING_GUIDANCE}
+                  </p>
+                  <ul className="text-xs text-text-secondary" style={{ paddingLeft: '1.1rem', listStyle: 'disc' }}>
+                    {unclassifiedSends.map((s) => (
+                      <li key={s.taskId}>{s.campaignName} ({formatDateShort(s.sentDate)})</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
           {educationSummary.status === 'available' ? (
             <>
               <RollupTable title="Scotland vs Northern Ireland vs Republic of Ireland" rows={rollupByGeography} />

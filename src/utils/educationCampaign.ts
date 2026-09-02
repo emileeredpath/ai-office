@@ -95,9 +95,18 @@ export function getEducationRollupByLevel(sends: EmailCampaignRecord[]): Educati
 }
 
 export function getEducationRollupByAudienceType(sends: EmailCampaignRecord[]): EducationRollupRow[] {
-  return ['New', 'Existing']
-    .map((type) => buildRollupRow(type, `${type} data`, sends.filter((s) => s.emailAudienceType === type)))
+  return ['New', 'Existing', 'Unclassified']
+    .map((type) => buildRollupRow(type, type === 'Unclassified' ? 'Unclassified' : `${type} data`, sends.filter((s) => s.emailAudienceType === type)))
     .filter((row) => row.sends > 0);
+}
+
+// Sends whose Education campaign membership/geography/level are known but
+// whose audience source (New vs Existing) could not be determined — see
+// backend/src/services/campaignMonitor.ts's parseEducationSegment doc
+// comment. Never silently dropped from the roll-up; surfaced separately
+// so a real naming gap is obvious and fixable.
+export function getUnclassifiedEducationSends(sends: EmailCampaignRecord[]): EmailCampaignRecord[] {
+  return sends.filter((s) => s.emailAudienceType === 'Unclassified');
 }
 
 export function getEducationRollupByBrand(sends: EmailCampaignRecord[]): EducationRollupRow[] {
