@@ -30,6 +30,17 @@ export function getEducationSends(
   return educationSends.filter((c) => c.brand === selectedEntity);
 }
 
+// Excludes real test sends (Campaign Monitor names carrying a trailing
+// "(first N)"/"(first N test)" — see backend/src/services/
+// campaignMonitor.ts's parseEducationSegment doc comment) from
+// production totals/comparisons, so a partial test batch never skews
+// real campaign numbers. Test sends remain fully visible via
+// getEducationSends above (the individual-send table's Education
+// filter) — this function is only used for roll-ups/summaries/averages.
+export function getProductionEducationSends(sends: EmailCampaignRecord[]): EmailCampaignRecord[] {
+  return sends.filter((s) => !s.isTest);
+}
+
 export interface EducationRollupRow {
   key: string;
   label: string;
@@ -128,22 +139,27 @@ export interface EducationSummary {
   status: 'available' | 'not-connected';
   totalSends: number;
   unmatchedCount: number;
+  testSendCount: number;
   subtitle: string;
 }
 
 // unmatchedCount surfaces real Education-named sends that didn't match the
 // naming convention exactly (see parseEducationSegment) — an honest count
 // of what's being silently excluded from the roll-up, never hidden.
+// testSendCount is the number of matched Education sends excluded from
+// these production totals because they're real test-slice sends (a
+// trailing "(first N)"/"(first N test)") — also never hidden.
 export function getEducationSummary(
   data: EmailPerformanceResponse | null,
   isGroupView: boolean,
   selectedEntity: EntitySelection
 ): EducationSummary {
   if (!data || !data.configured) {
-    return { status: 'not-connected', totalSends: 0, unmatchedCount: 0, subtitle: 'Awaiting Campaign Monitor integration' };
+    return { status: 'not-connected', totalSends: 0, unmatchedCount: 0, testSendCount: 0, subtitle: 'Awaiting Campaign Monitor integration' };
   }
   const relevant = isGroupView ? data.campaigns : data.campaigns.filter((c) => c.brand === selectedEntity);
-  const matched = relevant.filter((c) => c.emailCampaignGroup === 'education_2026');
+  const allMatched = relevant.filter((c) => c.emailCampaignGroup === 'education_2026');
+  const productionMatched = allMatched.filter((c) => !c.isTest);
   // A near-miss: the real name carries a recognised geography or the
   // word "Education" (so it's clearly meant for this campaign) but is
   // missing Primary/Secondary, so parseEducationSegment excluded it — see
@@ -151,12 +167,13 @@ export function getEducationSummary(
   const EDUCATION_HINT_RE = /education|scotland|northern ireland|republic of ireland/i;
   const unmatched = relevant.filter((c) => c.emailCampaignGroup !== 'education_2026' && EDUCATION_HINT_RE.test(c.campaignName));
   return {
-    status: matched.length > 0 ? 'available' : 'not-connected',
-    totalSends: matched.length,
+    status: productionMatched.length > 0 ? 'available' : 'not-connected',
+    totalSends: productionMatched.length,
     unmatchedCount: unmatched.length,
+    testSendCount: allMatched.length - productionMatched.length,
     subtitle:
-      matched.length > 0
-        ? `${matched.length} real Education 2026 send(s)`
+      productionMatched.length > 0
+        ? `${productionMatched.length} real Education 2026 send(s)`
         : 'No Education 2026 sends genuinely attributed yet',
   };
 }

@@ -144,6 +144,10 @@ export interface TaskRecord {
   emailGeography?: string | null;
   emailAudienceLevel?: string | null;
   emailAudienceType?: string | null;
+  // A real send only sent to a small test slice of the list — see
+  // parseEducationSegment's doc comment. False for every non-Education
+  // send and every Education send that isn't a test slice.
+  emailIsTest?: boolean;
   // Optional (rather than required like the rest of this interface) so the
   // several existing call sites that construct a full TaskRecord literal
   // (seed data, campaign-monitor sync, actions API) don't all need updating

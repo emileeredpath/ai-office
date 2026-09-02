@@ -247,77 +247,72 @@ const ENTITY_CODES: Record<string, Brand> = {
 };
 
 // Education 2026 campaign roll-up — parses the REAL Campaign Monitor
-// naming convention already in use (confirmed live examples: "MTech BC -
-// Scotland Primary Schools", "MTech IRCL - Northern Ireland Secondary
-// Schools", "MTech IRCL - Republic of Ireland Primary Schools"). Never
-// requires renaming a send, and never fuzzy-matches a subject line — only
-// exact, deterministic token matches inside the existing "MTech <CODE> -
-// <free text>" prefix every send already carries (the same prefix
-// parseEntity() above already parses for brand).
+// naming convention already in use (confirmed live examples: "MTech IRCL
+// - Education Solutions - High School - Brought Data - Northern
+// Ireland", "MTech BC - Education Solutions - Primary Schools - Brought
+// Data - Scotland", plus "(first 50)"/"(first 50 test)" test variants).
+// Never requires renaming a send, and never fuzzy-matches a subject line
+// — only exact, deterministic token matches inside the existing "MTech
+// <CODE> - <free text>" prefix every send already carries (the same
+// prefix parseEntity() above already parses for brand).
 //
 // Rules, applied to the free text after "MTech <CODE> - ":
 //  1. Brand comes from the existing CODE (BC/RL/CC/IRCL) — same as every
 //     other send, never overridden here. A send whose code isn't one of
 //     the four known ones can't be safely attributed and is excluded.
 //  2. Geography: an exact, case-insensitive match for "Scotland",
-//     "Northern Ireland", or "Republic of Ireland" anywhere in the free
+//     "Northern Ireland", or "Republic Of Ireland" anywhere in the free
 //     text. Geography identifies WHICH region this send targets — it is
 //     a separate dimension from audience source and is NEVER used to
-//     infer New vs Existing (a future Scotland send could just as easily
-//     be existing-customer data).
+//     infer New vs Existing.
 //  3. No geography match, but the word "Education" appears anywhere in
 //     the free text ⇒ still counts as Education campaign membership.
 //  4. Neither a geography nor "Education" ⇒ not an Education send at all
-//     (e.g. "MTech BC - Newsletter August") ⇒ excluded, never guessed.
-//  5. Primary/Secondary: an exact, case-insensitive whole-word match
-//     anywhere in the free text. If geography or "Education" matched but
-//     no level is found, the send is logged and excluded rather than
-//     guessed — a real naming gap to fix, not something to silently bucket.
+//     ⇒ excluded, never guessed.
+//  5. Level: "Primary" (from "Primary Schools") or "High School" (the
+//     real token used for secondary-level sends, mapped to "Secondary")
+//     — whichever whole-word/phrase token appears first. If geography or
+//     "Education" matched but no level token is found, the send is
+//     logged and excluded rather than guessed.
 //  6. Audience source (New prospect vs Existing data) — resolved in this
 //     order, never inferred from geography:
-//       a. An exact, case-insensitive match against
-//          EDUCATION_KNOWN_NEW_PROSPECT_SENDS — the six real sends
-//          already confirmed (2026-09) as genuine new-prospect data.
-//          A small, explicit, easy-to-extend stored list, not a rule.
-//       b. An explicit "New" or "Existing" whole-word token anywhere in
-//          the free text (e.g. "MTech BC - Scotland Primary Schools
-//          New") — the forward-looking convention for every future send.
+//       a. The whole-word/phrase "Brought Data" anywhere in the free
+//          text ⇒ "New" — this is the real, explicit marker MTech uses
+//          for purchased/prospected data on these sends.
+//       b. An explicit "New" or "Existing" whole-word token (for sends
+//          that don't use "Brought Data" wording) ⇒ that value.
 //       c. Otherwise: "Unclassified" — never guessed. Surfaced clearly
-//          on the Email page so it can be corrected (add the token, or
-//          ask for it to be added to the known-sends list).
+//          on the Email page so it can be corrected.
+//  7. Test sends: a trailing "(first 50)" or "(first 50 test)" (or any
+//     "(... test)"/"(first N)" bracketed suffix) marks a real send that
+//     was only sent to a small test slice of the list. These still sync
+//     and still categorise normally (campaign/geography/level/audience
+//     all still apply) but are flagged isTest — the Email page's
+//     production Education totals exclude them by default so a partial
+//     test batch never skews real campaign numbers, while they remain
+//     visible in the individual-send table for anyone checking them.
 //
-// A send that doesn't match ANY of this still syncs normally as a regular
-// email-send (visible on the Email page's individual-send table) — it's
-// simply left out of the Education roll-up (all four fields null).
+// A send that doesn't match ANY of rules 1-5 still syncs normally as a
+// regular email-send (visible on the Email page's individual-send table)
+// — it's simply left out of the Education roll-up (all fields null).
 const EDUCATION_CAMPAIGN_GROUP = 'education_2026';
+// Canonical stored/display casing — matched case-insensitively against
+// the source name, so this works regardless of whether Campaign Monitor
+// has "Republic Of Ireland" or "Republic of Ireland" in the real name.
 const EDUCATION_GEOGRAPHIES = ['Republic of Ireland', 'Northern Ireland', 'Scotland'];
-const EDUCATION_LEVELS = ['Primary', 'Secondary'];
-
-// Explicit, deterministic mapping — the only sends currently trusted as
-// "New" purely by name, because they've been individually confirmed, not
-// because of any pattern in the name itself. Exact match (case-
-// insensitive) against the full Campaign Monitor campaign name. Add to
-// this list only for a specific send that's been confirmed, never as a
-// general rule.
-const EDUCATION_KNOWN_NEW_PROSPECT_SENDS = [
-  'MTech BC - Scotland Primary Schools',
-  'MTech BC - Scotland Secondary Schools',
-  'MTech IRCL - Northern Ireland Primary Schools',
-  'MTech IRCL - Northern Ireland Secondary Schools',
-  'MTech IRCL - Republic of Ireland Primary Schools',
-  'MTech IRCL - Republic of Ireland Secondary Schools',
-].map((name) => name.toLowerCase());
+const EDUCATION_TEST_SEND_RE = /\(\s*first\s*\d+\s*(test)?\s*\)/i;
 
 // Shown to the user (via the Email page) as guidance for classifying
 // audience source going forward.
 export const EDUCATION_NAMING_GUIDANCE =
-  'Audience source (New prospect vs Existing data) is never inferred from geography alone — they\'re separate dimensions. Include an explicit "New" or "Existing" word in the Campaign Monitor send name (e.g. "MTech BC - Scotland Primary Schools New" or "MTech BC - Education Primary Schools Existing"), alongside your usual "MTech <CODE> -" prefix, a recognised geography or the word "Education", and Primary/Secondary. The six sends already confirmed as new-prospect data (Scotland/Northern Ireland/Republic of Ireland, sent September 2026) are recognised by an explicit stored list and don\'t need renaming. Any Education send that can\'t be confidently classified shows as "Unclassified" on the Email page rather than being guessed — send the exact name to have it added to the mapping, or add a New/Existing token.';
+  'Audience source (New prospect vs Existing data) is never inferred from geography alone — they\'re separate dimensions. "Brought Data" anywhere in the Campaign Monitor send name is read as New prospect (the marker already used on the real Education sends); otherwise include an explicit "New" or "Existing" word. A trailing "(first 50)" / "(first 50 test)" marks a real test send — these still sync and categorise normally but are excluded from production Education totals by default. Any Education send that can\'t be confidently classified for audience source shows as "Unclassified" on the Email page rather than being guessed.';
 
 interface EducationSegment {
   campaignGroup: string;
   geography: string | null; // set only for a recognised-geography segment
   audienceLevel: string;
   audienceType: 'New' | 'Existing' | 'Unclassified';
+  isTest: boolean;
 }
 
 export function parseEducationSegment(campaignName: string): EducationSegment | null {
@@ -332,16 +327,19 @@ export function parseEducationSegment(campaignName: string): EducationSegment | 
   const hasEducationKeyword = /\beducation\b/i.test(rest);
   if (!geography && !hasEducationKeyword) return null; // not an Education send
 
-  const level = EDUCATION_LEVELS.find((l) => new RegExp(`\\b${l}\\b`, 'i').test(rest));
+  let level: string | null = null;
+  if (/\bprimary\b/i.test(rest)) level = 'Primary';
+  else if (/\bhigh school\b/i.test(rest)) level = 'Secondary';
+  else if (/\bsecondary\b/i.test(rest)) level = 'Secondary';
   if (!level) {
     console.warn(
-      `[campaign-monitor] "${campaignName}" looks like an Education send (${geography ?? 'has "Education" in the name'}) but no Primary/Secondary found — excluded from the roll-up until the name includes one.`
+      `[campaign-monitor] "${campaignName}" looks like an Education send (${geography ?? 'has "Education" in the name'}) but no Primary/High School/Secondary token found — excluded from the roll-up until the name includes one.`
     );
     return null;
   }
 
   let audienceType: 'New' | 'Existing' | 'Unclassified';
-  if (EDUCATION_KNOWN_NEW_PROSPECT_SENDS.includes(trimmedName.toLowerCase())) {
+  if (/\bbrought data\b/i.test(rest)) {
     audienceType = 'New';
   } else if (/\bnew\b/i.test(rest)) {
     audienceType = 'New';
@@ -354,11 +352,14 @@ export function parseEducationSegment(campaignName: string): EducationSegment | 
     );
   }
 
+  const isTest = EDUCATION_TEST_SEND_RE.test(trimmedName);
+
   return {
     campaignGroup: EDUCATION_CAMPAIGN_GROUP,
     geography,
     audienceLevel: level,
     audienceType,
+    isTest,
   };
 }
 
@@ -548,6 +549,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             emailGeography: education?.geography ?? null,
             emailAudienceLevel: education?.audienceLevel ?? null,
             emailAudienceType: education?.audienceType ?? null,
+            emailIsTest: education?.isTest ?? false,
             campaignId: aiCampaignId,
           });
           updated += 1;
@@ -596,6 +598,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             emailGeography: education?.geography ?? null,
             emailAudienceLevel: education?.audienceLevel ?? null,
             emailAudienceType: education?.audienceType ?? null,
+            emailIsTest: education?.isTest ?? false,
           };
           insertTask(task);
           created += 1;

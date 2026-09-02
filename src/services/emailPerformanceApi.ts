@@ -22,6 +22,7 @@ export interface EmailCampaignRecord {
   emailGeography: string | null;
   emailAudienceLevel: string | null;
   emailAudienceType: string | null;
+  isTest: boolean;
   campaignMonitorId: string | null;
   dashboardCampaignId: string | null;
 }

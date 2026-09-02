@@ -46,6 +46,9 @@ export interface EmailCampaignRecord {
   emailGeography: string | null;
   emailAudienceLevel: string | null;
   emailAudienceType: string | null;
+  // A real send only sent to a small test slice of the list — see
+  // parseEducationSegment's doc comment.
+  isTest: boolean;
   // The real Campaign Monitor campaign ID (task.externalId) — useful for
   // cross-checking a send directly in Campaign Monitor's own UI.
   campaignMonitorId: string | null;
@@ -138,6 +141,7 @@ export function getEmailPerformance(startDate: string, endDate: string): EmailPe
       emailGeography: task.emailGeography ?? null,
       emailAudienceLevel: task.emailAudienceLevel ?? null,
       emailAudienceType: task.emailAudienceType ?? null,
+      isTest: task.emailIsTest ?? false,
       campaignMonitorId: task.externalId,
       dashboardCampaignId: task.campaignId,
     });

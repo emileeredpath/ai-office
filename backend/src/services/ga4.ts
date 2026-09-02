@@ -584,8 +584,26 @@ export async function getEnquiries(startDate?: string, endDate?: string): Promis
 
 // Education 2026 campaign downstream attribution (Email page) — real GA4
 // sessions (and, for brands with a verified enquiry definition, real GA4
-// Enquiries) filtered to the campaign's own tagged links:
-// utm_source=campaign_monitor, utm_medium=email, utm_campaign=education_2026.
+// Enquiries) filtered to Campaign Monitor's Education traffic.
+//
+// IMPORTANT — corrected against real evidence, not the originally assumed
+// tagging scheme. This app's Education emails don't carry the custom
+// utm_source=campaign_monitor/utm_campaign=education_2026 tags the brief
+// first assumed; Campaign Monitor's own built-in "add Google Analytics
+// tracking" feature auto-tags links instead, and GA4's live Traffic
+// Acquisition report for IRCL confirmed the real value is the combined
+// source/medium "Campaign Monitor Email / email" — i.e.
+// sessionSource="Campaign Monitor Email", sessionMedium="email". The
+// campaign name Campaign Monitor auto-fills is presumed to be the send's
+// own real name (e.g. "MTech IRCL - Education Solutions - High School -
+// Brought Data - Northern Ireland"), not a literal "education_2026" — so
+// isolating Education-specific traffic from any other Campaign Monitor
+// send uses a CONTAINS match for "education" in sessionCampaignName
+// (case-insensitive), mirroring the same "Education" keyword the backend
+// sync already uses to identify an Education send by name. This still
+// needs confirming against the exact live sessionSource/sessionCampaignName
+// strings — see the Email page follow-up for the diagnostic to run.
+//
 // Uses GA4's own built-in session-scoped UTM dimensions (sessionSource,
 // sessionMedium, sessionCampaignName, sessionManualAdContent for
 // utm_content) — no custom dimension registration required in GA4, unlike
@@ -598,9 +616,9 @@ export async function getEnquiries(startDate?: string, endDate?: string): Promis
 const EDUCATION_UTM_FILTER = {
   andGroup: {
     expressions: [
-      { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'EXACT', value: 'campaign_monitor' } } },
-      { filter: { fieldName: 'sessionMedium', stringFilter: { matchType: 'EXACT', value: 'email' } } },
-      { filter: { fieldName: 'sessionCampaignName', stringFilter: { matchType: 'EXACT', value: 'education_2026' } } },
+      { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'EXACT', value: 'Campaign Monitor Email', caseSensitive: false } } },
+      { filter: { fieldName: 'sessionMedium', stringFilter: { matchType: 'EXACT', value: 'email', caseSensitive: false } } },
+      { filter: { fieldName: 'sessionCampaignName', stringFilter: { matchType: 'CONTAINS', value: 'education', caseSensitive: false } } },
     ],
   },
 };

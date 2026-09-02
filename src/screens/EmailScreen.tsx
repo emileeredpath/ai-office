@@ -19,6 +19,7 @@ import {
   getEducationOverallAverage,
   getEducationWebsiteAttribution,
   getUnclassifiedEducationSends,
+  getProductionEducationSends,
   type EducationRollupRow,
 } from '@/utils/educationCampaign';
 import type { EmailCampaignRecord } from '@/services/emailPerformanceApi';
@@ -126,6 +127,10 @@ export function EmailScreen() {
     () => getEducationSends(emailPerformance, isGroupView, selectedEntity),
     [emailPerformance, isGroupView, selectedEntity]
   );
+  // Real test-slice sends (a trailing "(first N)"/"(first N test)")
+  // excluded from production roll-ups/comparisons/averages — still fully
+  // visible above in educationSends/the individual-send table.
+  const productionEducationSends = useMemo(() => getProductionEducationSends(educationSends), [educationSends]);
 
   const filteredSends = useMemo(() => {
     // The individual-send table draws from the full MTech Group Campaign
@@ -147,12 +152,12 @@ export function EmailScreen() {
     () => getEducationSummary(emailPerformance, isGroupView, selectedEntity),
     [emailPerformance, isGroupView, selectedEntity]
   );
-  const rollupByGeography = useMemo(() => getEducationRollupByGeography(educationSends), [educationSends]);
-  const rollupByLevel = useMemo(() => getEducationRollupByLevel(educationSends), [educationSends]);
-  const rollupByAudienceType = useMemo(() => getEducationRollupByAudienceType(educationSends), [educationSends]);
-  const rollupByBrand = useMemo(() => getEducationRollupByBrand(educationSends), [educationSends]);
-  const educationAverage = useMemo(() => getEducationOverallAverage(educationSends), [educationSends]);
-  const unclassifiedSends = useMemo(() => getUnclassifiedEducationSends(educationSends), [educationSends]);
+  const rollupByGeography = useMemo(() => getEducationRollupByGeography(productionEducationSends), [productionEducationSends]);
+  const rollupByLevel = useMemo(() => getEducationRollupByLevel(productionEducationSends), [productionEducationSends]);
+  const rollupByAudienceType = useMemo(() => getEducationRollupByAudienceType(productionEducationSends), [productionEducationSends]);
+  const rollupByBrand = useMemo(() => getEducationRollupByBrand(productionEducationSends), [productionEducationSends]);
+  const educationAverage = useMemo(() => getEducationOverallAverage(productionEducationSends), [productionEducationSends]);
+  const unclassifiedSends = useMemo(() => getUnclassifiedEducationSends(productionEducationSends), [productionEducationSends]);
 
   const websiteAttribution = useMemo(
     () => getEducationWebsiteAttribution(educationCampaignAttribution, isGroupView, selectedEntity),
@@ -261,7 +266,14 @@ export function EmailScreen() {
                   <tbody>
                     {filteredSends.map((send) => (
                       <tr key={send.taskId} onClick={() => setSelectedSend(send)} style={{ cursor: 'pointer' }}>
-                        <td className="text-text-primary">{send.campaignName}</td>
+                        <td className="text-text-primary">
+                          {send.campaignName}
+                          {send.isTest && (
+                            <span className="text-xs" style={{ marginLeft: 6, color: 'var(--v2-orange)', fontWeight: 600 }}>
+                              TEST
+                            </span>
+                          )}
+                        </td>
                         <td className="text-text-secondary">{BRAND_LABEL[send.brand] ?? send.brand}</td>
                         <td className="text-text-secondary text-xs">{formatDateShort(send.sentDate)}</td>
                         <td className="text-text-secondary text-xs">
@@ -297,7 +309,9 @@ export function EmailScreen() {
         <div className="mb-8">
           <h2 className="v2-section-title">Education 2026 Campaign</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            {educationSummary.status === 'available' ? educationSummary.subtitle : educationSummary.subtitle}
+            {educationSummary.subtitle}
+            {educationSummary.testSendCount > 0 &&
+              ` (${educationSummary.testSendCount} real test-slice send${educationSummary.testSendCount === 1 ? '' : 's'} — "(first N)" — excluded from these totals, still visible in Individual Sends above).`}
             {educationSummary.unmatchedCount > 0 &&
               ` — ${educationSummary.unmatchedCount} Education-named send(s) didn't match the naming convention and are excluded from this roll-up (still visible above as regular sends).`}
           </p>

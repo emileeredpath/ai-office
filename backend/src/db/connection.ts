@@ -245,6 +245,11 @@ addColumnIfMissing('tasks', 'email_campaign_group', 'TEXT');
 addColumnIfMissing('tasks', 'email_geography', 'TEXT');
 addColumnIfMissing('tasks', 'email_audience_level', 'TEXT');
 addColumnIfMissing('tasks', 'email_audience_type', 'TEXT');
+// A real send only sent to a small test slice of the list (Campaign
+// Monitor names carrying a trailing "(first N)"/"(first N test)") — still
+// syncs and categorises normally, but excluded from production Education
+// totals by default. See parseEducationSegment's doc comment.
+addColumnIfMissing('tasks', 'email_is_test', 'INTEGER NOT NULL DEFAULT 0');
 
 // Schedule linking for task-to-campaign cascade updates — see Phase 1 Implementation Brief.
 addColumnIfMissing('tasks', 'schedule_id', 'TEXT');
