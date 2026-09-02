@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getBrandTraffic, getSocialTraffic, getEnquiries } from '../services/ga4.js';
+import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance } from '../services/emailPerformance.js';
@@ -55,6 +55,19 @@ router.get('/ga4-enquiries', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getEnquiries(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Education 2026 campaign downstream attribution (Email page) — real GA4
+// sessions/enquiries filtered to the campaign's own tagged links (see
+// getEducationCampaignAttribution's own doc comment). A fully separate
+// query from /ga4-enquiries above — never touches or reuses it. Same
+// startDate/endDate contract as every other analytics route.
+router.get('/education-campaign', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await getEducationCampaignAttribution(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 

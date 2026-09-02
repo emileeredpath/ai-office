@@ -20,6 +20,7 @@ const CM_SOURCE = 'campaign-monitor';
 export interface EmailCampaignRecord {
   taskId: string;
   campaignName: string;
+  subject: string | null;
   sentDate: string; // ISO datetime
   brand: Brand;
   recipients: number | null;
@@ -30,6 +31,21 @@ export interface EmailCampaignRecord {
   clicks: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  // Unique-subscriber metrics (Email page) — see campaignMonitor.ts's
+  // extractMetrics() for exactly how each is derived.
+  uniqueOpens: number | null;
+  uniqueOpenRate: number | null;
+  delivered: number | null;
+  deliveryRate: number | null;
+  clickRate: number | null;
+  clickToOpenRate: number | null;
+  // Education 2026 roll-up fields — null unless this send's name matched
+  // the documented naming convention (see campaignMonitor.ts's
+  // parseEducationSegment doc comment).
+  emailCampaignGroup: string | null;
+  emailGeography: string | null;
+  emailAudienceLevel: string | null;
+  emailAudienceType: string | null;
   // The real Campaign Monitor campaign ID (task.externalId) — useful for
   // cross-checking a send directly in Campaign Monitor's own UI.
   campaignMonitorId: string | null;
@@ -104,6 +120,7 @@ export function getEmailPerformance(startDate: string, endDate: string): EmailPe
     campaigns.push({
       taskId: task.id,
       campaignName: task.title,
+      subject: task.subject,
       sentDate,
       brand: task.brand,
       recipients: task.recipients,
@@ -111,6 +128,16 @@ export function getEmailPerformance(startDate: string, endDate: string): EmailPe
       clicks: task.clicks,
       bounces: task.bounces,
       unsubscribes: task.unsubscribes,
+      uniqueOpens: task.uniqueOpens ?? null,
+      uniqueOpenRate: task.uniqueOpenRate ?? null,
+      delivered: task.delivered ?? null,
+      deliveryRate: task.deliveryRate ?? null,
+      clickRate: task.clickRate,
+      clickToOpenRate: task.clickToOpenRate ?? null,
+      emailCampaignGroup: task.emailCampaignGroup ?? null,
+      emailGeography: task.emailGeography ?? null,
+      emailAudienceLevel: task.emailAudienceLevel ?? null,
+      emailAudienceType: task.emailAudienceType ?? null,
       campaignMonitorId: task.externalId,
       dashboardCampaignId: task.campaignId,
     });

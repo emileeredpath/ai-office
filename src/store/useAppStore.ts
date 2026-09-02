@@ -28,6 +28,8 @@ import {
   type Ga4SocialTrafficResponse,
   fetchGa4Enquiries,
   type Ga4EnquiriesResponse,
+  fetchEducationCampaignAttribution,
+  type Ga4EducationAttributionResponse,
 } from '@/services/ga4Api';
 import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
 import { fetchSearchConsolePerformance, type SearchConsoleResponse } from '@/services/searchConsoleApi';
@@ -116,6 +118,14 @@ interface AppState {
   ga4Enquiries: Ga4EnquiriesResponse | null;
   ga4EnquiriesSyncing: boolean;
 
+  // Education 2026 campaign downstream attribution (Email page) — a fully
+  // separate query/response from ga4Enquiries above. See
+  // src/utils/educationCampaign.ts for how the Email page derives figures
+  // from this, and backend/src/services/ga4.ts's
+  // getEducationCampaignAttribution for the exact UTM filter used.
+  educationCampaignAttribution: Ga4EducationAttributionResponse | null;
+  educationCampaignAttributionSyncing: boolean;
+
   // Google Ads (Phase 1) — real campaign performance for Brentwood and
   // Radio Links only, a fully separate integration from GA4/GA4
   // Enquiries above. See src/utils/googleAdsPerformance.ts for how
@@ -180,6 +190,7 @@ interface AppState {
   syncGa4Traffic: (startDate: string, endDate: string) => Promise<void>;
   syncGa4SocialTraffic: (startDate: string, endDate: string) => Promise<void>;
   syncGa4Enquiries: (startDate: string, endDate: string) => Promise<void>;
+  syncEducationCampaignAttribution: (startDate: string, endDate: string) => Promise<void>;
   syncGoogleAdsPerformance: (startDate: string, endDate: string) => Promise<void>;
   syncSearchConsolePerformance: (startDate: string, endDate: string) => Promise<void>;
 
@@ -274,6 +285,8 @@ export const useAppStore = create<AppState>((set, get) => {
     ga4SocialTrafficSyncing: false,
     ga4Enquiries: null,
     ga4EnquiriesSyncing: false,
+    educationCampaignAttribution: null,
+    educationCampaignAttributionSyncing: false,
     googleAdsPerformance: null,
     googleAdsPerformanceSyncing: false,
     searchConsolePerformance: null,
@@ -668,6 +681,17 @@ export const useAppStore = create<AppState>((set, get) => {
       } catch (err) {
         console.error('GA4 enquiries sync error:', err);
         set({ ga4EnquiriesSyncing: false });
+      }
+    },
+
+    syncEducationCampaignAttribution: async (startDate: string, endDate: string) => {
+      set({ educationCampaignAttributionSyncing: true });
+      try {
+        const data = await fetchEducationCampaignAttribution(startDate, endDate);
+        set({ educationCampaignAttribution: data, educationCampaignAttributionSyncing: false });
+      } catch (err) {
+        console.error('Education campaign attribution sync error:', err);
+        set({ educationCampaignAttributionSyncing: false });
       }
     },
 

@@ -35,6 +35,15 @@ interface TaskRow {
   click_rate: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  unique_opens: number | null;
+  unique_open_rate: number | null;
+  delivered: number | null;
+  delivery_rate: number | null;
+  click_to_open_rate: number | null;
+  email_campaign_group: string | null;
+  email_geography: string | null;
+  email_audience_level: string | null;
+  email_audience_type: string | null;
   archived: number;
   archived_at: string | null;
 }
@@ -74,6 +83,15 @@ function rowToRecord(row: TaskRow): TaskRecord {
     clickRate: row.click_rate,
     bounces: row.bounces,
     unsubscribes: row.unsubscribes,
+    uniqueOpens: row.unique_opens,
+    uniqueOpenRate: row.unique_open_rate,
+    delivered: row.delivered,
+    deliveryRate: row.delivery_rate,
+    clickToOpenRate: row.click_to_open_rate,
+    emailCampaignGroup: row.email_campaign_group,
+    emailGeography: row.email_geography,
+    emailAudienceLevel: row.email_audience_level,
+    emailAudienceType: row.email_audience_type,
     archived: !!row.archived,
     archivedAt: row.archived_at,
   };
@@ -110,11 +128,15 @@ export function insertTask(task: TaskRecord): void {
       id, title, notes, brand, status, priority, deadline, start_date, campaign_id, schedule_id,
       created_at, completed_at, previous_status, history, approval_required, approver,
       blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to,
-      type, recipients, subject, cost, currency, external_id, opens, clicks, open_rate, click_rate, bounces, unsubscribes
+      type, recipients, subject, cost, currency, external_id, opens, clicks, open_rate, click_rate, bounces, unsubscribes,
+      unique_opens, unique_open_rate, delivered, delivery_rate, click_to_open_rate,
+      email_campaign_group, email_geography, email_audience_level, email_audience_type
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId, @scheduleId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
       @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo,
-      @type, @recipients, @subject, @cost, @currency, @externalId, @opens, @clicks, @openRate, @clickRate, @bounces, @unsubscribes)`
+      @type, @recipients, @subject, @cost, @currency, @externalId, @opens, @clicks, @openRate, @clickRate, @bounces, @unsubscribes,
+      @uniqueOpens, @uniqueOpenRate, @delivered, @deliveryRate, @clickToOpenRate,
+      @emailCampaignGroup, @emailGeography, @emailAudienceLevel, @emailAudienceType)`
   ).run({
     id: task.id,
     title: task.title,
@@ -149,6 +171,15 @@ export function insertTask(task: TaskRecord): void {
     clickRate: task.clickRate ?? null,
     bounces: task.bounces ?? null,
     unsubscribes: task.unsubscribes ?? null,
+    uniqueOpens: task.uniqueOpens ?? null,
+    uniqueOpenRate: task.uniqueOpenRate ?? null,
+    delivered: task.delivered ?? null,
+    deliveryRate: task.deliveryRate ?? null,
+    clickToOpenRate: task.clickToOpenRate ?? null,
+    emailCampaignGroup: task.emailCampaignGroup ?? null,
+    emailGeography: task.emailGeography ?? null,
+    emailAudienceLevel: task.emailAudienceLevel ?? null,
+    emailAudienceType: task.emailAudienceType ?? null,
   });
 }
 
@@ -180,7 +211,11 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
       approval_required = @approvalRequired, approver = @approver, blocker_reason = @blockerReason,
       last_brief_generated = @lastBriefGenerated, type = @type, recipients = @recipients, subject = @subject,
       cost = @cost, currency = @currency, external_id = @externalId, opens = @opens, clicks = @clicks,
-      open_rate = @openRate, click_rate = @clickRate, bounces = @bounces, unsubscribes = @unsubscribes
+      open_rate = @openRate, click_rate = @clickRate, bounces = @bounces, unsubscribes = @unsubscribes,
+      unique_opens = @uniqueOpens, unique_open_rate = @uniqueOpenRate, delivered = @delivered,
+      delivery_rate = @deliveryRate, click_to_open_rate = @clickToOpenRate,
+      email_campaign_group = @emailCampaignGroup, email_geography = @emailGeography,
+      email_audience_level = @emailAudienceLevel, email_audience_type = @emailAudienceType
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -212,6 +247,15 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     clickRate: merged.clickRate,
     bounces: merged.bounces,
     unsubscribes: merged.unsubscribes,
+    uniqueOpens: merged.uniqueOpens ?? null,
+    uniqueOpenRate: merged.uniqueOpenRate ?? null,
+    delivered: merged.delivered ?? null,
+    deliveryRate: merged.deliveryRate ?? null,
+    clickToOpenRate: merged.clickToOpenRate ?? null,
+    emailCampaignGroup: merged.emailCampaignGroup ?? null,
+    emailGeography: merged.emailGeography ?? null,
+    emailAudienceLevel: merged.emailAudienceLevel ?? null,
+    emailAudienceType: merged.emailAudienceType ?? null,
   });
 
   return getTaskById(id);

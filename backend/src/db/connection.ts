@@ -222,6 +222,29 @@ addColumnIfMissing('tasks', 'click_rate', 'REAL');
 addColumnIfMissing('tasks', 'bounces', 'INTEGER');
 addColumnIfMissing('tasks', 'unsubscribes', 'INTEGER');
 
+// Email page (Phase 1) — unique-subscriber metrics, kept as separate
+// columns from opens/open_rate above (which are Campaign Monitor's
+// TotalOpened) rather than repurposing them, so every existing reader of
+// opens/open_rate keeps its current, unchanged meaning. See
+// campaignMonitor.ts's extractMetrics() for exactly how these are derived
+// from Campaign Monitor's UniqueOpened field and from recipients/bounces.
+addColumnIfMissing('tasks', 'unique_opens', 'INTEGER');
+addColumnIfMissing('tasks', 'unique_open_rate', 'REAL');
+addColumnIfMissing('tasks', 'delivered', 'INTEGER');
+addColumnIfMissing('tasks', 'delivery_rate', 'REAL');
+addColumnIfMissing('tasks', 'click_to_open_rate', 'REAL');
+
+// Education 2026 campaign roll-up — populated only when a send's Campaign
+// Monitor name matches the documented "Education 2026 | <segment> |
+// <level> | <audience>" convention (see campaignMonitor.ts's
+// parseEducationSegment doc comment). Null for every other send, and for
+// any Education-named send that doesn't match the convention exactly —
+// never guessed from a subject line or fuzzy-matched.
+addColumnIfMissing('tasks', 'email_campaign_group', 'TEXT');
+addColumnIfMissing('tasks', 'email_geography', 'TEXT');
+addColumnIfMissing('tasks', 'email_audience_level', 'TEXT');
+addColumnIfMissing('tasks', 'email_audience_type', 'TEXT');
+
 // Schedule linking for task-to-campaign cascade updates — see Phase 1 Implementation Brief.
 addColumnIfMissing('tasks', 'schedule_id', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_schedule_id ON tasks(schedule_id)');

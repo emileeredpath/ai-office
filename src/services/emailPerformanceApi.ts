@@ -4,6 +4,7 @@ import type { Brand } from '@/types/index';
 export interface EmailCampaignRecord {
   taskId: string;
   campaignName: string;
+  subject: string | null;
   sentDate: string;
   brand: Brand;
   recipients: number | null;
@@ -11,6 +12,16 @@ export interface EmailCampaignRecord {
   clicks: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  uniqueOpens: number | null;
+  uniqueOpenRate: number | null;
+  delivered: number | null;
+  deliveryRate: number | null;
+  clickRate: number | null;
+  clickToOpenRate: number | null;
+  emailCampaignGroup: string | null;
+  emailGeography: string | null;
+  emailAudienceLevel: string | null;
+  emailAudienceType: string | null;
   campaignMonitorId: string | null;
   dashboardCampaignId: string | null;
 }

@@ -43,6 +43,12 @@ interface CmCampaignSummary {
   Recipients?: number;
   TotalOpened?: number;
   UniqueOpened?: number;
+  // Campaign Monitor's summary.json documents Clicks as the count of
+  // unique subscribers who clicked at least one link — there is no
+  // separate "TotalClicks" field on this endpoint (unlike Opens, which
+  // has both Total and Unique variants). Verify this against a live
+  // account (Clicks should never exceed UniqueOpened, since a subscriber
+  // can't click without first opening) before trusting Click-to-Open Rate.
   Clicks?: number;
   Unsubscribed?: number;
   Bounced?: number;
@@ -98,6 +104,14 @@ function extractCost(summary: CmCampaignSummary | null): number | null {
 // same label — the two mean different things and must not be blended.
 // Clicks has only one documented field (no separate unique-clicks value),
 // so it's captured as-is with no ambiguity to resolve.
+//
+// Email page (Phase 1) additions — uniqueOpens/uniqueOpenRate come from
+// CM's UniqueOpened field, kept fully separate from TotalOpened above.
+// delivered/deliveryRate are derived (recipients - bounces), since
+// Campaign Monitor's summary has no explicit "Delivered" field — this is
+// a real total minus a real total, never guessed. clickToOpenRate is
+// Clicks ÷ UniqueOpened (unique-basis CTOR), only computed when
+// UniqueOpened is a real positive number.
 function extractMetrics(summary: CmCampaignSummary | null, recipients: number | null): {
   opens: number | null;
   clicks: number | null;
@@ -105,24 +119,120 @@ function extractMetrics(summary: CmCampaignSummary | null, recipients: number | 
   clickRate: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  uniqueOpens: number | null;
+  uniqueOpenRate: number | null;
+  delivered: number | null;
+  deliveryRate: number | null;
+  clickToOpenRate: number | null;
 } {
   if (!summary) {
-    return { opens: null, clicks: null, openRate: null, clickRate: null, bounces: null, unsubscribes: null };
+    return {
+      opens: null, clicks: null, openRate: null, clickRate: null, bounces: null, unsubscribes: null,
+      uniqueOpens: null, uniqueOpenRate: null, delivered: null, deliveryRate: null, clickToOpenRate: null,
+    };
   }
 
   const opens = typeof summary.TotalOpened === 'number' ? summary.TotalOpened : null;
-  const clicks = summary.Clicks ?? null;
+  const clicks = typeof summary.Clicks === 'number' ? summary.Clicks : null;
+  const bounces = typeof summary.Bounced === 'number' ? summary.Bounced : null;
+  const uniqueOpens = typeof summary.UniqueOpened === 'number' ? summary.UniqueOpened : null;
   const finalRecipients = recipients ?? summary.Recipients ?? null;
-  const openRate = opens && finalRecipients && finalRecipients > 0 ? (opens / finalRecipients) * 100 : null;
-  const clickRate = clicks && finalRecipients && finalRecipients > 0 ? (clicks / finalRecipients) * 100 : null;
+
+  const openRate = opens != null && finalRecipients && finalRecipients > 0 ? (opens / finalRecipients) * 100 : null;
+  const clickRate = clicks != null && finalRecipients && finalRecipients > 0 ? (clicks / finalRecipients) * 100 : null;
+  const uniqueOpenRate = uniqueOpens != null && finalRecipients && finalRecipients > 0 ? (uniqueOpens / finalRecipients) * 100 : null;
+
+  const delivered = finalRecipients != null && bounces != null ? finalRecipients - bounces : null;
+  const deliveryRate = delivered != null && finalRecipients && finalRecipients > 0 ? (delivered / finalRecipients) * 100 : null;
+  const clickToOpenRate = clicks != null && uniqueOpens != null && uniqueOpens > 0 ? (clicks / uniqueOpens) * 100 : null;
 
   return {
-    opens: typeof opens === 'number' ? opens : null,
-    clicks: typeof clicks === 'number' ? clicks : null,
-    openRate: typeof openRate === 'number' ? openRate : null,
-    clickRate: typeof clickRate === 'number' ? clickRate : null,
-    bounces: summary.Bounced ?? null,
-    unsubscribes: summary.Unsubscribed ?? null,
+    opens,
+    clicks,
+    openRate,
+    clickRate,
+    bounces,
+    unsubscribes: typeof summary.Unsubscribed === 'number' ? summary.Unsubscribed : null,
+    uniqueOpens,
+    uniqueOpenRate,
+    delivered,
+    deliveryRate,
+    clickToOpenRate,
+  };
+}
+
+// Education 2026 campaign roll-up — documented, deterministic naming
+// convention for Campaign Monitor send names, so segment/geography/
+// audience-type membership is parsed exactly, never fuzzy-matched or
+// guessed from a subject line. A send belongs to the roll-up ONLY when
+// its name matches this exact 4-part pipe-delimited pattern:
+//
+//   Education 2026 | <Segment> | <Primary|Secondary> | <New|Existing>
+//
+// <Segment> is either a new-prospect geography (Scotland, Northern
+// Ireland, Republic of Ireland) or an existing-customer brand name
+// (Brentwood, Radio Links, Capcom, Irish Radio). For an existing-customer
+// segment, the brand is taken from this parse and OVERRIDES parseEntity's
+// result — Education sends to existing customers aren't expected to also
+// follow the unrelated "MTech <CODE> -" naming convention.
+//
+// A send named "Education 2026 ..." that doesn't match this exact pattern
+// still syncs normally as a regular email-send (visible on the Email
+// page's individual-send table) but is left out of the Education roll-up
+// entirely (all four fields null) — never guessed into a bucket.
+const EDUCATION_CAMPAIGN_GROUP = 'education_2026';
+
+const EDUCATION_GEOGRAPHIES = ['Scotland', 'Northern Ireland', 'Republic of Ireland'];
+const EDUCATION_EXISTING_BRANDS: Record<string, Brand> = {
+  Brentwood: 'brentwood',
+  'Radio Links': 'radio-links',
+  Capcom: 'capcom',
+  'Irish Radio': 'ircl',
+};
+const EDUCATION_LEVELS = ['Primary', 'Secondary'];
+const EDUCATION_AUDIENCE_TYPES = ['New', 'Existing'];
+
+interface EducationSegment {
+  campaignGroup: string;
+  geography: string | null; // set only for a geography segment
+  brandOverride: Brand | null; // set only for an existing-customer segment
+  audienceLevel: string;
+  audienceType: string;
+}
+
+export function parseEducationSegment(campaignName: string): EducationSegment | null {
+  const parts = campaignName.split('|').map((p) => p.trim());
+  if (parts.length !== 4) return null;
+  const [groupLabel, segment, level, audienceType] = parts;
+  if (!/^education\s*2026$/i.test(groupLabel)) return null;
+
+  const matchedGeography = EDUCATION_GEOGRAPHIES.find((g) => g.toLowerCase() === segment.toLowerCase()) ?? null;
+  const matchedBrandKey = Object.keys(EDUCATION_EXISTING_BRANDS).find((b) => b.toLowerCase() === segment.toLowerCase());
+  if (!matchedGeography && !matchedBrandKey) return null;
+
+  const matchedLevel = EDUCATION_LEVELS.find((l) => l.toLowerCase() === level.toLowerCase());
+  if (!matchedLevel) return null;
+
+  const matchedAudienceType = EDUCATION_AUDIENCE_TYPES.find((a) => a.toLowerCase() === audienceType.toLowerCase());
+  if (!matchedAudienceType) return null;
+
+  // Cross-check: a geography segment should be "New", a brand segment
+  // should be "Existing" — a mismatch is still parsed (the explicit token
+  // wins) but logged, since it likely means a naming mistake in Campaign
+  // Monitor rather than a code bug.
+  const expectedAudienceType = matchedGeography ? 'New' : 'Existing';
+  if (matchedAudienceType !== expectedAudienceType) {
+    console.warn(
+      `[campaign-monitor] Education segment "${campaignName}" pairs ${matchedGeography ? matchedGeography : matchedBrandKey} with "${matchedAudienceType}" — expected "${expectedAudienceType}". Using the name as written.`
+    );
+  }
+
+  return {
+    campaignGroup: EDUCATION_CAMPAIGN_GROUP,
+    geography: matchedGeography,
+    brandOverride: matchedBrandKey ? EDUCATION_EXISTING_BRANDS[matchedBrandKey] : null,
+    audienceLevel: matchedLevel,
+    audienceType: matchedAudienceType,
   };
 }
 
@@ -244,10 +354,21 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
       campaignsSeen += 1;
 
       try {
-        const { brand, matched } = parseEntity(campaign.Name);
+        const { brand: parsedBrand, matched } = parseEntity(campaign.Name);
         if (!matched) {
           console.warn(`[campaign-monitor] "${campaign.Name}" didn't match a known naming pattern — filed under mtech.`);
         }
+
+        const education = parseEducationSegment(campaign.Name);
+        if (!education && /^education\s*2026/i.test(campaign.Name)) {
+          console.warn(
+            `[campaign-monitor] "${campaign.Name}" looks like an Education 2026 send but doesn't match the "Education 2026 | <Segment> | <Primary|Secondary> | <New|Existing>" naming convention — synced as a regular send, excluded from the Education roll-up.`
+          );
+        }
+        // An Education existing-customer segment (Brentwood/Radio Links/
+        // Capcom/Irish Radio) overrides the brand parsed from the
+        // unrelated "MTech <CODE> -" convention above.
+        const brand = education?.brandOverride ?? parsedBrand;
 
         let summary: CmCampaignSummary | null = null;
         try {
@@ -259,7 +380,10 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
 
         const recipients = campaign.TotalRecipients ?? summary?.Recipients ?? null;
         const cost = extractCost(summary);
-        const { opens, clicks, openRate, clickRate, bounces, unsubscribes } = extractMetrics(summary, recipients);
+        const {
+          opens, clicks, openRate, clickRate, bounces, unsubscribes,
+          uniqueOpens, uniqueOpenRate, delivered, deliveryRate, clickToOpenRate,
+        } = extractMetrics(summary, recipients);
         const sentIso = sentDate.toISOString();
 
         // Match campaign to AI Office campaign by name
@@ -298,6 +422,19 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             clickRate,
             bounces,
             unsubscribes,
+            uniqueOpens,
+            uniqueOpenRate,
+            delivered,
+            deliveryRate,
+            clickToOpenRate,
+            emailCampaignGroup: education?.campaignGroup ?? null,
+            // Geography applies only to new-prospect segments — for an
+            // existing-customer segment, the (already brand-overridden)
+            // `brand` field above is itself the segment identity, so
+            // geography stays null there rather than duplicating it.
+            emailGeography: education?.geography ?? null,
+            emailAudienceLevel: education?.audienceLevel ?? null,
+            emailAudienceType: education?.audienceType ?? null,
             campaignId: aiCampaignId,
           });
           updated += 1;
@@ -337,6 +474,15 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             clickRate,
             bounces,
             unsubscribes,
+            uniqueOpens,
+            uniqueOpenRate,
+            delivered,
+            deliveryRate,
+            clickToOpenRate,
+            emailCampaignGroup: education?.campaignGroup ?? null,
+            emailGeography: education?.geography ?? null,
+            emailAudienceLevel: education?.audienceLevel ?? null,
+            emailAudienceType: education?.audienceType ?? null,
           };
           insertTask(task);
           created += 1;

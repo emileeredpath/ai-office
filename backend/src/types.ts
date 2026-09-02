@@ -117,13 +117,33 @@ export interface TaskRecord {
   // `source`, e.g. source='campaign-monitor' + externalId=CM's campaign ID)
   // so re-running a sync updates the existing row instead of duplicating it.
   externalId: string | null;
-  // Email engagement metrics from Campaign Monitor (populated by sync)
+  // Email engagement metrics from Campaign Monitor (populated by sync).
+  // opens/openRate are Campaign Monitor's TotalOpened — total open events,
+  // including repeats by the same subscriber. Never presented as "unique."
   opens: number | null;
   clicks: number | null;
   openRate: number | null;
   clickRate: number | null;
   bounces: number | null;
   unsubscribes: number | null;
+  // Unique-subscriber metrics (Email page) — Campaign Monitor's
+  // UniqueOpened, and delivered/deliveryRate/clickToOpenRate derived from
+  // real totals (recipients, bounces, uniqueOpens, clicks). See
+  // campaignMonitor.ts's extractMetrics() for the exact derivation.
+  // Optional, same reasoning as archived/archivedAt below — taskRepository
+  // fills these from the DB regardless, where the column default is NULL.
+  uniqueOpens?: number | null;
+  uniqueOpenRate?: number | null;
+  delivered?: number | null;
+  deliveryRate?: number | null;
+  clickToOpenRate?: number | null;
+  // Education 2026 campaign roll-up fields — null unless this send's
+  // Campaign Monitor name matched the documented naming convention (see
+  // campaignMonitor.ts's parseEducationSegment doc comment).
+  emailCampaignGroup?: string | null;
+  emailGeography?: string | null;
+  emailAudienceLevel?: string | null;
+  emailAudienceType?: string | null;
   // Optional (rather than required like the rest of this interface) so the
   // several existing call sites that construct a full TaskRecord literal
   // (seed data, campaign-monitor sync, actions API) don't all need updating

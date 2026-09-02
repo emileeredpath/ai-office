@@ -14,6 +14,7 @@ import {
   Upload,
   Share2,
   Globe,
+  Mail,
 } from 'lucide-react';
 import { Sidebar, type NavItem } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
@@ -30,13 +31,14 @@ import { PpcScreen } from '@/screens/PpcScreen';
 import { InfinityTrackingScreen } from '@/screens/InfinityTrackingScreen';
 import { SocialScreen } from '@/screens/SocialScreen';
 import { WebsiteScreen } from '@/screens/WebsiteScreen';
+import { EmailScreen } from '@/screens/EmailScreen';
 import { FundingScreen } from '@/screens/FundingScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'infinity' | 'social' | 'website' | 'funding' | 'metrics' | 'settings';
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'infinity' | 'social' | 'website' | 'email' | 'funding' | 'metrics' | 'settings';
 
 // Sidebar labels reflect the long-term MTech Marketing Hub navigation from
 // the approved V2 mockup. Every label maps to an existing, unmodified
@@ -55,6 +57,7 @@ const PRIMARY_NAV: NavItem[] = [
   { id: 'infinity' as Screen, icon: Phone, label: 'Call Tracking' },
   { id: 'social' as Screen, icon: Share2, label: 'Social' },
   { id: 'website' as Screen, icon: Globe, label: 'Website' },
+  { id: 'email' as Screen, icon: Mail, label: 'Email' },
   { id: 'funding' as Screen, icon: Landmark, label: 'Funding' },
   { id: 'metrics' as Screen, icon: FileBarChart, label: 'Reports' },
 ];
@@ -100,6 +103,8 @@ export default function App() {
         return <SocialScreen />;
       case 'website':
         return <WebsiteScreen />;
+      case 'email':
+        return <EmailScreen />;
       case 'funding':
         return <FundingScreen />;
       case 'metrics':

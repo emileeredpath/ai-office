@@ -582,6 +582,184 @@ export async function getEnquiries(startDate?: string, endDate?: string): Promis
   return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, errors };
 }
 
+// Education 2026 campaign downstream attribution (Email page) — real GA4
+// sessions (and, for brands with a verified enquiry definition, real GA4
+// Enquiries) filtered to the campaign's own tagged links:
+// utm_source=campaign_monitor, utm_medium=email, utm_campaign=education_2026.
+// Uses GA4's own built-in session-scoped UTM dimensions (sessionSource,
+// sessionMedium, sessionCampaignName, sessionManualAdContent for
+// utm_content) — no custom dimension registration required in GA4, unlike
+// the older Wave 1 query's customEvent:utm_content. Every property with a
+// configured GA4_PROPERTY_ID_* is queried for sessions regardless of
+// whether that brand has a verified enquiry definition; enquiries are only
+// computed for brands that do (same configured/not-connected honesty rule
+// as getEnquiries). This never invents a "leads/opportunities/revenue"
+// stage — those require Acumatica, which isn't connected.
+const EDUCATION_UTM_FILTER = {
+  andGroup: {
+    expressions: [
+      { filter: { fieldName: 'sessionSource', stringFilter: { matchType: 'EXACT', value: 'campaign_monitor' } } },
+      { filter: { fieldName: 'sessionMedium', stringFilter: { matchType: 'EXACT', value: 'email' } } },
+      { filter: { fieldName: 'sessionCampaignName', stringFilter: { matchType: 'EXACT', value: 'education_2026' } } },
+    ],
+  },
+};
+
+export interface EducationContentRow {
+  utmContent: string;
+  sessions: number;
+}
+
+export interface EducationEnquiryContentRow {
+  utmContent: string;
+  count: number;
+}
+
+export interface BrandEducationAttribution {
+  brand: Brand;
+  sessions: number;
+  byContent: EducationContentRow[];
+  // null when this brand has no verified GA4 Enquiry definition — never a
+  // fabricated 0. See ENQUIRY_EVENTS_BY_BRAND above.
+  enquiries: number | null;
+  enquiriesByContent: EducationEnquiryContentRow[];
+}
+
+export interface Ga4EducationAttributionResult {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  brands: BrandEducationAttribution[];
+  // Every brand with a configured GA4 property — sessions are queried for
+  // all of them, not just brands with a verified enquiry definition.
+  configuredBrands: Brand[];
+  errors: string[];
+}
+
+interface Ga4RawRow {
+  dimensionValues: { value: string }[];
+  metricValues: { value: string }[];
+}
+
+async function runEducationSessionsReport(propertyId: string, token: string, startDate: string, endDate: string): Promise<EducationContentRow[]> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'sessionManualAdContent' }],
+      metrics: [{ name: 'sessions' }],
+      dimensionFilter: EDUCATION_UTM_FILTER,
+      limit: 1000,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 Education attribution runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { rows?: Ga4RawRow[] };
+  return (json.rows || []).map((row) => ({
+    utmContent: row.dimensionValues[0]?.value || '(not set)',
+    sessions: Number(row.metricValues[0]?.value ?? 0),
+  }));
+}
+
+async function runEducationEnquiryReport(
+  propertyId: string,
+  token: string,
+  startDate: string,
+  endDate: string,
+  eventNames: string[]
+): Promise<{ utmContent: string; eventName: string; count: number }[]> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'sessionManualAdContent' }, { name: 'eventName' }],
+      metrics: [{ name: 'eventCount' }],
+      dimensionFilter: {
+        andGroup: {
+          expressions: [
+            EDUCATION_UTM_FILTER,
+            { filter: { fieldName: 'eventName', inListFilter: { values: eventNames } } },
+          ],
+        },
+      },
+      limit: 1000,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 Education enquiry attribution runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { rows?: Ga4RawRow[] };
+  return (json.rows || []).map((row) => ({
+    utmContent: row.dimensionValues[0]?.value || '(not set)',
+    eventName: row.dimensionValues[1]?.value || '',
+    count: Number(row.metricValues[0]?.value ?? 0),
+  }));
+}
+
+export async function getEducationCampaignAttribution(startDate?: string, endDate?: string): Promise<Ga4EducationAttributionResult> {
+  const errors: string[] = [];
+  const configuredBrands = (Object.keys(PROPERTY_ID_ENV) as Brand[]).filter(
+    (brand) => !!process.env[PROPERTY_ID_ENV[brand] as string]
+  );
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || configuredBrands.length === 0) {
+    return {
+      configured: false,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      brands: [],
+      configuredBrands: [],
+      errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to get access token:', msg);
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, brands: [], configuredBrands, errors: [msg] };
+  }
+
+  const brands: BrandEducationAttribution[] = [];
+  for (const brand of configuredBrands) {
+    const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string;
+    try {
+      const byContent = await runEducationSessionsReport(propertyId, token, range.startDate, range.endDate);
+      const sessions = byContent.reduce((sum, r) => sum + r.sessions, 0);
+
+      const def = ENQUIRY_EVENTS_BY_BRAND[brand];
+      let enquiries: number | null = null;
+      let enquiriesByContent: EducationEnquiryContentRow[] = [];
+      if (def) {
+        const eventNames = [...(def.form ?? []), ...(def.phone ?? []), ...(def.email ?? []), ...(def.livechat ?? [])];
+        const enquiryRows = await runEducationEnquiryReport(propertyId, token, range.startDate, range.endDate, eventNames);
+        const byContentMap = new Map<string, number>();
+        for (const row of enquiryRows) {
+          byContentMap.set(row.utmContent, (byContentMap.get(row.utmContent) ?? 0) + row.count);
+        }
+        enquiriesByContent = Array.from(byContentMap.entries()).map(([utmContent, count]) => ({ utmContent, count }));
+        enquiries = enquiriesByContent.reduce((sum, r) => sum + r.count, 0);
+      }
+
+      brands.push({ brand, sessions, byContent, enquiries, enquiriesByContent });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[ga4] failed to fetch Education campaign attribution for ${brand}:`, msg);
+      errors.push(`${brand}: ${msg}`);
+    }
+  }
+
+  return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, errors };
+}
+
 export interface Wave1PerformanceMetrics {
   clicks: number;
   pageViews: number;

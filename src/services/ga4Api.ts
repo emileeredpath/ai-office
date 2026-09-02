@@ -112,3 +112,44 @@ export async function fetchGa4Enquiries(startDate: string, endDate: string): Pro
   }
   return response.json();
 }
+
+// Education 2026 campaign downstream attribution (Email page) — real GA4
+// sessions/enquiries filtered to the campaign's own tagged links. A fully
+// separate response from Ga4EnquiriesResponse above — never touched by or
+// feeding into it. See backend/src/services/ga4.ts's
+// getEducationCampaignAttribution doc comment.
+export interface Ga4EducationContentRow {
+  utmContent: string;
+  sessions: number;
+}
+
+export interface Ga4EducationEnquiryContentRow {
+  utmContent: string;
+  count: number;
+}
+
+export interface Ga4BrandEducationAttribution {
+  brand: Brand;
+  sessions: number;
+  byContent: Ga4EducationContentRow[];
+  enquiries: number | null;
+  enquiriesByContent: Ga4EducationEnquiryContentRow[];
+}
+
+export interface Ga4EducationAttributionResponse {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  brands: Ga4BrandEducationAttribution[];
+  configuredBrands: Brand[];
+  errors: string[];
+}
+
+export async function fetchEducationCampaignAttribution(startDate: string, endDate: string): Promise<Ga4EducationAttributionResponse> {
+  const params = new URLSearchParams({ startDate, endDate });
+  const response = await apiFetch(`/api/analytics/education-campaign?${params.toString()}`);
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch Education campaign attribution (${response.status}).`, response.status);
+  }
+  return response.json();
+}
