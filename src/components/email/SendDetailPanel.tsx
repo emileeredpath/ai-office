@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import type { EmailCampaignRecord } from '@/services/emailPerformanceApi';
+import { fetchTopLinksForSend, type EmailCampaignRecord, type TopLinkRow } from '@/services/emailPerformanceApi';
 import { BRAND_LABEL } from '@/utils/brandColors';
 
 interface SendDetailPanelProps {
@@ -44,7 +45,39 @@ function ComparisonRow({ label, thisValue, avgValue }: { label: string; thisValu
 // which lists real subscriber-level events; this app deliberately never
 // calls that endpoint (data minimisation), so this is honestly shown as
 // unavailable rather than silently omitted.
+type TopLinksState =
+  | { status: 'loading' }
+  | { status: 'available'; rows: TopLinkRow[] }
+  | { status: 'unavailable'; message: string };
+
 export function SendDetailPanel({ send, educationAverage, onClose }: SendDetailPanelProps) {
+  const [topLinks, setTopLinks] = useState<TopLinksState>({ status: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+    setTopLinks({ status: 'loading' });
+    if (!send.campaignMonitorId) {
+      setTopLinks({ status: 'unavailable', message: 'No Campaign Monitor ID on record for this send.' });
+      return;
+    }
+    fetchTopLinksForSend(send.campaignMonitorId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.rows) {
+          setTopLinks(res.rows.length > 0 ? { status: 'available', rows: res.rows } : { status: 'unavailable', message: 'No clicks recorded for this send yet.' });
+        } else {
+          setTopLinks({ status: 'unavailable', message: res.message ?? 'Top links are not available for this send.' });
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setTopLinks({ status: 'unavailable', message: err instanceof Error ? err.message : 'Top links are not available for this send.' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [send.campaignMonitorId]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -79,12 +112,36 @@ export function SendDetailPanel({ send, educationAverage, onClose }: SendDetailP
         </div>
 
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-2">Top Clicked Links</h3>
-          <p className="text-xs text-text-secondary">
-            Not available — Campaign Monitor only exposes link-level click data through its individual
-            click-event log, which lists real subscriber-level records. This app deliberately never
-            fetches that endpoint (data minimisation) — only send-level aggregates like the figures above.
+          <h3 className="text-sm font-semibold text-text-primary mb-2">Top Links</h3>
+          <p className="text-xs text-text-secondary mb-2">
+            Aggregated server-side from Campaign Monitor's individual click log for this send — total and
+            unique-clicker counts per URL only. No subscriber name, email address, or IP address is ever
+            stored or shown; the raw click records are discarded immediately after this aggregate is computed.
           </p>
+          {topLinks.status === 'loading' && <p className="text-xs text-text-secondary">Loading…</p>}
+          {topLinks.status === 'unavailable' && <p className="text-xs text-text-secondary">{topLinks.message}</p>}
+          {topLinks.status === 'available' && (
+            <table className="table w-full text-sm">
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th style={{ textAlign: 'right' }}>Total Clicks</th>
+                  <th style={{ textAlign: 'right' }}>Unique Clicks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topLinks.rows.map((row) => (
+                  <tr key={row.url}>
+                    <td className="text-text-primary text-xs" style={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.url}>
+                      {row.url}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>{row.totalClicks.toLocaleString('en-GB')}</td>
+                    <td style={{ textAlign: 'right' }}>{row.uniqueClicks.toLocaleString('en-GB')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {educationAverage && (

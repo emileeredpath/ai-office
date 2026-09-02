@@ -135,9 +135,12 @@ export function getEducationSummary(
   }
   const relevant = isGroupView ? data.campaigns : data.campaigns.filter((c) => c.brand === selectedEntity);
   const matched = relevant.filter((c) => c.emailCampaignGroup === 'education_2026');
-  const unmatched = relevant.filter(
-    (c) => c.emailCampaignGroup !== 'education_2026' && /^education\s*2026/i.test(c.campaignName)
-  );
+  // A near-miss: the real name carries a recognised geography or the
+  // word "Education" (so it's clearly meant for this campaign) but is
+  // missing Primary/Secondary, so parseEducationSegment excluded it — see
+  // that function's doc comment. Surfaced honestly rather than hidden.
+  const EDUCATION_HINT_RE = /education|scotland|northern ireland|republic of ireland/i;
+  const unmatched = relevant.filter((c) => c.emailCampaignGroup !== 'education_2026' && EDUCATION_HINT_RE.test(c.campaignName));
   return {
     status: matched.length > 0 ? 'available' : 'not-connected',
     totalSends: matched.length,

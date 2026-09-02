@@ -46,3 +46,31 @@ export async function fetchEmailPerformance(startDate: string, endDate: string):
   }
   return response.json();
 }
+
+// Top Links (Send Detail) — fetched only when a Send Detail view actually
+// opens, never as part of the regular sync. The backend aggregates
+// Campaign Monitor's individual-subscriber click log server-side and
+// returns ONLY { url, totalClicks, uniqueClicks } rows — see
+// backend/src/services/campaignMonitor.ts's getTopLinksForSend doc
+// comment. No subscriber-level data (names, emails, IPs) ever reaches
+// this response.
+export interface TopLinkRow {
+  url: string;
+  totalClicks: number;
+  uniqueClicks: number;
+}
+
+export interface TopLinksResponse {
+  success: boolean;
+  rows?: TopLinkRow[];
+  message?: string;
+}
+
+export async function fetchTopLinksForSend(campaignMonitorId: string): Promise<TopLinksResponse> {
+  const response = await apiFetch(`/api/campaign-monitor/sends/${encodeURIComponent(campaignMonitorId)}/top-links`);
+  const body = (await response.json().catch(() => ({}))) as TopLinksResponse;
+  if (!response.ok) {
+    return { success: false, message: body.message ?? `Failed to fetch top links (${response.status}).` };
+  }
+  return body;
+}

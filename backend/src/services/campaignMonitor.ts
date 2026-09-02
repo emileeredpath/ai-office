@@ -91,6 +91,82 @@ const listCampaignsForClient = (apiKey: string, clientId: string) =>
 const getCampaignSummary = (apiKey: string, campaignId: string) =>
   cmFetch<CmCampaignSummary>(`/campaigns/${campaignId}/summary.json`, apiKey);
 
+// Top Links (Send Detail, on demand only — never part of the regular
+// sync). Campaign Monitor's /clicks.json returns one record per real
+// subscriber click (EmailAddress, IPAddress, Date, URL per CM's
+// documented schema — unverified against a live account from this
+// sandbox, see this file's header note). This function fetches those
+// pages, aggregates them into { url, totalClicks, uniqueClicks } purely
+// in local variables, and returns ONLY that aggregate — the raw
+// per-subscriber records (every email address, every IP) are never
+// logged, never persisted, and go out of scope the moment this function
+// returns. uniqueClicks counts distinct EmailAddress values seen for
+// that URL — a real, accurate unique-clicker count without the response
+// ever naming which address it was.
+interface CmClickRecord {
+  EmailAddress?: string;
+  URL?: string;
+}
+
+interface CmPagedResponse<T> {
+  Results?: T[];
+  NumberOfPages?: number;
+}
+
+const TOP_LINKS_PAGE_SIZE = 1000;
+// Safety cap on pagination — 20,000 raw click records is far more than
+// any single MTech send should realistically see; stops a runaway loop
+// against an unexpectedly large or misbehaving response.
+const TOP_LINKS_MAX_PAGES = 20;
+
+async function fetchClickRecords(apiKey: string, campaignId: string): Promise<CmClickRecord[]> {
+  const all: CmClickRecord[] = [];
+  // Campaign Monitor's clicks.json requires a `date` parameter (clicks on
+  // or after this date) — an early sentinel returns the send's full click
+  // history rather than an arbitrary recent window.
+  const earliestDate = '2000-01-01';
+  for (let page = 1; page <= TOP_LINKS_MAX_PAGES; page++) {
+    const path = `/campaigns/${campaignId}/clicks.json?date=${earliestDate}&page=${page}&pagesize=${TOP_LINKS_PAGE_SIZE}`;
+    const json = await cmFetch<CmPagedResponse<CmClickRecord> | CmClickRecord[]>(path, apiKey);
+    const pageResults = Array.isArray(json) ? json : (json.Results ?? []);
+    all.push(...pageResults);
+    const totalPages = Array.isArray(json) ? 1 : (json.NumberOfPages ?? 1);
+    if (page >= totalPages || pageResults.length < TOP_LINKS_PAGE_SIZE) break;
+  }
+  return all;
+}
+
+export interface TopLinkRow {
+  url: string;
+  totalClicks: number;
+  uniqueClicks: number;
+}
+
+export async function getTopLinksForSend(campaignId: string): Promise<TopLinkRow[]> {
+  const apiKey = process.env.CAMPAIGN_MONITOR_API_KEY;
+  if (!apiKey) throw new Error('Campaign Monitor is not configured — CAMPAIGN_MONITOR_API_KEY is not set.');
+
+  const records = await fetchClickRecords(apiKey, campaignId);
+  if (records.length === 0) return [];
+
+  const byUrl = new Map<string, { total: number; emails: Set<string> }>();
+  for (const record of records) {
+    if (!record.URL) continue; // no URL on this record — can't attribute it, never guessed
+    const entry = byUrl.get(record.URL) ?? { total: 0, emails: new Set<string>() };
+    entry.total += 1;
+    if (record.EmailAddress) entry.emails.add(record.EmailAddress);
+    byUrl.set(record.URL, entry);
+  }
+  // `records` and every per-subscriber field it carried (EmailAddress,
+  // and any other field Campaign Monitor's response includes) are never
+  // referenced again after this point — only the aggregate below escapes
+  // this function.
+  return Array.from(byUrl.entries())
+    .map(([url, { total, emails }]) => ({ url, totalClicks: total, uniqueClicks: emails.size }))
+    .sort((a, b) => b.totalClicks - a.totalClicks)
+    .slice(0, 20);
+}
+
 function extractCost(summary: CmCampaignSummary | null): number | null {
   if (!summary) return null;
   const value = summary.Cost ?? summary.TotalCost ?? summary.Spend;
@@ -161,81 +237,6 @@ function extractMetrics(summary: CmCampaignSummary | null, recipients: number | 
   };
 }
 
-// Education 2026 campaign roll-up — documented, deterministic naming
-// convention for Campaign Monitor send names, so segment/geography/
-// audience-type membership is parsed exactly, never fuzzy-matched or
-// guessed from a subject line. A send belongs to the roll-up ONLY when
-// its name matches this exact 4-part pipe-delimited pattern:
-//
-//   Education 2026 | <Segment> | <Primary|Secondary> | <New|Existing>
-//
-// <Segment> is either a new-prospect geography (Scotland, Northern
-// Ireland, Republic of Ireland) or an existing-customer brand name
-// (Brentwood, Radio Links, Capcom, Irish Radio). For an existing-customer
-// segment, the brand is taken from this parse and OVERRIDES parseEntity's
-// result — Education sends to existing customers aren't expected to also
-// follow the unrelated "MTech <CODE> -" naming convention.
-//
-// A send named "Education 2026 ..." that doesn't match this exact pattern
-// still syncs normally as a regular email-send (visible on the Email
-// page's individual-send table) but is left out of the Education roll-up
-// entirely (all four fields null) — never guessed into a bucket.
-const EDUCATION_CAMPAIGN_GROUP = 'education_2026';
-
-const EDUCATION_GEOGRAPHIES = ['Scotland', 'Northern Ireland', 'Republic of Ireland'];
-const EDUCATION_EXISTING_BRANDS: Record<string, Brand> = {
-  Brentwood: 'brentwood',
-  'Radio Links': 'radio-links',
-  Capcom: 'capcom',
-  'Irish Radio': 'ircl',
-};
-const EDUCATION_LEVELS = ['Primary', 'Secondary'];
-const EDUCATION_AUDIENCE_TYPES = ['New', 'Existing'];
-
-interface EducationSegment {
-  campaignGroup: string;
-  geography: string | null; // set only for a geography segment
-  brandOverride: Brand | null; // set only for an existing-customer segment
-  audienceLevel: string;
-  audienceType: string;
-}
-
-export function parseEducationSegment(campaignName: string): EducationSegment | null {
-  const parts = campaignName.split('|').map((p) => p.trim());
-  if (parts.length !== 4) return null;
-  const [groupLabel, segment, level, audienceType] = parts;
-  if (!/^education\s*2026$/i.test(groupLabel)) return null;
-
-  const matchedGeography = EDUCATION_GEOGRAPHIES.find((g) => g.toLowerCase() === segment.toLowerCase()) ?? null;
-  const matchedBrandKey = Object.keys(EDUCATION_EXISTING_BRANDS).find((b) => b.toLowerCase() === segment.toLowerCase());
-  if (!matchedGeography && !matchedBrandKey) return null;
-
-  const matchedLevel = EDUCATION_LEVELS.find((l) => l.toLowerCase() === level.toLowerCase());
-  if (!matchedLevel) return null;
-
-  const matchedAudienceType = EDUCATION_AUDIENCE_TYPES.find((a) => a.toLowerCase() === audienceType.toLowerCase());
-  if (!matchedAudienceType) return null;
-
-  // Cross-check: a geography segment should be "New", a brand segment
-  // should be "Existing" — a mismatch is still parsed (the explicit token
-  // wins) but logged, since it likely means a naming mistake in Campaign
-  // Monitor rather than a code bug.
-  const expectedAudienceType = matchedGeography ? 'New' : 'Existing';
-  if (matchedAudienceType !== expectedAudienceType) {
-    console.warn(
-      `[campaign-monitor] Education segment "${campaignName}" pairs ${matchedGeography ? matchedGeography : matchedBrandKey} with "${matchedAudienceType}" — expected "${expectedAudienceType}". Using the name as written.`
-    );
-  }
-
-  return {
-    campaignGroup: EDUCATION_CAMPAIGN_GROUP,
-    geography: matchedGeography,
-    brandOverride: matchedBrandKey ? EDUCATION_EXISTING_BRANDS[matchedBrandKey] : null,
-    audienceLevel: matchedLevel,
-    audienceType: matchedAudienceType,
-  };
-}
-
 // Parse logic per the brief: IDARO is a product line (not a brand entity);
 // everything else follows "MTech <CODE> - <name>".
 const ENTITY_CODES: Record<string, Brand> = {
@@ -244,6 +245,84 @@ const ENTITY_CODES: Record<string, Brand> = {
   CC: 'capcom',
   IRCL: 'ircl',
 };
+
+// Education 2026 campaign roll-up — parses the REAL Campaign Monitor
+// naming convention already in use (confirmed live examples: "MTech BC -
+// Scotland Primary Schools", "MTech IRCL - Northern Ireland Secondary
+// Schools", "MTech IRCL - Republic of Ireland Primary Schools"). Never
+// requires renaming a send, and never fuzzy-matches a subject line — only
+// exact, deterministic token matches inside the existing "MTech <CODE> -
+// <free text>" prefix every send already carries (the same prefix
+// parseEntity() above already parses for brand).
+//
+// Rules, applied to the free text after "MTech <CODE> - ":
+//  1. Brand comes from the existing CODE (BC/RL/CC/IRCL) — same as every
+//     other send, never overridden here. A send whose code isn't one of
+//     the four known ones can't be safely attributed and is excluded.
+//  2. Geography: an exact, case-insensitive match for "Scotland",
+//     "Northern Ireland", or "Republic of Ireland" anywhere in the free
+//     text. Found ⇒ this is real, confirmed new-prospect outreach ⇒
+//     audienceType = "New" (not a guess — this is exactly how the real
+//     Education sends already going out are named).
+//  3. No geography match, but the word "Education" appears anywhere in
+//     the free text ⇒ existing-customer segment ⇒ audienceType =
+//     "Existing". This is the forward-looking convention for the
+//     not-yet-sent Brentwood/Radio Links/Capcom/Irish Radio
+//     existing-data sends — see this file's exported
+//     EDUCATION_NAMING_GUIDANCE for the exact text shown to the user.
+//  4. Neither a geography nor "Education" ⇒ not an Education send at all
+//     (e.g. "MTech BC - Newsletter August") ⇒ excluded, never guessed.
+//  5. Primary/Secondary: an exact, case-insensitive whole-word match
+//     anywhere in the free text. If geography or "Education" matched but
+//     no level is found, the send is logged and excluded rather than
+//     guessed — a real naming gap to fix, not something to silently bucket.
+//
+// A send that doesn't match ANY of this still syncs normally as a regular
+// email-send (visible on the Email page's individual-send table) — it's
+// simply left out of the Education roll-up (all four fields null).
+const EDUCATION_CAMPAIGN_GROUP = 'education_2026';
+const EDUCATION_GEOGRAPHIES = ['Republic of Ireland', 'Northern Ireland', 'Scotland'];
+const EDUCATION_LEVELS = ['Primary', 'Secondary'];
+
+// Shown to the user (via the Email page) as guidance for existing-customer
+// Education sends, where audienceType can't be inferred from a geography
+// token the way new-prospect sends can.
+export const EDUCATION_NAMING_GUIDANCE =
+  'For existing-customer Education sends (Brentwood/Radio Links/Capcom/Irish Radio), include the word "Education" and Primary or Secondary in the Campaign Monitor send name alongside your usual "MTech <CODE> -" prefix — e.g. "MTech BC - Education Primary Schools". Brand and level are then read automatically; audience type is set to Existing for this branch since these go to your existing customer lists. A send with neither a recognised geography nor the word "Education" is never guessed into the campaign — it stays a regular send.';
+
+interface EducationSegment {
+  campaignGroup: string;
+  geography: string | null; // set only for a new-prospect geography segment
+  audienceLevel: string;
+  audienceType: 'New' | 'Existing';
+}
+
+export function parseEducationSegment(campaignName: string): EducationSegment | null {
+  const match = campaignName.trim().match(/^MTech\s+(\w+)\s*-\s*(.+)$/i);
+  if (!match) return null;
+  const code = match[1].toUpperCase();
+  if (!ENTITY_CODES[code]) return null; // unknown code — brand can't be safely attributed
+  const rest = match[2];
+
+  const geography = EDUCATION_GEOGRAPHIES.find((g) => rest.toLowerCase().includes(g.toLowerCase())) ?? null;
+  const hasEducationKeyword = /\beducation\b/i.test(rest);
+  if (!geography && !hasEducationKeyword) return null; // not an Education send
+
+  const level = EDUCATION_LEVELS.find((l) => new RegExp(`\\b${l}\\b`, 'i').test(rest));
+  if (!level) {
+    console.warn(
+      `[campaign-monitor] "${campaignName}" looks like an Education send (${geography ?? 'has "Education" in the name'}) but no Primary/Secondary found — excluded from the roll-up until the name includes one.`
+    );
+    return null;
+  }
+
+  return {
+    campaignGroup: EDUCATION_CAMPAIGN_GROUP,
+    geography,
+    audienceLevel: level,
+    audienceType: geography ? 'New' : 'Existing',
+  };
+}
 
 // Campaign name matching: maps Campaign Monitor campaign name fragments to AI Office campaign IDs.
 // Update this as campaigns are created. Format: "campaign_monitor_fragment" → "ai_office_campaign_id"
@@ -354,21 +433,17 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
       campaignsSeen += 1;
 
       try {
-        const { brand: parsedBrand, matched } = parseEntity(campaign.Name);
+        const { brand, matched } = parseEntity(campaign.Name);
         if (!matched) {
           console.warn(`[campaign-monitor] "${campaign.Name}" didn't match a known naming pattern — filed under mtech.`);
         }
 
+        // Education membership/geography/level/audience-type — see
+        // parseEducationSegment's doc comment for exactly how this reads
+        // the real "MTech <CODE> - <free text>" convention already in
+        // use. Brand always comes from parseEntity above, never
+        // overridden here.
         const education = parseEducationSegment(campaign.Name);
-        if (!education && /^education\s*2026/i.test(campaign.Name)) {
-          console.warn(
-            `[campaign-monitor] "${campaign.Name}" looks like an Education 2026 send but doesn't match the "Education 2026 | <Segment> | <Primary|Secondary> | <New|Existing>" naming convention — synced as a regular send, excluded from the Education roll-up.`
-          );
-        }
-        // An Education existing-customer segment (Brentwood/Radio Links/
-        // Capcom/Irish Radio) overrides the brand parsed from the
-        // unrelated "MTech <CODE> -" convention above.
-        const brand = education?.brandOverride ?? parsedBrand;
 
         let summary: CmCampaignSummary | null = null;
         try {

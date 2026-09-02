@@ -234,12 +234,13 @@ addColumnIfMissing('tasks', 'delivered', 'INTEGER');
 addColumnIfMissing('tasks', 'delivery_rate', 'REAL');
 addColumnIfMissing('tasks', 'click_to_open_rate', 'REAL');
 
-// Education 2026 campaign roll-up — populated only when a send's Campaign
-// Monitor name matches the documented "Education 2026 | <segment> |
-// <level> | <audience>" convention (see campaignMonitor.ts's
-// parseEducationSegment doc comment). Null for every other send, and for
-// any Education-named send that doesn't match the convention exactly —
-// never guessed from a subject line or fuzzy-matched.
+// Education 2026 campaign roll-up — populated only when a send's real
+// Campaign Monitor name (the existing "MTech <CODE> - <free text>"
+// convention) contains a recognised geography or the word "Education",
+// plus Primary/Secondary (see campaignMonitor.ts's parseEducationSegment
+// doc comment). Null for every other send, and for any Education-looking
+// send that's missing the level token — never guessed from a subject
+// line or fuzzy-matched.
 addColumnIfMissing('tasks', 'email_campaign_group', 'TEXT');
 addColumnIfMissing('tasks', 'email_geography', 'TEXT');
 addColumnIfMissing('tasks', 'email_audience_level', 'TEXT');
