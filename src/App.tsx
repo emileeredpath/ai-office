@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -15,7 +15,9 @@ import {
   Share2,
   Globe,
   Mail,
+  Building2,
 } from 'lucide-react';
+import { isWebglAvailable, isLikelyMobileViewport } from '@/utils/webgl';
 import { Sidebar, type NavItem } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 import { TaskDetailPanel } from '@/components/tasks/TaskDetailPanel';
@@ -38,7 +40,13 @@ import { useAppStore } from '@/store/useAppStore';
 import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'infinity' | 'social' | 'website' | 'email' | 'funding' | 'metrics' | 'settings';
+// MTech HQ is lazy-loaded so Three.js/react-three-fiber/drei are only ever
+// fetched and parsed when someone actually navigates there — every other
+// screen's load time and bundle size are unaffected. See
+// src/screens/MTechHQScreen.tsx's header comment and DATA_INTEGRITY.md.
+const MTechHQScreen = lazy(() => import('@/screens/MTechHQScreen'));
+
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'infinity' | 'social' | 'website' | 'email' | 'funding' | 'metrics' | 'settings' | 'mtech-hq';
 
 // Sidebar labels reflect the long-term MTech Marketing Hub navigation from
 // the approved V2 mockup. Every label maps to an existing, unmodified
@@ -66,7 +74,58 @@ const SECONDARY_NAV: NavItem[] = [
   { id: 'tasks' as Screen, icon: CheckSquare, label: 'My Tasks' },
   { id: null, icon: Upload, label: 'Uploads', comingSoon: true },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
+  { id: 'mtech-hq' as Screen, icon: Building2, label: 'MTech HQ' },
 ];
+
+// Gate in front of the lazy-loaded MTechHQScreen: checks WebGL support and
+// viewport width with a dependency-free util (src/utils/webgl.ts) BEFORE
+// triggering the dynamic import, so the 3D bundle is never fetched at all
+// for a browser/device that can't use it — not just caught after loading.
+// See DATA_INTEGRITY.md and MTechHQScreen.tsx's header comment for the
+// rest of MTech HQ's scope/rationale.
+function MTechHQGate({ onNavigate }: { onNavigate: (screen: string) => void }) {
+  if (!isWebglAvailable()) {
+    return (
+      <div className="v2-page">
+        <div className="card max-w-lg mx-auto mt-12 text-center">
+          <h2 className="text-xl font-bold text-text-primary mb-2">MTech HQ isn't available in this browser</h2>
+          <p className="text-text-secondary mb-4">
+            MTech HQ needs WebGL, which this browser doesn't support or has disabled. Everything in AI Office is
+            still available from the normal dashboard.
+          </p>
+          <button className="btn btn-primary" onClick={() => onNavigate('home')}>Back to Overview</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLikelyMobileViewport()) {
+    return (
+      <div className="v2-page">
+        <div className="card max-w-lg mx-auto mt-12 text-center">
+          <h2 className="text-xl font-bold text-text-primary mb-2">MTech HQ works best on desktop</h2>
+          <p className="text-text-secondary mb-4">
+            The full interactive 3D office is designed for a larger screen. Use the normal AI Office navigation on
+            mobile — every screen is fully available there.
+          </p>
+          <button className="btn btn-primary" onClick={() => onNavigate('home')}>Back to Overview</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Suspense
+      fallback={
+        <div className="v2-page flex items-center justify-center h-full">
+          <p className="text-text-secondary">Loading MTech HQ…</p>
+        </div>
+      }
+    >
+      <MTechHQScreen onNavigate={onNavigate} />
+    </Suspense>
+  );
+}
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -111,6 +170,8 @@ export default function App() {
         return <ReportsScreen />;
       case 'settings':
         return <SettingsScreen />;
+      case 'mtech-hq':
+        return <MTechHQGate onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       default:
         return <HomeScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
     }

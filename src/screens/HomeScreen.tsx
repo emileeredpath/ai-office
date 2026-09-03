@@ -689,6 +689,27 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             </button>
           </div>
         </div>
+
+        {/* MTech HQ entry point — optional secondary way in, alongside the
+            sidebar's "More" section. Purely navigational: opens the same
+            lazy-loaded 3D screen the sidebar link does, so nothing here
+            duplicates data or logic. */}
+        <div className="mb-4">
+          <div className="rounded-lg p-5 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #1A2438, #2A3A5C)' }}>
+            <div>
+              <h3 className="text-base font-semibold text-white mb-1">Enter MTech HQ</h3>
+              <p className="text-sm text-white opacity-75">Explore AI Office as an interactive 3D office (desktop only)</p>
+            </div>
+            <button
+              onClick={() => onNavigate?.('mtech-hq')}
+              className="flex items-center gap-2 whitespace-nowrap text-white font-medium px-5 py-3 rounded-lg transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--v2-purple)' }}
+            >
+              Enter MTech HQ
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
