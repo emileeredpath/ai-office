@@ -25,7 +25,7 @@
 // Tracking Link utmCampaign values) that hasn't shipped yet. Until that
 // lands, GA4 campaign-level figures stay "Not connected" on Campaign
 // Detail rather than guessing from date/volume alone.
-import type { Campaign } from '@/types/index';
+import type { Campaign, Brand } from '@/types/index';
 import type { GoogleAdsResponse, GoogleAdsCampaignRow, GoogleAdsBrandPerformance } from '@/services/googleAdsApi';
 import type { InfinityCallsResponse } from '@/services/infinityCallsApi';
 import { isAnswered } from '@/utils/callPerformance';
@@ -177,4 +177,32 @@ export function getInfinityForCampaign(
     missed: matched.length - answered,
     answerRate: matched.length > 0 ? Math.round((answered / matched.length) * 1000) / 10 : null,
   };
+}
+
+export interface UnmatchedGa4Campaign {
+  campaignName: string;
+  brand: Brand;
+}
+
+// Every real GA4 campaign name with genuine session activity this period
+// (per brand — see fetchGa4CampaignNamesInUse) that isn't claimed by any
+// AI Office campaign's own ga4CampaignNames. Exact, case-insensitive
+// comparison only — the same discipline as getUnmatchedGoogleAdsCampaigns.
+// namesInUseByBrand only needs to include brands GA4 is actually
+// configured for; a brand absent or with an empty list contributes
+// nothing here, never treated as "no gap."
+export function getUnmatchedGa4Campaigns(
+  namesInUseByBrand: Partial<Record<Brand, string[]>>,
+  campaigns: Campaign[]
+): UnmatchedGa4Campaign[] {
+  const mappedNames = new Set(campaigns.flatMap((c) => (c.ga4CampaignNames ?? []).map((n) => n.toLowerCase())));
+  const unmatched: UnmatchedGa4Campaign[] = [];
+  for (const brand of Object.keys(namesInUseByBrand) as Brand[]) {
+    for (const name of namesInUseByBrand[brand] ?? []) {
+      if (!mappedNames.has(name.toLowerCase())) {
+        unmatched.push({ campaignName: name, brand });
+      }
+    }
+  }
+  return unmatched;
 }

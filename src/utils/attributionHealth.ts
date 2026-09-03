@@ -86,22 +86,16 @@ export function getCampaignsWithNoActivity(campaigns: Campaign[], tasks: Task[])
 // honestly as "not applicable" rather than omitted or faked as zero.
 // See REPORTING_PERIOD.md / the attribution audit for why each is what it
 // is:
-//  - Google Ads NOW has a real linkage mechanism — see
-//    src/utils/campaignAttribution.ts's getUnmatchedGoogleAdsCampaigns(),
-//    computed live in LeadsCrmScreen.tsx rather than as a static constant
-//    here (Campaign Attribution phase).
-//  - GA4 enquiries: no general per-enquiry campaign dimension exists;
-//    the only two campaign-scoped GA4 queries in the app are hardcoded
-//    to two specific named campaigns, not a reusable per-enquiry link.
+//  - Google Ads and GA4 campaigns NOW have real linkage mechanisms — see
+//    src/utils/campaignAttribution.ts's getUnmatchedGoogleAdsCampaigns()
+//    and getUnmatchedGa4Campaigns(), both computed live in
+//    LeadsCrmScreen.tsx rather than as static constants here (Campaign
+//    Attribution phase). Per-individual-enquiry-record campaign linking
+//    (as opposed to a campaign-level session/enquiry total) still doesn't
+//    exist and isn't claimed here.
 //  - Marketing spend without a campaign: structurally impossible in the
 //    current data model — `spend` only ever exists as a field directly on
 //    a Campaign row, so it cannot exist unattached to one.
-
-export const GA4_ENQUIRY_ATTRIBUTION_GAP: AttributionGap = {
-  status: 'not-applicable',
-  count: null,
-  subtitle: 'GA4 enquiries have no general per-record campaign link today',
-};
 
 export const SPEND_WITHOUT_CAMPAIGN_GAP: AttributionGap = {
   status: 'not-applicable',

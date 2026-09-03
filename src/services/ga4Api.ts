@@ -187,3 +187,21 @@ export async function fetchCampaignGa4Attribution(
   }
   return response.json();
 }
+
+// Real GA4 campaign names with genuine session activity for one brand —
+// mirrors backend/src/services/ga4.ts's getGa4CampaignNamesInUse. Feeds
+// Attribution Health's "GA4 campaigns unlinked" gap.
+export interface Ga4CampaignNamesResponse {
+  configured: boolean;
+  campaignNames: string[];
+  error: string | null;
+}
+
+export async function fetchGa4CampaignNamesInUse(brand: Brand, startDate: string, endDate: string): Promise<Ga4CampaignNamesResponse> {
+  const params = new URLSearchParams({ brand, startDate, endDate });
+  const response = await apiFetch(`/api/analytics/ga4-campaign-names?${params.toString()}`);
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch GA4 campaign names (${response.status}).`, response.status);
+  }
+  return response.json();
+}

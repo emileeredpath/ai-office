@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod, periodStartDate } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
@@ -15,11 +16,15 @@ import {
   getUnmappedEmailSends,
   getUnclassifiedCalls,
   getCampaignsWithNoActivity,
-  GA4_ENQUIRY_ATTRIBUTION_GAP,
   SPEND_WITHOUT_CAMPAIGN_GAP,
 } from '@/utils/attributionHealth';
-import { getUnmatchedGoogleAdsCampaigns } from '@/utils/campaignAttribution';
+import { getUnmatchedGoogleAdsCampaigns, getUnmatchedGa4Campaigns } from '@/utils/campaignAttribution';
 import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
+import { resolveGa4DateRange } from '@/utils/ga4Traffic';
+import { fetchGa4CampaignNamesInUse } from '@/services/ga4Api';
+import type { Brand } from '@/types/index';
+
+const GA4_BRANDS: Brand[] = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'];
 
 interface LeadsCrmScreenProps {
   onNavigate?: (screen: string) => void;
@@ -41,8 +46,10 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
+  const updateCampaign = useAppStore((s) => s.updateCampaign);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
+  const { isEditor } = useAuth();
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -62,17 +69,74 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   // Real gap, not a static placeholder — every real Google Ads campaign
   // this period whose ID isn't mapped to any AI Office campaign. See
   // getUnmatchedGoogleAdsCampaigns's doc comment.
+  const unmatchedGoogleAdsCampaigns = useMemo(
+    () => getUnmatchedGoogleAdsCampaigns(googleAdsPerformance, campaigns),
+    [googleAdsPerformance, campaigns]
+  );
   const googleAdsGap = useMemo(() => {
     if (!googleAdsPerformance || !googleAdsPerformance.configured) {
       return { status: 'not-connected' as const, count: null, subtitle: 'Google Ads is not connected' };
     }
-    const unmatched = getUnmatchedGoogleAdsCampaigns(googleAdsPerformance, campaigns);
     return {
       status: 'available' as const,
-      count: unmatched.length,
-      subtitle: unmatched.length > 0 ? 'Real Google Ads campaigns with no AI Office campaign mapped' : 'Every Google Ads campaign this period is mapped',
+      count: unmatchedGoogleAdsCampaigns.length,
+      subtitle: unmatchedGoogleAdsCampaigns.length > 0 ? 'Real Google Ads campaigns with no AI Office campaign mapped' : 'Every Google Ads campaign this period is mapped',
     };
-  }, [googleAdsPerformance, campaigns]);
+  }, [googleAdsPerformance, unmatchedGoogleAdsCampaigns]);
+
+  // Manual Google Ads -> AI Office campaign mapping — additive only:
+  // appends this real Google Ads campaign ID to the chosen campaign's own
+  // googleAdsCampaignIds, so an existing mapping (on this campaign or any
+  // other) is never overwritten, and no AI Office campaign is ever created
+  // here. See UnmatchedActivity's doc comment.
+  const handleMapGoogleAdsCampaign = async (aiCampaignId: string, googleAdsCampaignId: string) => {
+    const target = campaigns.find((c) => c.id === aiCampaignId);
+    if (!target) throw new Error('Campaign not found.');
+    const existingIds = target.googleAdsCampaignIds ?? [];
+    if (existingIds.includes(googleAdsCampaignId)) return;
+    await updateCampaign(aiCampaignId, { googleAdsCampaignIds: [...existingIds, googleAdsCampaignId] });
+  };
+
+  // Genuine GA4 attribution gap — a discrete list IS identifiable here
+  // (sessionCampaignName breakdown, no filter), unlike per-enquiry-record
+  // linking which remains genuinely unavailable. Fetched per brand this
+  // period; a brand with no GA4 property configured just contributes
+  // nothing (never treated as "no gap"). See
+  // getUnmatchedGa4Campaigns's doc comment.
+  const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
+  const [ga4NamesInUse, setGa4NamesInUse] = useState<Partial<Record<Brand, string[]>>>({});
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      GA4_BRANDS.map((brand) =>
+        fetchGa4CampaignNamesInUse(brand, ga4Range.startDate, ga4Range.endDate)
+          .then((res) => [brand, res] as const)
+          .catch(() => [brand, null] as const)
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Partial<Record<Brand, string[]>> = {};
+      for (const [brand, res] of results) {
+        if (res && res.configured) next[brand] = res.campaignNames;
+      }
+      setGa4NamesInUse(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ga4Range.startDate, ga4Range.endDate]);
+
+  const unmatchedGa4Campaigns = useMemo(() => getUnmatchedGa4Campaigns(ga4NamesInUse, campaigns), [ga4NamesInUse, campaigns]);
+  const ga4EnquiryGap = useMemo(() => {
+    if (Object.keys(ga4NamesInUse).length === 0) {
+      return { status: 'not-connected' as const, count: null, subtitle: 'GA4 is not connected' };
+    }
+    return {
+      status: 'available' as const,
+      count: unmatchedGa4Campaigns.length,
+      subtitle: unmatchedGa4Campaigns.length > 0 ? 'Real GA4 campaigns with traffic this period but no AI Office campaign mapped' : 'Every GA4 campaign with traffic this period is mapped',
+    };
+  }, [ga4NamesInUse, unmatchedGa4Campaigns]);
 
   const entityCampaigns = useMemo(
     () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
@@ -168,9 +232,13 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
             unmappedEmailSends={unmappedEmailSends}
             unclassifiedCalls={unclassifiedCalls}
             googleAdsGap={googleAdsGap}
-            ga4EnquiryGap={GA4_ENQUIRY_ATTRIBUTION_GAP}
+            ga4EnquiryGap={ga4EnquiryGap}
             spendGap={SPEND_WITHOUT_CAMPAIGN_GAP}
             campaignsWithNoActivity={campaignsWithNoActivity}
+            unmatchedGoogleAdsCampaigns={unmatchedGoogleAdsCampaigns}
+            campaigns={campaigns}
+            isEditor={isEditor}
+            onMapGoogleAdsCampaign={handleMapGoogleAdsCampaign}
           />
         </div>
 

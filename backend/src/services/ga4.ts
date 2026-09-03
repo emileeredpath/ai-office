@@ -923,6 +923,62 @@ export async function getCampaignGa4Attribution(
   }
 }
 
+// Real GA4 campaign names with genuine session activity this period, for
+// one brand — the discrete list Attribution Health needs to compute a
+// genuine "GA4 campaigns with real traffic but no AI Office campaign
+// mapped" gap (Campaign Attribution phase, slice 2). "(not set)" (GA4's
+// own placeholder for sessions with no campaign tag at all — e.g. direct
+// traffic) is always excluded; it is not a real campaign name and mapping
+// against it would be meaningless.
+export interface Ga4CampaignNamesResult {
+  configured: boolean;
+  campaignNames: string[];
+  error: string | null;
+}
+
+export async function getGa4CampaignNamesInUse(brand: Brand, startDate?: string, endDate?: string): Promise<Ga4CampaignNamesResult> {
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
+  const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string | undefined;
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || !propertyId) {
+    return { configured: false, campaignNames: [], error: 'GA4 is not configured for this brand.' };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { configured: true, campaignNames: [], error: msg };
+  }
+
+  try {
+    const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dateRanges: [{ startDate: range.startDate, endDate: range.endDate }],
+        dimensions: [{ name: 'sessionCampaignName' }],
+        metrics: [{ name: 'sessions' }],
+        limit: 200,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`GA4 campaign-names runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+    }
+    const json = (await res.json()) as { rows?: Ga4RawRow[] };
+    const campaignNames = (json.rows || [])
+      .map((row) => row.dimensionValues[0]?.value)
+      .filter((name): name is string => !!name && name.toLowerCase() !== '(not set)');
+    return { configured: true, campaignNames, error: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[ga4] failed to fetch campaign names in use for ${brand}:`, msg);
+    return { configured: true, campaignNames: [], error: msg };
+  }
+}
+
 export interface Wave1PerformanceMetrics {
   clicks: number;
   pageViews: number;

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution, getCampaignGa4Attribution } from '../services/ga4.js';
+import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution, getCampaignGa4Attribution, getGa4CampaignNamesInUse } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance, getCampaignMonitorCoverage } from '../services/emailPerformance.js';
@@ -97,6 +97,25 @@ router.get('/campaign-ga4', async (req: Request, res: Response) => {
   }
 
   const result = await getCampaignGa4Attribution(brand as Brand, campaignNames, validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Real GA4 campaign names with genuine session activity this period, for
+// one brand — see getGa4CampaignNamesInUse's own doc comment. Feeds
+// Attribution Health's "GA4 campaigns unlinked" gap. Same startDate/
+// endDate contract as every other analytics route.
+router.get('/ga4-campaign-names', async (req: Request, res: Response) => {
+  const brand = req.query.brand as string | undefined;
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+
+  if (!brand || !VALID_BRANDS.includes(brand as Brand)) {
+    res.status(400).json({ configured: false, campaignNames: [], error: 'A valid brand is required.' });
+    return;
+  }
+
+  const result = await getGa4CampaignNamesInUse(brand as Brand, validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 
