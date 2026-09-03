@@ -15,10 +15,11 @@ import {
   getUnmappedEmailSends,
   getUnclassifiedCalls,
   getCampaignsWithNoActivity,
-  GOOGLE_ADS_ATTRIBUTION_GAP,
   GA4_ENQUIRY_ATTRIBUTION_GAP,
   SPEND_WITHOUT_CAMPAIGN_GAP,
 } from '@/utils/attributionHealth';
+import { getUnmatchedGoogleAdsCampaigns } from '@/utils/campaignAttribution';
+import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
 
 interface LeadsCrmScreenProps {
   onNavigate?: (screen: string) => void;
@@ -38,6 +39,8 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const infinityCalls = useAppStore((s) => s.infinityCalls);
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
 
@@ -50,6 +53,26 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   useEffect(() => {
     syncInfinityCalls(callRange.startDate, callRange.endDate);
   }, [callRange.startDate, callRange.endDate, syncInfinityCalls]);
+
+  const googleAdsRange = useMemo(() => resolveGoogleAdsDateRange(period), [period]);
+  useEffect(() => {
+    syncGoogleAdsPerformance(googleAdsRange.startDate, googleAdsRange.endDate);
+  }, [googleAdsRange.startDate, googleAdsRange.endDate, syncGoogleAdsPerformance]);
+
+  // Real gap, not a static placeholder — every real Google Ads campaign
+  // this period whose ID isn't mapped to any AI Office campaign. See
+  // getUnmatchedGoogleAdsCampaigns's doc comment.
+  const googleAdsGap = useMemo(() => {
+    if (!googleAdsPerformance || !googleAdsPerformance.configured) {
+      return { status: 'not-connected' as const, count: null, subtitle: 'Google Ads is not connected' };
+    }
+    const unmatched = getUnmatchedGoogleAdsCampaigns(googleAdsPerformance, campaigns);
+    return {
+      status: 'available' as const,
+      count: unmatched.length,
+      subtitle: unmatched.length > 0 ? 'Real Google Ads campaigns with no AI Office campaign mapped' : 'Every Google Ads campaign this period is mapped',
+    };
+  }, [googleAdsPerformance, campaigns]);
 
   const entityCampaigns = useMemo(
     () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
@@ -144,7 +167,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
           <UnmatchedActivity
             unmappedEmailSends={unmappedEmailSends}
             unclassifiedCalls={unclassifiedCalls}
-            googleAdsGap={GOOGLE_ADS_ATTRIBUTION_GAP}
+            googleAdsGap={googleAdsGap}
             ga4EnquiryGap={GA4_ENQUIRY_ATTRIBUTION_GAP}
             spendGap={SPEND_WITHOUT_CAMPAIGN_GAP}
             campaignsWithNoActivity={campaignsWithNoActivity}

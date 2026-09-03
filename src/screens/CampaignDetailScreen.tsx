@@ -9,6 +9,7 @@ import { CampaignPerformanceTab } from '@/components/campaigns/CampaignPerforman
 import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
+import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 
 type DetailTab = 'overview' | 'performance' | 'leads' | 'opportunities' | 'content' | 'calendar' | 'files' | 'notes';
@@ -49,6 +50,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const campaign = useAppStore((s) => s.campaigns.find((c) => c.id === campaignId));
   const tasks = useAppStore((s) => s.tasks);
   const auditLog = useAppStore((s) => s.auditLog);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const deleteCampaign = useAppStore((s) => s.deleteCampaign);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
@@ -84,6 +86,15 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   };
 
   const campaignTasks = useMemo(() => (campaign ? tasks.filter((t) => t.campaignId === campaign.id) : []), [tasks, campaign]);
+  // Google Ads spend is deliberately never summed into the "Spend" KPI
+  // below — that figure is the campaign's own recorded/manually-logged
+  // spend (campaign.spend), which this app has no way to prove is (or
+  // isn't) already inclusive of Google Ads cost. Shown as a clearly
+  // separate tile instead — see getGoogleAdsForCampaign's doc comment.
+  const googleAds = useMemo(
+    () => (campaign ? getGoogleAdsForCampaign(googleAdsPerformance, campaign) : null),
+    [googleAdsPerformance, campaign]
+  );
   // Content tab shows genuine Campaign Monitor sends only — source ===
   // 'campaign-monitor' — never 'seed'/'test-seed' fixture rows, matching
   // the same honesty guarantee the Performance tab's Email Performance
@@ -203,7 +214,19 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
         {/* KPI strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : '—'} subtitle="Set on this campaign" />
-          <KpiCard title="Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle="Manually logged" />
+          <KpiCard title="Recorded Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle="Manually logged — may or may not include Google Ads cost" />
+          <KpiCard
+            title="Google Ads Spend"
+            value={googleAds?.status === 'available' ? `£${googleAds.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : undefined}
+            status={googleAds?.status === 'available' ? 'available' : 'not-connected'}
+            subtitle={
+              googleAds?.status === 'available'
+                ? 'Shown separately — never added to Recorded Spend'
+                : googleAds?.status === 'unmapped'
+                  ? 'Unmatched — no Google Ads campaign ID mapped'
+                  : 'Google Ads not connected'
+            }
+          />
           <KpiCard title="Marketing Leads" value={campaign.leads} subtitle="Manually logged, not CRM-linked" accent="var(--v2-green)" />
           <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
           <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />

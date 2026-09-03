@@ -220,6 +220,14 @@ export interface Campaign {
 
   // Schedule milestones (supports both legacy ScheduleElement and new CampaignSchedule with IDs)
   schedule?: (ScheduleElement | CampaignSchedule)[];
+
+  // Central campaign-attribution identifiers (Campaign Attribution phase) —
+  // both entirely manual/user-entered, never inferred. campaignCode is
+  // currently a pure reference field — no connected integration emits a
+  // comparable code to match against yet. googleAdsCampaignIds genuinely
+  // powers deterministic attribution — see src/utils/campaignAttribution.ts.
+  campaignCode?: string | null;
+  googleAdsCampaignIds?: string[];
 }
 
 export interface BriefGeneratorState {

@@ -86,20 +86,16 @@ export function getCampaignsWithNoActivity(campaigns: Campaign[], tasks: Task[])
 // honestly as "not applicable" rather than omitted or faked as zero.
 // See REPORTING_PERIOD.md / the attribution audit for why each is what it
 // is:
-//  - Google Ads: no linkage field exists in the integration at all
-//    (PpcScreen.tsx: "shown exactly as returned — never matched to a
-//    dashboard campaign record").
+//  - Google Ads NOW has a real linkage mechanism — see
+//    src/utils/campaignAttribution.ts's getUnmatchedGoogleAdsCampaigns(),
+//    computed live in LeadsCrmScreen.tsx rather than as a static constant
+//    here (Campaign Attribution phase).
 //  - GA4 enquiries: no general per-enquiry campaign dimension exists;
 //    the only two campaign-scoped GA4 queries in the app are hardcoded
 //    to two specific named campaigns, not a reusable per-enquiry link.
 //  - Marketing spend without a campaign: structurally impossible in the
 //    current data model — `spend` only ever exists as a field directly on
 //    a Campaign row, so it cannot exist unattached to one.
-export const GOOGLE_ADS_ATTRIBUTION_GAP: AttributionGap = {
-  status: 'not-applicable',
-  count: null,
-  subtitle: 'No campaign-linkage mechanism exists yet for Google Ads campaigns',
-};
 
 export const GA4_ENQUIRY_ATTRIBUTION_GAP: AttributionGap = {
   status: 'not-applicable',

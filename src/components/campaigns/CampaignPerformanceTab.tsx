@@ -6,6 +6,9 @@ import { Campaign, TrackingLink, Brand } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { isWave1Campaign } from '@/utils/wave1';
 import { getEmailPerformanceForCampaign, resolveEmailDateRange } from '@/utils/emailPerformance';
+import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
+import { getGoogleAdsForCampaign, getInfinityForCampaign } from '@/utils/campaignAttribution';
+import { resolveCallDateRange } from '@/utils/callPerformance';
 import { formatDateShort } from '@/utils/dateUtils';
 
 interface CampaignPerformanceTabProps {
@@ -37,6 +40,10 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
+  const infinityCalls = useAppStore((s) => s.infinityCalls);
+  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
 
   useEffect(() => {
     syncWave1Performance();
@@ -56,6 +63,34 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
   const emailPerf = useMemo(
     () => getEmailPerformanceForCampaign(emailPerformance, campaign.id),
     [emailPerformance, campaign.id]
+  );
+
+  // Google Ads attribution — same "all-time" reasoning as Email Performance
+  // above: a campaign's real ad spend can predate or outlast whatever the
+  // global Period selector happens to be set to, so this always looks
+  // across everything currently synced. Deterministic only — see
+  // getGoogleAdsForCampaign's own doc comment.
+  useEffect(() => {
+    const { startDate, endDate } = resolveGoogleAdsDateRange('all-time');
+    syncGoogleAdsPerformance(startDate, endDate);
+  }, [syncGoogleAdsPerformance]);
+
+  const googleAds = useMemo(
+    () => getGoogleAdsForCampaign(googleAdsPerformance, campaign),
+    [googleAdsPerformance, campaign]
+  );
+
+  // Infinity call attribution — deterministic landing-page-path match
+  // against this campaign's own Tracking Links only. Same "all-time"
+  // reasoning as Email Performance/Google Ads above.
+  useEffect(() => {
+    const { startDate, endDate } = resolveCallDateRange('all-time');
+    syncInfinityCalls(startDate, endDate);
+  }, [syncInfinityCalls]);
+
+  const infinityAttribution = useMemo(
+    () => getInfinityForCampaign(infinityCalls, campaign),
+    [infinityCalls, campaign]
   );
 
   const [trackingLinkForm, setTrackingLinkForm] = useState(EMPTY_LINK_FORM);
@@ -194,7 +229,8 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                     <th>Send Name</th>
                     <th>Date</th>
                     <th style={{ textAlign: 'right' }}>Recipients</th>
-                    <th style={{ textAlign: 'right' }}>Opens</th>
+                    <th style={{ textAlign: 'right' }}>Delivered</th>
+                    <th style={{ textAlign: 'right' }}>Unique Opens</th>
                     <th style={{ textAlign: 'right' }}>Clicks</th>
                     <th style={{ textAlign: 'right' }}>Bounces</th>
                     <th style={{ textAlign: 'right' }}>Unsubscribes</th>
@@ -207,7 +243,8 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                       <td className="text-text-primary">{send.campaignName}</td>
                       <td className="text-text-secondary">{formatDateShort(send.sentDate)}</td>
                       <td style={{ textAlign: 'right' }}>{send.recipients != null ? send.recipients.toLocaleString() : '—'}</td>
-                      <td style={{ textAlign: 'right' }}>{send.opens != null ? send.opens.toLocaleString() : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{send.delivered != null ? send.delivered.toLocaleString() : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>{send.uniqueOpens != null ? send.uniqueOpens.toLocaleString() : '—'}</td>
                       <td style={{ textAlign: 'right' }}>{send.clicks != null ? send.clicks.toLocaleString() : '—'}</td>
                       <td style={{ textAlign: 'right' }}>{send.bounces != null ? send.bounces.toLocaleString() : '—'}</td>
                       <td style={{ textAlign: 'right' }}>{send.unsubscribes != null ? send.unsubscribes.toLocaleString() : '—'}</td>
@@ -231,6 +268,113 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                   : "Sends are linked automatically by the existing Campaign Monitor sync. If a real send for this campaign isn't showing, its name may not have matched — this is never guessed here."}
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Google Ads — deterministic only: sums real Google Ads campaign
+          rows whose campaign.id exactly matches one of this campaign's own
+          googleAdsCampaignIds (set via Edit Campaign). A campaign with none
+          configured is shown as Unmatched, never a guessed £0 — see
+          getGoogleAdsForCampaign's doc comment. */}
+      <div>
+        <h3 className="v2-section-title">Google Ads</h3>
+        {googleAds.status === 'available' ? (
+          <div className="card p-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Spend</div>
+                <div className="text-xl font-bold text-text-primary">£{googleAds.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Impressions</div>
+                <div className="text-xl font-bold text-text-primary">{googleAds.impressions.toLocaleString('en-GB')}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Clicks</div>
+                <div className="text-xl font-bold text-text-primary">{googleAds.clicks.toLocaleString('en-GB')}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">CTR</div>
+                <div className="text-xl font-bold text-text-primary">{googleAds.ctr != null ? `${googleAds.ctr}%` : '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Avg. CPC</div>
+                <div className="text-xl font-bold text-text-primary">{googleAds.averageCpc != null ? `£${googleAds.averageCpc.toFixed(2)}` : '—'}</div>
+              </div>
+              <div>
+                {/* Google Ads' own conversions metric — a fractional,
+                    partial-credit count, never rounded. This is NOT the
+                    same population as a GA4 Enquiry — never presented or
+                    summed as if it were. */}
+                <div className="text-xs text-text-secondary mb-1">Conversions</div>
+                <div className="text-xl font-bold text-text-primary">{googleAds.conversions.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+            <table className="table w-full text-sm">
+              <thead>
+                <tr>
+                  <th>Google Ads Campaign</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Spend</th>
+                  <th style={{ textAlign: 'right' }}>Clicks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {googleAds.matchedCampaigns.map((c) => (
+                  <tr key={c.campaignId}>
+                    <td className="text-text-primary">{c.campaignName}</td>
+                    <td className="text-text-secondary capitalize">{c.status.toLowerCase()}</td>
+                    <td style={{ textAlign: 'right' }}>£{c.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</td>
+                    <td style={{ textAlign: 'right' }}>{c.clicks.toLocaleString('en-GB')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="card p-4">
+            <p className="text-sm text-text-secondary">
+              {googleAds.status === 'not-connected'
+                ? 'Google Ads is not connected.'
+                : 'Unmatched — no Google Ads campaign ID is mapped to this campaign yet. Add one via Edit Campaign to attribute real spend, impressions, clicks, CTR, CPC and conversions here.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Infinity calls — deterministic only: a call's landing page path
+          exactly matching one of this campaign's own Tracking Link landing
+          pages. Never a caller phone number or any other personal data —
+          aggregate counts only. See getInfinityForCampaign's doc comment. */}
+      <div>
+        <h3 className="v2-section-title">Calls (Infinity)</h3>
+        {infinityAttribution.status === 'available' ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">Calls</div>
+              <div className="text-2xl font-bold">{infinityAttribution.calls}</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">Answered</div>
+              <div className="text-2xl font-bold">{infinityAttribution.answered}</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">Missed</div>
+              <div className="text-2xl font-bold">{infinityAttribution.missed}</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">Answer Rate</div>
+              <div className="text-2xl font-bold">{infinityAttribution.answerRate != null ? `${infinityAttribution.answerRate}%` : '—'}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="card p-4">
+            <p className="text-sm text-text-secondary">
+              {infinityAttribution.status === 'not-connected'
+                ? 'Infinity call tracking is not connected.'
+                : 'Unmatched — this campaign has no Tracking Link with a landing page yet, so calls cannot be reliably linked to it. Add one below to attribute real calls here.'}
+            </p>
           </div>
         )}
       </div>

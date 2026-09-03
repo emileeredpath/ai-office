@@ -41,6 +41,16 @@ export function EditCampaignModal({ campaign, onClose }: EditCampaignModalProps)
   const [cofundRate, setCofundRate] = useState(campaign.cofundRate?.toString() ?? '');
   const [claimStatus, setClaimStatus] = useState<ClaimStatus | ''>(campaign.claimStatus || '');
 
+  // Central campaign-attribution identifiers — see
+  // src/utils/campaignAttribution.ts. campaignCode is a pure reference
+  // field today (nothing matches against it yet); googleAdsCampaignIds is
+  // entered as a comma-separated list of real Google Ads campaign.id
+  // values (visible in the Google Ads UI/API — never guessed) and powers
+  // genuine deterministic Google Ads attribution on this campaign's
+  // Performance tab.
+  const [campaignCode, setCampaignCode] = useState(campaign.campaignCode || '');
+  const [googleAdsCampaignIdsText, setGoogleAdsCampaignIdsText] = useState((campaign.googleAdsCampaignIds || []).join(', '));
+
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -72,6 +82,11 @@ export function EditCampaignModal({ campaign, onClose }: EditCampaignModalProps)
       scheme: scheme || '',
       cofundRate: cofundRate ? Number(cofundRate) : null,
       claimStatus: (claimStatus || null) as ClaimStatus | null,
+      campaignCode: campaignCode.trim() || null,
+      googleAdsCampaignIds: googleAdsCampaignIdsText
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0),
     });
     setSaving(false);
     onClose();
@@ -139,6 +154,28 @@ export function EditCampaignModal({ campaign, onClose }: EditCampaignModalProps)
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-2">Theme</label>
               <input type="text" value={theme} onChange={(e) => setTheme(e.target.value)} className="input" placeholder="e.g. Performance optimisation" />
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-border">
+            <h3 className="v2-section-title" style={{ marginBottom: 4 }}>Attribution</h3>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">Campaign code</label>
+              <input type="text" value={campaignCode} onChange={(e) => setCampaignCode(e.target.value)} className="input" placeholder="Internal reference only — not yet matched against any integration" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">Google Ads campaign ID(s)</label>
+              <input
+                type="text"
+                value={googleAdsCampaignIdsText}
+                onChange={(e) => setGoogleAdsCampaignIdsText(e.target.value)}
+                className="input"
+                placeholder="e.g. 1234567890, 9876543210"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                Comma-separated real Google Ads campaign IDs (from the Google Ads UI or API). Every Google Ads campaign
+                with a matching ID will be attributed to this campaign on the Performance tab below.
+              </p>
             </div>
           </div>
 

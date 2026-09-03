@@ -49,6 +49,12 @@ export interface CampaignRecord {
   trackingLinks?: TrackingLink[];
   archived: boolean;
   archivedAt: string | null;
+  // Central campaign-attribution identifiers (Campaign Attribution phase) —
+  // see connection.ts's addColumnIfMissing comment for exactly what each is
+  // and isn't matched against. Both entirely manual/user-entered, never
+  // inferred.
+  campaignCode: string | null;
+  googleAdsCampaignIds: string[];
 }
 
 interface CampaignRow {
@@ -85,6 +91,8 @@ interface CampaignRow {
   tracking_links?: string | null;
   archived?: number;
   archived_at?: string | null;
+  campaign_code?: string | null;
+  google_ads_campaign_ids?: string | null;
 }
 
 function rowToRecord(row: CampaignRow): CampaignRecord {
@@ -121,6 +129,8 @@ function rowToRecord(row: CampaignRow): CampaignRecord {
     trackingLinks: row.tracking_links ? (JSON.parse(row.tracking_links) as TrackingLink[]) : [],
     archived: !!row.archived,
     archivedAt: row.archived_at ?? null,
+    campaignCode: row.campaign_code ?? null,
+    googleAdsCampaignIds: row.google_ads_campaign_ids ? (JSON.parse(row.google_ads_campaign_ids) as string[]) : [],
   };
 }
 
@@ -165,6 +175,8 @@ export interface NewCampaignInput {
   claimStatus?: string | null;
   schedule?: Array<{ date: string; element: string; status: string }>;
   trackingLinks?: TrackingLink[];
+  campaignCode?: string | null;
+  googleAdsCampaignIds?: string[];
 }
 
 export function insertCampaign(input: NewCampaignInput): CampaignRecord {
@@ -176,11 +188,13 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
       id, name, brand, entities, primary_industry, secondary_industry, theme, status,
       start_date, end_date, budget, spend, conversions, leads, engagement, colour,
       reactive, notes, results, created_at, updated_at, industry, recipients, value_generated,
-      vendor, scheme, cofund_rate, claim_status, schedule, tracking_links
+      vendor, scheme, cofund_rate, claim_status, schedule, tracking_links,
+      campaign_code, google_ads_campaign_ids
     ) VALUES (@id, @name, @brand, @entities, @primaryIndustry, @secondaryIndustry, @theme, @status,
       @startDate, @endDate, @budget, @spend, @conversions, @leads, @engagement, @colour,
       @reactive, @notes, @results, @createdAt, @updatedAt, @industry, @recipients, @valueGenerated,
-      @vendor, @scheme, @cofundRate, @claimStatus, @schedule, @trackingLinks)`
+      @vendor, @scheme, @cofundRate, @claimStatus, @schedule, @trackingLinks,
+      @campaignCode, @googleAdsCampaignIds)`
   ).run({
     id,
     name: input.name,
@@ -212,6 +226,8 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
     claimStatus: input.claimStatus ?? null,
     schedule: input.schedule ? JSON.stringify(input.schedule) : null,
     trackingLinks: JSON.stringify(input.trackingLinks ?? []),
+    campaignCode: input.campaignCode ?? null,
+    googleAdsCampaignIds: JSON.stringify(input.googleAdsCampaignIds ?? []),
   });
 
   return getCampaignById(id)!;
@@ -228,6 +244,8 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     results: updates.results !== undefined ? updates.results : existing.results,
     schedule: updates.schedule !== undefined ? updates.schedule : existing.schedule,
     trackingLinks: updates.trackingLinks !== undefined ? updates.trackingLinks : existing.trackingLinks,
+    campaignCode: updates.campaignCode !== undefined ? updates.campaignCode : existing.campaignCode,
+    googleAdsCampaignIds: updates.googleAdsCampaignIds !== undefined ? updates.googleAdsCampaignIds : existing.googleAdsCampaignIds,
     updatedAt: new Date().toISOString(),
   } as CampaignRecord;
 
@@ -240,7 +258,8 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
       reactive = @reactive, notes = @notes, results = @results, updated_at = @updatedAt,
       industry = @industry, recipients = @recipients, value_generated = @valueGenerated,
       vendor = @vendor, scheme = @scheme, cofund_rate = @cofundRate, claim_status = @claimStatus,
-      schedule = @schedule, tracking_links = @trackingLinks
+      schedule = @schedule, tracking_links = @trackingLinks,
+      campaign_code = @campaignCode, google_ads_campaign_ids = @googleAdsCampaignIds
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -272,6 +291,8 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     claimStatus: merged.claimStatus ?? null,
     schedule: merged.schedule ? JSON.stringify(merged.schedule) : null,
     trackingLinks: JSON.stringify(merged.trackingLinks ?? []),
+    campaignCode: merged.campaignCode ?? null,
+    googleAdsCampaignIds: JSON.stringify(merged.googleAdsCampaignIds ?? []),
   });
 
   return getCampaignById(id);

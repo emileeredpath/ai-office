@@ -361,4 +361,17 @@ db.exec(`
 // task, on this sync or any future one.
 addColumnIfMissing('tasks', 'campaign_mapping_source', 'TEXT');
 
+// Central campaign-attribution identifiers (Campaign Attribution phase) — a
+// campaign may optionally carry a short internal code and/or the real
+// Google Ads campaign ID(s) that belong to it. Both are entirely manual,
+// user-entered fields — never inferred or auto-generated. campaign_code is
+// currently a pure reference field: no integration this app connects to
+// emits a comparable "campaign code" of its own to match against, so
+// nothing auto-matches on it yet (see campaignAttribution.ts). Google Ads
+// campaign IDs ARE genuinely matchable — Google Ads' campaign.id is a real,
+// stable identifier returned by the API — so google_ads_campaign_ids
+// powers real deterministic attribution once a user enters it here.
+addColumnIfMissing('campaigns', 'campaign_code', 'TEXT');
+addColumnIfMissing('campaigns', 'google_ads_campaign_ids', "TEXT NOT NULL DEFAULT '[]'");
+
 export default db;

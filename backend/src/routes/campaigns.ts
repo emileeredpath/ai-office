@@ -78,6 +78,10 @@ const createCampaignSchema = z.object({
     status: z.string().max(50).optional(),
     clicks: z.number().optional(),
   })).optional(),
+  // Central campaign-attribution identifiers — see campaignRepository.ts's
+  // CampaignRecord doc comment. Both entirely manual/user-entered.
+  campaignCode: z.string().max(100).nullable().optional(),
+  googleAdsCampaignIds: z.array(z.string().max(50)).optional(),
 });
 
 const updateCampaignSchema = createCampaignSchema.partial();
