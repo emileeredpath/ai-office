@@ -6,6 +6,7 @@ import { getEmailPerformance, getCampaignMonitorCoverage } from '../services/ema
 import { fetchInfinityCalls } from '../services/infinity.js';
 import { getGoogleAdsPerformance } from '../services/googleAds.js';
 import { getSearchConsolePerformance } from '../services/searchConsole.js';
+import { getAcumaticaSummary } from '../services/acumaticaReporting.js';
 import type { Brand } from '../types.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
@@ -237,6 +238,23 @@ router.get('/wave1/history', (req: Request, res: Response) => {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
   }
+});
+
+// Genuine commercial KPIs from manually-imported Acumatica Opportunities
+// (Discovery & Foundation phase) — see getAcumaticaSummary's own doc
+// comment for exactly what each figure does/doesn't include. Never a live
+// Acumatica connection. Same startDate/endDate/brand-respecting contract
+// as every other analytics route — an omitted range returns the summary
+// across every imported opportunity, not a rolling default.
+router.get('/acumatica', (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const brand = req.query.brand as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const validBrand = brand && VALID_BRANDS.includes(brand as Brand) ? (brand as Brand) : undefined;
+
+  const summary = getAcumaticaSummary(validRange ? rawStart : undefined, validRange ? rawEnd : undefined, validBrand);
+  res.json(summary);
 });
 
 export default router;

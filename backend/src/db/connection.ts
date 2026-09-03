@@ -386,4 +386,68 @@ addColumnIfMissing('campaigns', 'google_ads_campaign_ids', "TEXT NOT NULL DEFAUL
 // (exact, case-insensitive, never CONTAINS).
 addColumnIfMissing('campaigns', 'ga4_campaign_names', "TEXT NOT NULL DEFAULT '[]'");
 
+// Acumatica Manual Commercial Import (Discovery & Foundation phase) — a
+// dedicated commercial-opportunity model, deliberately NOT forced into the
+// campaigns table (an Acumatica Opportunity is a CRM record, not a
+// marketing campaign). Every column here mirrors a genuine field commonly
+// present in an Acumatica Opportunities export — see
+// services/acumaticaImport.ts's header-mapping table for the exact
+// accepted column names/aliases. No customer/contact personal data column
+// (name, email, phone, postal address) is ever accepted or persisted here
+// — see acumaticaImport.ts's REJECTED_PERSONAL_DATA_HEADERS. `owner` is
+// kept because it identifies an internal employee, not a customer, and the
+// Discovery brief explicitly allows retaining owner/employee information
+// for management reporting.
+//
+// status/stage are stored verbatim, exactly as exported — commercial_status
+// is a SEPARATE, derived open/won/lost/unclassified classification (see
+// classifyCommercialStatus in acumaticaImport.ts) computed from status only,
+// using Acumatica's own standard tri-state values. This has NOT been
+// confirmed against a real customer export from this sandbox — flagged
+// there for verification before the KPIs it feeds are trusted in
+// production.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS acumatica_opportunities (
+    id TEXT PRIMARY KEY,
+    opportunity_id TEXT NOT NULL UNIQUE,
+    created_on TEXT,
+    status TEXT,
+    stage TEXT,
+    commercial_status TEXT NOT NULL DEFAULT 'unclassified',
+    total REAL,
+    estimated_close_date TEXT,
+    opportunity_class TEXT,
+    owner TEXT,
+    source_lead TEXT,
+    heard_about_us TEXT,
+    product_focus TEXT,
+    probability REAL,
+    industry_sector TEXT,
+    proposal_sent TEXT,
+    hire_type TEXT,
+    quantity_units REAL,
+    brand TEXT,
+    source TEXT NOT NULL DEFAULT 'acumatica_manual',
+    source_filename TEXT,
+    imported_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_acumatica_opportunities_status ON acumatica_opportunities(commercial_status);
+  CREATE INDEX IF NOT EXISTS idx_acumatica_opportunities_brand ON acumatica_opportunities(brand);
+
+  CREATE TABLE IF NOT EXISTS acumatica_imports (
+    id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    recognised_columns TEXT NOT NULL DEFAULT '[]',
+    ignored_personal_data_columns TEXT NOT NULL DEFAULT '[]',
+    processed INTEGER NOT NULL DEFAULT 0,
+    created INTEGER NOT NULL DEFAULT 0,
+    updated INTEGER NOT NULL DEFAULT 0,
+    rejected INTEGER NOT NULL DEFAULT 0,
+    errors TEXT NOT NULL DEFAULT '[]',
+    imported_at TEXT NOT NULL
+  );
+`);
+
 export default db;

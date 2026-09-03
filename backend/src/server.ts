@@ -11,6 +11,7 @@ import fundingRouter from './routes/funding.js';
 import documentsRouter from './routes/documents.js';
 import auditLogRouter from './routes/auditLog.js';
 import campaignMonitorRouter from './routes/campaignMonitor.js';
+import acumaticaRouter from './routes/acumatica.js';
 import analyticsRouter from './routes/analytics.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
@@ -60,16 +61,19 @@ app.use(
 );
 
 // Payload size limit — the actions API accepts small structured requests,
-// never bulk file uploads. /mcp is the one exception: creating a document
+// never bulk file uploads. /mcp is one exception: creating a document
 // attachment (entity: "document") via ai_office_create_record can carry a
 // base64-encoded file (e.g. a source PDF), so it gets a much larger limit.
-// Exactly one parser runs per request — never stack two express.json()
-// calls on the same request, since the second would try to read an
-// already-consumed body stream.
+// The Acumatica manual import route is the other: uploading a real
+// Opportunities export (CSV/XLSX, base64-encoded in the JSON body — see
+// routes/acumatica.ts) needs the same headroom. Exactly one parser runs
+// per request — never stack two express.json() calls on the same request,
+// since the second would try to read an already-consumed body stream.
 const smallJsonParser = express.json({ limit: '100kb' });
 const mcpJsonParser = express.json({ limit: '15mb' });
+const LARGE_BODY_PATHS = ['/mcp', '/api/acumatica/import'];
 app.use((req: Request, res: Response, next: NextFunction) => {
-  (req.path === '/mcp' ? mcpJsonParser : smallJsonParser)(req, res, next);
+  (LARGE_BODY_PATHS.includes(req.path) ? mcpJsonParser : smallJsonParser)(req, res, next);
 });
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -100,6 +104,7 @@ app.use('/api/funding', requireSession, fundingRouter);
 app.use('/api/documents', requireSession, documentsRouter);
 app.use('/api/audit-log', requireSession, auditLogRouter);
 app.use('/api/campaign-monitor', requireSession, campaignMonitorRouter);
+app.use('/api/acumatica', requireSession, acumaticaRouter);
 app.use('/api/analytics', requireSession, analyticsRouter);
 app.use('/api/actions', requireSession, actionsRouter);
 app.use('/api/marketingos', requireSession, marketingosRouter);
