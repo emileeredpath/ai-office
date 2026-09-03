@@ -27,8 +27,16 @@ export function Environment() {
 
   return (
     <group>
-      {/* Floor */}
-      <mesh position={[0, -0.5, 0]} receiveShadow>
+      {/* Floor — rotation is required: PlaneGeometry defaults to the XY
+          plane (facing +Z, i.e. standing upright facing the camera), not
+          the XZ ground plane. Without this rotation the "floor" is
+          actually a full-height invisible wall at z=0 that silently
+          occludes everything placed behind it (z<0) — found while
+          building MTech HQ (src/screens/MTechHQScreen.tsx): real content
+          placed at z=-9.6 (the back wall) rendered completely invisible
+          until this was added. This file was never live/rendered before
+          MTech HQ, so the bug was never caught. */}
+      <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[20, 20]} />
         <meshStandardMaterial color="#1a1d27" />
       </mesh>
