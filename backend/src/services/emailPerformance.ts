@@ -105,6 +105,139 @@ function sentDateOf(task: TaskRecord): string | null {
   return task.completedAt ?? task.startDate ?? task.deadline ?? null;
 }
 
+export interface CampaignMonitorCoverage {
+  lastSuccessfulSyncAt: string | null;
+  lastSyncError: string | null;
+  // The earliest point AI Office can actually PROVE continuous sync
+  // coverage back to — derived only from consecutive successful syncs
+  // whose own recorded lookback windows (SyncResult.sinceDays) overlap
+  // with no gap. Never a guess: null means coverage before the most
+  // recent known-lookback sync genuinely cannot be established (e.g. no
+  // sync has recorded its lookback yet, or a real gap was found).
+  continuousCoverageSince: string | null;
+  // True when a real gap between two successful syncs was detected (a
+  // sync's lookback window didn't reach back to the previous sync's
+  // timestamp) — i.e. there is a real, provable hole in coverage, not
+  // just "we don't know."
+  hasKnownGap: boolean;
+  // Human-readable explanation of exactly what could/couldn't be proven,
+  // for display next to the raw dates.
+  explanation: string;
+}
+
+interface AuditLogFullSyncRow {
+  new_value: string;
+  created_at: string;
+}
+
+// Walks every real recorded Campaign Monitor sync (oldest to newest) to
+// determine, honestly, how far back continuous coverage can be proven —
+// never assumed complete just because rows exist in the tasks table. See
+// SyncResult.sinceDays (campaignMonitor.ts) — only syncs that recorded
+// their own lookback window (i.e. run after this capability was added)
+// can be chained into a provable continuous window; older rows are
+// acknowledged, not silently treated as gapless.
+export function getCampaignMonitorCoverage(): CampaignMonitorCoverage {
+  const rows = db
+    .prepare(
+      `SELECT new_value, created_at FROM audit_log
+       WHERE resource_type = 'campaign_monitor' AND action = 'sync'
+       ORDER BY created_at ASC`
+    )
+    .all() as unknown as AuditLogFullSyncRow[];
+
+  if (rows.length === 0) {
+    return {
+      lastSuccessfulSyncAt: null,
+      lastSyncError: null,
+      continuousCoverageSince: null,
+      hasKnownGap: false,
+      explanation: 'Campaign Monitor has never synced on this deployment — no coverage exists yet.',
+    };
+  }
+
+  interface ParsedSync {
+    createdAt: string;
+    success: boolean;
+    error: string | null;
+    sinceDays: number | null;
+  }
+
+  const parsed: ParsedSync[] = rows.map((row) => {
+    try {
+      const v = JSON.parse(row.new_value) as { success?: boolean; errors?: string[]; message?: string; sinceDays?: number };
+      const failed = v.success === false || (v.errors && v.errors.length > 0);
+      return {
+        createdAt: row.created_at,
+        success: !failed,
+        error: failed ? v.errors?.join('; ') || v.message || 'Unknown sync error' : null,
+        sinceDays: typeof v.sinceDays === 'number' ? v.sinceDays : null,
+      };
+    } catch {
+      return { createdAt: row.created_at, success: false, error: 'Could not read this sync result.', sinceDays: null };
+    }
+  });
+
+  const last = parsed[parsed.length - 1];
+  const lastSuccessfulSyncAt = [...parsed].reverse().find((s) => s.success)?.createdAt ?? null;
+
+  // Walk backwards from the most recent successful, lookback-recording
+  // sync, chaining each earlier successful sync in as long as its own
+  // window reaches back far enough to abut the one after it — the moment
+  // that breaks (unknown lookback, a failed sync in between, or a real
+  // gap), stop and report exactly what was proven.
+  let continuousCoverageSince: string | null = null;
+  let hasKnownGap = false;
+  let cursor = parsed.length - 1;
+
+  // Find the most recent successful sync with a known lookback to anchor from.
+  while (cursor >= 0 && !(parsed[cursor].success && parsed[cursor].sinceDays !== null)) {
+    cursor--;
+  }
+
+  if (cursor >= 0) {
+    let coverageStart = new Date(parsed[cursor].createdAt);
+    coverageStart.setDate(coverageStart.getDate() - (parsed[cursor].sinceDays as number));
+    continuousCoverageSince = coverageStart.toISOString();
+
+    for (let i = cursor - 1; i >= 0; i--) {
+      const candidate = parsed[i];
+      if (!candidate.success || candidate.sinceDays === null) {
+        // Can't verify further back than this — the chain stops here,
+        // honestly, rather than assuming the older row was fine.
+        break;
+      }
+      const candidateTime = new Date(candidate.createdAt);
+      if (candidateTime.getTime() < coverageStart.getTime()) {
+        // This earlier sync happened before the window the newer sync(s)
+        // already cover — a real, provable gap between the two.
+        hasKnownGap = true;
+        break;
+      }
+      const candidateStart = new Date(candidateTime);
+      candidateStart.setDate(candidateStart.getDate() - (candidate.sinceDays as number));
+      coverageStart = candidateStart;
+      continuousCoverageSince = coverageStart.toISOString();
+    }
+  }
+
+  const explanation = !last.success
+    ? `The most recent Campaign Monitor sync failed — see the error below. Any previously-synced data before that point may still be reliable, but nothing has confirmed coverage since.`
+    : continuousCoverageSince
+      ? hasKnownGap
+        ? `Continuous coverage is only provable back to ${continuousCoverageSince} — an earlier sync exists but doesn't reach back far enough to close the gap before it, so anything before this date cannot be confirmed complete.`
+        : `Continuous coverage is provable back to ${continuousCoverageSince}, based on each sync's own recorded lookback window with no detected gap.`
+      : `No sync on record has recorded its own lookback window yet, so continuous coverage cannot be proven for any period — this will resolve itself as future syncs run and record their window.`;
+
+  return {
+    lastSuccessfulSyncAt,
+    lastSyncError: last.success ? null : last.error,
+    continuousCoverageSince,
+    hasKnownGap,
+    explanation,
+  };
+}
+
 // startDate/endDate are plain "YYYY-MM-DD" calendar-day strings from the
 // caller's resolved Period range (see resolveEmailDateRange on the
 // frontend) — endDate is inclusive of the whole day.

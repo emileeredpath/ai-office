@@ -10,7 +10,12 @@ import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataF
 import { SendDetailPanel } from '@/components/email/SendDetailPanel';
 import { resolveEmailDateRange, getEmailHeadlineMetrics, getEmailSends, formatPercent } from '@/utils/emailPerformance';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
-import { triggerCampaignMonitorSync, type CampaignMonitorSyncResult } from '@/services/emailPerformanceApi';
+import {
+  triggerCampaignMonitorSync,
+  fetchCampaignMonitorCoverage,
+  type CampaignMonitorSyncResult,
+  type CampaignMonitorCoverage,
+} from '@/services/emailPerformanceApi';
 import { ApiError } from '@/services/apiConfig';
 import {
   getEducationSends,
@@ -93,6 +98,7 @@ function RollupTable({ title, rows }: { title: string; rows: EducationRollupRow[
 export function EmailScreen() {
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
+  const campaigns = useAppStore((s) => s.campaigns);
   const educationCampaignAttribution = useAppStore((s) => s.educationCampaignAttribution);
   const syncEducationCampaignAttribution = useAppStore((s) => s.syncEducationCampaignAttribution);
   const { isGroupView, selectedEntity } = useEntity();
@@ -126,6 +132,26 @@ export function EmailScreen() {
       setCmSyncing(false);
     }
   };
+
+  // Genuine Campaign Monitor sync coverage — fetched once on mount (not
+  // period-scoped, so it doesn't depend on emailRange). See
+  // fetchCampaignMonitorCoverage's doc comment: this can only ever report
+  // what the stored sync history genuinely proves, never an assumption.
+  const [cmCoverage, setCmCoverage] = useState<CampaignMonitorCoverage | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCampaignMonitorCoverage()
+      .then((c) => {
+        if (!cancelled) setCmCoverage(c);
+      })
+      .catch(() => {
+        // Coverage is a secondary, additive indicator — a fetch failure
+        // here should never block the rest of the Email page.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cmSyncResult]);
 
   const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
   useEffect(() => {
@@ -234,6 +260,17 @@ export function EmailScreen() {
           </p>
         )}
         {cmSyncError && <p className="text-xs mb-6" style={{ color: 'var(--v2-red)' }}>{cmSyncError}</p>}
+        {cmConfigured && cmCoverage && (
+          <p className="text-xs text-text-secondary mb-6">
+            {cmCoverage.lastSuccessfulSyncAt
+              ? `Last successful Campaign Monitor sync: ${formatDateShort(cmCoverage.lastSuccessfulSyncAt)}. `
+              : 'No successful Campaign Monitor sync on record. '}
+            {cmCoverage.explanation}
+            {cmCoverage.lastSyncError && (
+              <span style={{ color: 'var(--v2-red)' }}> Last sync error: {cmCoverage.lastSyncError}</span>
+            )}
+          </p>
+        )}
 
         {/* Headline metrics */}
         <div className="mb-8">
@@ -449,6 +486,12 @@ export function EmailScreen() {
           send={selectedSend}
           educationAverage={selectedSend.emailCampaignGroup === 'education_2026' ? educationAverage : null}
           onClose={() => setSelectedSend(null)}
+          campaigns={campaigns}
+          isEditor={isEditor}
+          onMapped={(_taskId, newCampaignId) => {
+            setSelectedSend((prev) => (prev ? { ...prev, dashboardCampaignId: newCampaignId } : prev));
+            syncEmailPerformance(emailRange.startDate, emailRange.endDate);
+          }}
         />
       )}
     </div>

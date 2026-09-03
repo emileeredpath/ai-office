@@ -420,7 +420,7 @@ export function ReportsScreen() {
         columns: ['Metric', 'Value', 'Detail'],
         rows: [
           ['Opportunities', 'Not connected', 'Awaiting Acumatica integration'],
-          ['Pipeline', 'Not connected', 'Awaiting Acumatica integration'],
+          ['Open Pipeline', 'Not connected', 'Awaiting Acumatica integration'],
           ['Won Revenue', 'Not connected', 'Awaiting Acumatica integration'],
         ],
       },
@@ -865,7 +865,7 @@ export function ReportsScreen() {
           <h2 className="v2-section-title">Commercial</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
-            <KpiCard title="Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
+            <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
             <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
           </div>
         </div>

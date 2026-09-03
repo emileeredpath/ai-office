@@ -9,7 +9,7 @@ const COLUMNS = [
   'Created Date',
   'Status',
   'Opportunity',
-  'Pipeline Value',
+  'Open Pipeline',
   'Won Revenue',
 ];
 

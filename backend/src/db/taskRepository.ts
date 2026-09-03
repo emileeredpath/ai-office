@@ -47,6 +47,7 @@ interface TaskRow {
   email_is_test: number;
   archived: number;
   archived_at: string | null;
+  campaign_mapping_source: string | null;
 }
 
 function rowToRecord(row: TaskRow): TaskRecord {
@@ -96,6 +97,7 @@ function rowToRecord(row: TaskRow): TaskRecord {
     emailIsTest: !!row.email_is_test,
     archived: !!row.archived,
     archivedAt: row.archived_at,
+    campaignMappingSource: (row.campaign_mapping_source as TaskRecord['campaignMappingSource']) ?? null,
   };
 }
 
@@ -132,13 +134,15 @@ export function insertTask(task: TaskRecord): void {
       blocker_reason, last_brief_generated, source, source_conversation_id, assigned_to,
       type, recipients, subject, cost, currency, external_id, opens, clicks, open_rate, click_rate, bounces, unsubscribes,
       unique_opens, unique_open_rate, delivered, delivery_rate, click_to_open_rate,
-      email_campaign_group, email_geography, email_audience_level, email_audience_type, email_is_test
+      email_campaign_group, email_geography, email_audience_level, email_audience_type, email_is_test,
+      campaign_mapping_source
     ) VALUES (@id, @title, @notes, @brand, @status, @priority, @deadline, @startDate, @campaignId, @scheduleId,
       @createdAt, @completedAt, @previousStatus, @history, @approvalRequired, @approver,
       @blockerReason, @lastBriefGenerated, @source, @sourceConversationId, @assignedTo,
       @type, @recipients, @subject, @cost, @currency, @externalId, @opens, @clicks, @openRate, @clickRate, @bounces, @unsubscribes,
       @uniqueOpens, @uniqueOpenRate, @delivered, @deliveryRate, @clickToOpenRate,
-      @emailCampaignGroup, @emailGeography, @emailAudienceLevel, @emailAudienceType, @emailIsTest)`
+      @emailCampaignGroup, @emailGeography, @emailAudienceLevel, @emailAudienceType, @emailIsTest,
+      @campaignMappingSource)`
   ).run({
     id: task.id,
     title: task.title,
@@ -183,6 +187,7 @@ export function insertTask(task: TaskRecord): void {
     emailAudienceLevel: task.emailAudienceLevel ?? null,
     emailAudienceType: task.emailAudienceType ?? null,
     emailIsTest: task.emailIsTest ? 1 : 0,
+    campaignMappingSource: task.campaignMappingSource ?? null,
   });
 }
 
@@ -219,7 +224,7 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
       delivery_rate = @deliveryRate, click_to_open_rate = @clickToOpenRate,
       email_campaign_group = @emailCampaignGroup, email_geography = @emailGeography,
       email_audience_level = @emailAudienceLevel, email_audience_type = @emailAudienceType,
-      email_is_test = @emailIsTest
+      email_is_test = @emailIsTest, campaign_mapping_source = @campaignMappingSource
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -261,6 +266,7 @@ export function updateTaskRow(id: string, updates: Partial<TaskRecord>): TaskRec
     emailAudienceLevel: merged.emailAudienceLevel ?? null,
     emailAudienceType: merged.emailAudienceType ?? null,
     emailIsTest: merged.emailIsTest ? 1 : 0,
+    campaignMappingSource: merged.campaignMappingSource ?? null,
   });
 
   return getTaskById(id);

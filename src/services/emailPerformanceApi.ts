@@ -110,3 +110,40 @@ export async function triggerCampaignMonitorSync(sinceDays: number): Promise<Cam
     errors: body.errors ?? [],
   };
 }
+
+// Genuine Campaign Monitor sync coverage — mirrors the backend's
+// CampaignMonitorCoverage shape exactly (backend/src/services/
+// emailPerformance.ts's getCampaignMonitorCoverage). Never a period-scoped
+// figure — this is a property of the sync history itself.
+export interface CampaignMonitorCoverage {
+  lastSuccessfulSyncAt: string | null;
+  lastSyncError: string | null;
+  continuousCoverageSince: string | null;
+  hasKnownGap: boolean;
+  explanation: string;
+}
+
+export async function fetchCampaignMonitorCoverage(): Promise<CampaignMonitorCoverage> {
+  const response = await apiFetch('/api/analytics/campaign-monitor/coverage');
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch Campaign Monitor coverage (${response.status}).`, response.status);
+  }
+  return response.json();
+}
+
+// Manual Campaign Monitor -> AI Office campaign mapping — mirrors the
+// backend's POST /api/campaign-monitor/sends/:taskId/map-campaign route
+// (see routes/campaignMonitor.ts's doc comment). Edit-role only. Passing
+// campaignId: null explicitly clears the mapping back to Unmatched.
+export async function mapSendToCampaign(taskId: string, campaignId: string | null): Promise<string | null> {
+  const response = await apiFetch(`/api/campaign-monitor/sends/${encodeURIComponent(taskId)}/map-campaign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ campaignId }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { success?: boolean; message?: string; task?: { campaignId: string | null } };
+  if (!response.ok || !body.success) {
+    throw new ApiError(body.message ?? `Failed to map this send to a campaign (${response.status}).`, response.status);
+  }
+  return body.task?.campaignId ?? null;
+}

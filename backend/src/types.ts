@@ -155,6 +155,14 @@ export interface TaskRecord {
   // default is 0/NULL.
   archived?: boolean;
   archivedAt?: string | null;
+  // Protects an explicit Campaign Monitor -> AI Office campaign mapping
+  // (Email page's manual mapping action) from being silently overwritten by
+  // a later automated sync. 'manual' means a user explicitly chose
+  // campaignId — syncCampaignMonitor() must leave it untouched on every
+  // future run. 'auto' or null/undefined means the current campaignId (if
+  // any) came from the sync's own name-matching and may still change.
+  // Optional for the same reason as archived/archivedAt above.
+  campaignMappingSource?: 'manual' | 'auto' | null;
 }
 
 export interface ActionSource {

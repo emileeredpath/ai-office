@@ -322,7 +322,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
           <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" comparison={leadsComparison} />
           <KpiCard title="Marketing Spend" value={`£${Math.round(marketingSpend).toLocaleString()}`} subtitle={MARKETING_SPEND_CAVEAT} onClick={() => onNavigate?.('campaigns')} comparison={spendComparison} />
           <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
+          <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
           <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
         </div>
 

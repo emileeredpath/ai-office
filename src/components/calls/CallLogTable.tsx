@@ -15,7 +15,7 @@ const COLUMNS = [
   'Qualified',
   'Lead',
   'Opportunity',
-  'Pipeline Value',
+  'Open Pipeline',
   'Won Revenue',
 ];
 
@@ -46,7 +46,7 @@ interface CallLogTableProps {
 // Irish Radio); Source shows the readable chName (e.g. "Paid Search"),
 // falling back to the raw src value only if chName is genuinely blank on
 // that call. Landing Page is real wherever Infinity reported it.
-// Campaign, Qualified, Lead, Opportunity, Pipeline Value and Won Revenue
+// Campaign, Qualified, Lead, Opportunity, Open Pipeline and Won Revenue
 // stay "Not connected" — no defensible Infinity-side campaign identifier
 // exists yet (campaign/adGroup/keywordRef were confirmed blank in real
 // records during the Phase 2 audit), and CRM attribution doesn't exist.

@@ -25,9 +25,16 @@
 //     numeric strings are accepted; genuinely invalid/blank values stay
 //     null and are never coerced to 0.
 //   - Pagination: confirmed real (limit/offset both honoured; a 30-day,
-//     125-row window was not truncated at limit=1000). No pagination loop
-//     is implemented yet — add one if a single window is ever observed at
-//     exactly 1000 rows, which would indicate real truncation.
+//     125-row window was not truncated at limit=1000). fetchAllCallRows
+//     below now loops on offset until a page returns fewer than
+//     CALLS_PAGE_SIZE rows, so a query legitimately returning >1000 calls
+//     is no longer silently truncated. Defended against two ways this
+//     could still go wrong without a live account to test against: (1) a
+//     hard page-count cap (CALLS_MAX_PAGES) in case a real query is ever
+//     larger than that, and (2) a same-page-twice guard in case offset is
+//     ever NOT honoured for some request shape — either case is reported
+//     as a genuine error/truncation flag, never silently returned as if
+//     the totals were complete.
 //   - Marketing attribution (Phase 2): `chType` is the confirmed real
 //     source-classification field — 'ppc'/'seo'/'direct'/'ref' are the
 //     only confirmed values (mapped in src/utils/callPerformance.ts on the
@@ -237,6 +244,93 @@ function defaultMonthToDateRange(): { startDate: string; endDate: string } {
   return { startDate: start.toISOString().slice(0, 10), endDate: now.toISOString().slice(0, 10) };
 }
 
+const CALLS_PAGE_SIZE = 1000;
+// Safety cap on pagination, mirroring the same pattern already used for
+// Campaign Monitor's Top Links pagination (campaignMonitor.ts's
+// TOP_LINKS_MAX_PAGES) — 20 pages * 1000 rows = 20,000 calls, far more
+// than any single MTech period/entity query should realistically return.
+// If this is ever genuinely hit, it's reported as a truncation error
+// rather than silently returned as a complete total.
+const CALLS_MAX_PAGES = 20;
+
+interface FetchAllResult {
+  rows: RawCallRow[];
+  truncationWarning: string | null;
+}
+
+// Loops on `offset` until a page returns fewer than CALLS_PAGE_SIZE rows
+// (the real signal that there's no more data, confirmed against the live
+// account per this file's header comment). Two defensive stops, neither
+// verifiable from this sandbox (no live Infinity account reachable here)
+// so both are treated as genuine unknowns, reported honestly rather than
+// assumed safe:
+//   1. CALLS_MAX_PAGES reached — a real period/entity query returned more
+//      calls than the safety cap allows for.
+//   2. A page contributes zero rowIds not already seen — offset may not
+//      be honoured for this request shape (would otherwise loop forever
+//      re-fetching the same page).
+async function fetchAllCallRows(
+  apiKey: string,
+  igrpId: string,
+  range: { startDate: string; endDate: string }
+): Promise<FetchAllResult> {
+  const rows: RawCallRow[] = [];
+  const seenRowIds = new Set<string>();
+
+  for (let page = 0; page < CALLS_MAX_PAGES; page++) {
+    const offset = page * CALLS_PAGE_SIZE;
+    const params = new URLSearchParams({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      limit: String(CALLS_PAGE_SIZE),
+      offset: String(offset),
+      tz: 'Europe/London',
+    });
+    const response = await fetch(
+      `${INFINITY_API_BASE}/reports/v2.1/igrps/${igrpId}/triggers/calls?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: { Authorization: `ApiKey ${apiKey}` },
+      }
+    );
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Infinity API call failed (${response.status}): ${body.slice(0, 300)}`);
+    }
+
+    const text = await response.text();
+    const pageRows = parseNdjson(text);
+    if (pageRows.length === 0) break; // genuinely no more data
+
+    const newRowIds = pageRows.filter((r) => !seenRowIds.has(String(r.rowId ?? ''))).length;
+    if (newRowIds === 0) {
+      return {
+        rows,
+        truncationWarning:
+          `Infinity pagination stopped after ${rows.length} call(s): the next page returned no new rows, ` +
+          `which usually means offset isn't being honoured for this request — results may be incomplete rather than complete.`,
+      };
+    }
+    for (const r of pageRows) seenRowIds.add(String(r.rowId ?? ''));
+    rows.push(...pageRows);
+
+    if (pageRows.length < CALLS_PAGE_SIZE) break; // last page — fewer rows than a full page
+
+    if (page === CALLS_MAX_PAGES - 1) {
+      return {
+        rows,
+        truncationWarning:
+          `Infinity returned at least ${rows.length} call(s) for this period and is still paging — ` +
+          `stopped after the ${CALLS_MAX_PAGES}-page safety cap (${CALLS_MAX_PAGES * CALLS_PAGE_SIZE} calls); ` +
+          `real totals for this period/entity may be higher than what's shown.`,
+      };
+    }
+  }
+
+  return { rows, truncationWarning: null };
+}
+
 // Fetches real Infinity call records for a genuine calendar date range.
 // No campaign filter is sent — Infinity has no concept of AI Office's
 // internal campaign IDs, so filtering by campaign happens (if ever) on the
@@ -256,30 +350,14 @@ export async function fetchInfinityCalls(startDate?: string, endDate?: string): 
   const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
 
   try {
-    const params = new URLSearchParams({
-      startDate: range.startDate,
-      endDate: range.endDate,
-      limit: '1000',
-      tz: 'Europe/London',
-    });
-    const response = await fetch(
-      `${INFINITY_API_BASE}/reports/v2.1/igrps/${igrpId}/triggers/calls?${params.toString()}`,
-      {
-        method: 'GET',
-        headers: { Authorization: `ApiKey ${apiKey}` },
-      }
-    );
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`Infinity API call failed (${response.status}): ${body.slice(0, 300)}`);
-    }
-
-    const text = await response.text();
-    const rows = parseNdjson(text);
+    const { rows, truncationWarning } = await fetchAllCallRows(apiKey, igrpId, range);
     const calls = rows.map(toCallRecord);
-
-    return { configured: true, calls, mappedBrands: MAPPED_BRANDS, errors: [] };
+    // A real, partial result still returns everything genuinely fetched —
+    // paired with an explicit warning in `errors` (surfaced today via the
+    // Call Tracking screen's existing DataFreshnessBar error state) rather
+    // than either hiding the gap or discarding real data just because the
+    // total might be incomplete.
+    return { configured: true, calls, mappedBrands: MAPPED_BRANDS, errors: truncationWarning ? [truncationWarning] : [] };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[infinity] failed to fetch call records:', msg);

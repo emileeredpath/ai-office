@@ -68,6 +68,13 @@ export interface SyncResult {
   updated: number;
   skipped: number;
   errors: string[];
+  // The real lookback window (days before "now") this run actually
+  // queried Campaign Monitor for — persisted into audit_log alongside the
+  // rest of this result so a later coverage check can genuinely determine
+  // how far back continuous sync coverage reaches, rather than assuming
+  // every historic sync used the current default. See
+  // getCampaignMonitorCoverage in emailPerformance.ts.
+  sinceDays: number;
 }
 
 function authHeader(apiKey: string): string {
@@ -363,25 +370,25 @@ export function parseEducationSegment(campaignName: string): EducationSegment | 
   };
 }
 
-// Campaign name matching: maps Campaign Monitor campaign name fragments to AI Office campaign IDs.
-// Update this as campaigns are created. Format: "campaign_monitor_fragment" → "ai_office_campaign_id"
+// Campaign name matching: maps a Campaign Monitor campaign's full normalized
+// name to an AI Office campaign ID, for deterministic auto-matching only.
+//
+// This deliberately no longer includes the old word-fragment fallback (e.g.
+// matching any Campaign Monitor send containing the word "repair" to
+// whichever campaign happened to claim that word first). That fallback
+// could silently produce a confident-looking attribution from a single
+// >3-character word in common between two otherwise-unrelated campaign
+// names — exactly the kind of weak match the data-integrity rules forbid.
+// A send that doesn't exactly match a known campaign name now stays
+// genuinely Unmatched (campaignId: null) rather than being guessed —
+// unless/until a user explicitly maps it (see the manual mapping route in
+// routes/analytics.ts and campaignMappingSource on TaskRecord).
 function buildCampaignMap(aiCampaigns: Array<{ id: string; name: string }>): Map<string, string> {
   const map = new Map<string, string>();
-
-  // Auto-match by campaign name similarity (lowercase, remove special chars)
   aiCampaigns.forEach((campaign) => {
     const normalized = campaign.name.toLowerCase().replace(/[^a-z0-9]/g, '');
     map.set(normalized, campaign.id);
   });
-
-  // Also try fragment matching for Campaign Monitor names like "Service and Repair"
-  aiCampaigns.forEach((campaign) => {
-    const words = campaign.name.toLowerCase().split(/[\s&-]+/).filter((w) => w.length > 3);
-    words.forEach((word) => {
-      if (!map.has(word)) map.set(word, campaign.id);
-    });
-  });
-
   return map;
 }
 
@@ -406,6 +413,7 @@ function parseCmDate(sentDate: string): Date {
 
 export async function syncCampaignMonitor(options: { sinceDays?: number } = {}): Promise<SyncResult> {
   const apiKey = process.env.CAMPAIGN_MONITOR_API_KEY;
+  const sinceDays = options.sinceDays ?? 7;
   const errors: string[] = [];
   let created = 0;
   let updated = 0;
@@ -423,10 +431,10 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
       updated: 0,
       skipped: 0,
       errors: ['CAMPAIGN_MONITOR_API_KEY missing'],
+      sinceDays,
     };
   }
 
-  const sinceDays = options.sinceDays ?? 7;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - sinceDays);
 
@@ -451,6 +459,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
       updated: 0,
       skipped: 0,
       errors: [msg],
+      sinceDays,
     };
   }
 
@@ -500,29 +509,20 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
         } = extractMetrics(summary, recipients);
         const sentIso = sentDate.toISOString();
 
-        // Match campaign to AI Office campaign by name
-        // Try exact normalized match first, then try individual word matches
-        let aiCampaignId: string | null = null;
+        // Match campaign to AI Office campaign by name — deterministic exact
+        // match only (see buildCampaignMap's doc comment for why the old
+        // word-fragment fallback was removed). No match means genuinely
+        // Unmatched (null), not a guess.
         const normalizedCmName = campaign.Name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        aiCampaignId = campaignMap.get(normalizedCmName) || null;
-
-        if (!aiCampaignId) {
-          // Try matching by individual words (for multi-word campaigns)
-          const cmWords = campaign.Name.toLowerCase().split(/[\s&-]+/).filter((w) => w.length > 3);
-          for (const word of cmWords) {
-            if (campaignMap.has(word)) {
-              aiCampaignId = campaignMap.get(word) || null;
-              console.log(`[campaign-monitor] Matched "${campaign.Name}" to campaign ${aiCampaignId} via word "${word}"`);
-              break;
-            }
-          }
-          if (!aiCampaignId) {
-            console.log(`[campaign-monitor] No match for "${campaign.Name}" — words: ${cmWords.join(', ')}`);
-          }
-        }
+        const aiCampaignId: string | null = campaignMap.get(normalizedCmName) || null;
 
         const existing = findTaskByExternalId(SOURCE, campaign.CampaignID);
         if (existing) {
+          // Explicit mapping wins, always — a user-assigned campaignId (and
+          // its 'manual' source) is never overwritten by this sync, whether
+          // this run found a deterministic match or not. See
+          // TaskRecord.campaignMappingSource's doc comment.
+          const isManuallyMapped = existing.campaignMappingSource === 'manual';
           updateTaskRow(existing.id, {
             title: campaign.Name,
             brand,
@@ -550,7 +550,9 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             emailAudienceLevel: education?.audienceLevel ?? null,
             emailAudienceType: education?.audienceType ?? null,
             emailIsTest: education?.isTest ?? false,
-            campaignId: aiCampaignId,
+            ...(isManuallyMapped
+              ? {}
+              : { campaignId: aiCampaignId, campaignMappingSource: aiCampaignId ? 'auto' : null }),
           });
           updated += 1;
         } else {
@@ -599,6 +601,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
             emailAudienceLevel: education?.audienceLevel ?? null,
             emailAudienceType: education?.audienceType ?? null,
             emailIsTest: education?.isTest ?? false,
+            campaignMappingSource: aiCampaignId ? 'auto' : null,
           };
           insertTask(task);
           created += 1;
@@ -621,6 +624,7 @@ export async function syncCampaignMonitor(options: { sinceDays?: number } = {}):
     updated,
     skipped,
     errors,
+    sinceDays,
   };
 
   db.prepare(

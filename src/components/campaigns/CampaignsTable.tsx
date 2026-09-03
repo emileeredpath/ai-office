@@ -53,7 +53,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, onSelectCamp
                   Manual, not CRM-linked
                 </div>
               </th>
-              <th style={{ textAlign: 'right' }}>Pipeline</th>
+              <th style={{ textAlign: 'right' }}>Open Pipeline</th>
               <th style={{ textAlign: 'right' }}>Budget</th>
               <th style={{ textAlign: 'right' }}>Spend</th>
               <th style={{ textAlign: 'right' }}>ROI</th>

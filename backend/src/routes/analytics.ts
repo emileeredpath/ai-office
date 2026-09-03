@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
-import { getEmailPerformance } from '../services/emailPerformance.js';
+import { getEmailPerformance, getCampaignMonitorCoverage } from '../services/emailPerformance.js';
 import { fetchInfinityCalls } from '../services/infinity.js';
 import { getGoogleAdsPerformance } from '../services/googleAds.js';
 import { getSearchConsolePerformance } from '../services/searchConsole.js';
@@ -117,6 +117,13 @@ router.get('/campaign-monitor', (req: Request, res: Response) => {
   }
   const result = getEmailPerformance(startDate as string, endDate as string);
   res.json(result);
+});
+
+// Genuine Campaign Monitor sync coverage/freshness — see
+// getCampaignMonitorCoverage's doc comment. Not period-scoped (coverage
+// is a property of the sync history itself, not of any one report range).
+router.get('/campaign-monitor/coverage', (_req: Request, res: Response) => {
+  res.json(getCampaignMonitorCoverage());
 });
 
 // Real, entity-attributed Infinity call records (V2 Call Tracking page —

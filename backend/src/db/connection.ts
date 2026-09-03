@@ -353,4 +353,12 @@ db.exec(`
   );
 `);
 
+// Explicit Campaign Monitor -> AI Office campaign mapping protection — see
+// campaignMonitor.ts's syncCampaignMonitor(). Null/'auto' means campaign_id
+// was set (or may still be reset) by the sync's own name-matching logic;
+// 'manual' means a user explicitly assigned this send to a campaign via the
+// Email page, and the sync must never overwrite campaign_id again for this
+// task, on this sync or any future one.
+addColumnIfMissing('tasks', 'campaign_mapping_source', 'TEXT');
+
 export default db;

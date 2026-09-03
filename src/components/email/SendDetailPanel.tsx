@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { fetchTopLinksForSend, type EmailCampaignRecord, type TopLinkRow } from '@/services/emailPerformanceApi';
+import { fetchTopLinksForSend, mapSendToCampaign, type EmailCampaignRecord, type TopLinkRow } from '@/services/emailPerformanceApi';
+import { ApiError } from '@/services/apiConfig';
 import { BRAND_LABEL } from '@/utils/brandColors';
 import { formatPercent } from '@/utils/emailPerformance';
+import type { Campaign } from '@/types/index';
 
 interface SendDetailPanelProps {
   send: EmailCampaignRecord;
@@ -11,6 +13,15 @@ interface SendDetailPanelProps {
   // is a genuine "not applicable," never a fabricated comparison.
   educationAverage: { deliveryRate: number | null; uniqueOpenRate: number | null; clickRate: number | null } | null;
   onClose: () => void;
+  // Manual Campaign Monitor -> AI Office campaign mapping — only rendered
+  // when both are provided (edit-role sessions on the Email page). See
+  // routes/campaignMonitor.ts's map-campaign route: this always creates an
+  // explicit, protected mapping — never a new campaign — and future syncs
+  // will never silently overwrite it. onMapped is called with the send's
+  // new dashboardCampaignId so the caller can refresh its own send list.
+  campaigns?: Campaign[];
+  isEditor?: boolean;
+  onMapped?: (taskId: string, campaignId: string | null) => void;
 }
 
 function formatDateTime(iso: string): string {
@@ -51,8 +62,24 @@ type TopLinksState =
   | { status: 'available'; rows: TopLinkRow[] }
   | { status: 'unavailable'; message: string };
 
-export function SendDetailPanel({ send, educationAverage, onClose }: SendDetailPanelProps) {
+export function SendDetailPanel({ send, educationAverage, onClose, campaigns, isEditor, onMapped }: SendDetailPanelProps) {
   const [topLinks, setTopLinks] = useState<TopLinksState>({ status: 'loading' });
+  const [mapSelection, setMapSelection] = useState(send.dashboardCampaignId ?? '');
+  const [mapping, setMapping] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  const handleMap = async () => {
+    setMapping(true);
+    setMapError(null);
+    try {
+      const newCampaignId = await mapSendToCampaign(send.taskId, mapSelection || null);
+      onMapped?.(send.taskId, newCampaignId);
+    } catch (err) {
+      setMapError(err instanceof ApiError ? err.message : 'Could not save this mapping — could not reach the AI Office backend.');
+    } finally {
+      setMapping(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +194,36 @@ export function SendDetailPanel({ send, educationAverage, onClose }: SendDetailP
                 <ComparisonRow label="Click Rate" thisValue={send.clickRate} avgValue={educationAverage.clickRate} />
               </tbody>
             </table>
+          </div>
+        )}
+
+        {campaigns && isEditor && (
+          <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--v2-border)' }}>
+            <h3 className="text-sm font-semibold text-text-primary mb-1">Campaign Mapping</h3>
+            <p className="text-xs text-text-secondary mb-2">
+              {send.dashboardCampaignId
+                ? 'This send is currently linked to the campaign below. Changing it creates an explicit mapping that future Campaign Monitor syncs will never overwrite.'
+                : 'This send is Unmatched — no automatic name match was found. Assign it to a real AI Office campaign below; this creates an explicit, permanent mapping that future syncs will never overwrite. This never creates a new campaign.'}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="input text-sm"
+                value={mapSelection}
+                onChange={(e) => setMapSelection(e.target.value)}
+                disabled={mapping}
+              >
+                <option value="">Unmatched (no campaign)</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({BRAND_LABEL[c.brand] ?? c.brand})
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="btn btn-secondary text-sm" onClick={handleMap} disabled={mapping}>
+                {mapping ? 'Saving…' : 'Save mapping'}
+              </button>
+            </div>
+            {mapError && <p className="text-xs mt-2" style={{ color: 'var(--v2-red)' }}>{mapError}</p>}
           </div>
         )}
 

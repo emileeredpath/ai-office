@@ -1,7 +1,7 @@
 import { ChevronRight, ChevronDown } from 'lucide-react';
 
 const INFINITY_STEPS = ['Marketing Campaign', 'Call', 'Qualified Call'];
-const ACUMATICA_STEPS = ['CRM Lead', 'Opportunity', 'Pipeline', 'Won Revenue'];
+const ACUMATICA_STEPS = ['CRM Lead', 'Opportunity', 'Open Pipeline', 'Won Revenue'];
 
 // Explanatory only — makes the two-source attribution chain obvious
 // (Infinity measures call activity, Acumatica measures the commercial
