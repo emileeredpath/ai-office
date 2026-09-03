@@ -798,7 +798,13 @@ export interface Wave1Result {
   configured: boolean;
   metrics: Wave1PerformanceMetrics | null;
   errors: string[];
-  lastSynced: string;
+  // Genuinely null (never "now") unless a fetch actually succeeded this
+  // call — this was previously set to new Date().toISOString() on every
+  // branch, including "not configured" and "fetch failed," which made the
+  // frontend's "Last synced: ..." label lie by always reading the current
+  // moment regardless of whether anything real had synced. Found during
+  // the Reporting Foundations audit (see REPORTING_PERIOD.md).
+  lastSynced: string | null;
 }
 
 async function runWave1Report(
@@ -926,7 +932,7 @@ export async function getWave1Performance(): Promise<Wave1Result> {
       configured: false,
       metrics: null,
       errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
-      lastSynced: new Date().toISOString(),
+      lastSynced: null,
     };
   }
 
@@ -936,7 +942,7 @@ export async function getWave1Performance(): Promise<Wave1Result> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[ga4] failed to get access token:', msg);
-    return { configured: true, metrics: null, errors: [msg], lastSynced: new Date().toISOString() };
+    return { configured: true, metrics: null, errors: [msg], lastSynced: null };
   }
 
   // Wave 1: Aug 12 - Aug 31, 2026
@@ -962,7 +968,7 @@ export async function getWave1Performance(): Promise<Wave1Result> {
       configured: true,
       metrics: null,
       errors: [msg],
-      lastSynced: new Date().toISOString(),
+      lastSynced: null,
     };
   }
 }

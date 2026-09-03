@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod, periodStartDate } from '@/contexts/PeriodContext';
@@ -11,12 +11,22 @@ import { PerformanceByBrandTable, type BrandPerformanceRow } from '@/components/
 import { CampaignPerformanceTable } from '@/components/performance/CampaignPerformanceTable';
 import { BRAND_COLOR } from '@/utils/brandColors';
 import { Brand } from '@/types/index';
-import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
+import {
+  filterCampaignsByPeriod,
+  filterCampaignsByDateRange,
+  sumLeads,
+  sumSpend,
+  sumEnquiries,
+  MARKETING_LEADS_CAVEAT,
+  MARKETING_SPEND_CAVEAT,
+} from '@/utils/campaignMetrics';
 import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
+import { getPreviousPeriodRange, compareToPrevious } from '@/utils/periodComparison';
+import { fetchGa4Traffic, fetchGa4Enquiries, type Ga4TrafficResponse, type Ga4EnquiriesResponse } from '@/services/ga4Api';
 
 interface PerformanceScreenProps {
   onNavigate?: (screen: string) => void;
@@ -105,6 +115,72 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const googleAds = useMemo(
     () => getGoogleAdsSummary(googleAdsPerformance, isGroupView, selectedEntity),
     [googleAdsPerformance, isGroupView, selectedEntity]
+  );
+
+  // ---- Previous-period comparisons ---------------------------------------
+  // See src/utils/periodComparison.ts and REPORTING_PERIOD.md/
+  // KPI_DEFINITIONS.md for exactly which KPIs can honestly support this and
+  // why (Website Users, GA4 Enquiries, Enquiries, Marketing Leads, Marketing
+  // Spend — the same real, bounded-window sources already used above).
+  // "All time" has no meaningful previous period (previousRange is null),
+  // so every comparison below is null in that case — an honest "not
+  // available" via KpiCard's comparison prop, never a fabricated 0%.
+  //
+  // GA4's previous-period figures are fetched directly (bypassing the
+  // shared store, which only ever holds one "current" GA4 response) so this
+  // stays entirely local to this screen and never touches what any other
+  // screen sees.
+  const previousRange = useMemo(() => getPreviousPeriodRange(period), [period]);
+  const [previousGa4Traffic, setPreviousGa4Traffic] = useState<Ga4TrafficResponse | null>(null);
+  const [previousGa4Enquiries, setPreviousGa4Enquiries] = useState<Ga4EnquiriesResponse | null>(null);
+  useEffect(() => {
+    if (!previousRange) {
+      setPreviousGa4Traffic(null);
+      setPreviousGa4Enquiries(null);
+      return;
+    }
+    let cancelled = false;
+    fetchGa4Traffic(previousRange.startDate, previousRange.endDate)
+      .then((data) => { if (!cancelled) setPreviousGa4Traffic(data); })
+      .catch(() => { if (!cancelled) setPreviousGa4Traffic(null); });
+    fetchGa4Enquiries(previousRange.startDate, previousRange.endDate)
+      .then((data) => { if (!cancelled) setPreviousGa4Enquiries(data); })
+      .catch(() => { if (!cancelled) setPreviousGa4Enquiries(null); });
+    return () => { cancelled = true; };
+  }, [previousRange?.startDate, previousRange?.endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const previousPeriodCampaigns = useMemo(() => {
+    if (!previousRange) return [];
+    return filterCampaignsByDateRange(entityCampaigns, new Date(previousRange.startDate), new Date(previousRange.endDate));
+  }, [entityCampaigns, previousRange]);
+
+  const websiteUsersComparison = useMemo(() => {
+    const previousUsers = getWebsiteUsers(previousGa4Traffic, isGroupView, selectedEntity);
+    return compareToPrevious(
+      websiteUsers.status === 'available' ? websiteUsers.activeUsers! : null,
+      previousRange && previousUsers.status === 'available' ? previousUsers.activeUsers! : null
+    );
+  }, [websiteUsers, previousGa4Traffic, previousRange, isGroupView, selectedEntity]);
+
+  const ga4EnquiriesComparison = useMemo(() => {
+    const previousInfo = getEnquiries(previousGa4Enquiries, isGroupView, selectedEntity);
+    return compareToPrevious(
+      ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total! : null,
+      previousRange && previousInfo.status === 'available' ? previousInfo.total! : null
+    );
+  }, [ga4EnquiriesInfo, previousGa4Enquiries, previousRange, isGroupView, selectedEntity]);
+
+  const enquiriesComparison = useMemo(
+    () => compareToPrevious(enquiriesTotal, previousRange ? sumEnquiries(previousPeriodCampaigns) : null),
+    [enquiriesTotal, previousPeriodCampaigns, previousRange]
+  );
+  const leadsComparison = useMemo(
+    () => compareToPrevious(marketingLeads, previousRange ? sumLeads(previousPeriodCampaigns) : null),
+    [marketingLeads, previousPeriodCampaigns, previousRange]
+  );
+  const spendComparison = useMemo(
+    () => compareToPrevious(marketingSpend, previousRange ? sumSpend(previousPeriodCampaigns) : null),
+    [marketingSpend, previousPeriodCampaigns, previousRange]
   );
 
   // ---- Leads by Brand (group) / Leads by Campaign (single entity) --------
@@ -233,16 +309,18 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
             status={websiteUsers.status}
             subtitle={websiteUsers.subtitle}
+            comparison={websiteUsers.status === 'available' ? websiteUsersComparison : undefined}
           />
-          <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged per campaign" />
+          <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged per campaign" comparison={enquiriesComparison} />
           <KpiCard
             title="GA4 Enquiries"
             value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
             status={ga4EnquiriesInfo.status}
             subtitle={ga4EnquiriesInfo.status === 'available' ? 'Verified GA4 key events — a website action, not a qualified lead' : ga4EnquiriesInfo.subtitle}
+            comparison={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesComparison : undefined}
           />
-          <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" accent="var(--v2-green)" />
-          <KpiCard title="Marketing Spend" value={`£${Math.round(marketingSpend).toLocaleString()}`} subtitle="Manually logged campaign spend" onClick={() => onNavigate?.('campaigns')} />
+          <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" comparison={leadsComparison} />
+          <KpiCard title="Marketing Spend" value={`£${Math.round(marketingSpend).toLocaleString()}`} subtitle={MARKETING_SPEND_CAVEAT} onClick={() => onNavigate?.('campaigns')} comparison={spendComparison} />
           <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
           <KpiCard title="Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
           <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
