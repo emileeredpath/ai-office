@@ -55,6 +55,7 @@ export interface CampaignRecord {
   // inferred.
   campaignCode: string | null;
   googleAdsCampaignIds: string[];
+  ga4CampaignNames: string[];
 }
 
 interface CampaignRow {
@@ -93,6 +94,7 @@ interface CampaignRow {
   archived_at?: string | null;
   campaign_code?: string | null;
   google_ads_campaign_ids?: string | null;
+  ga4_campaign_names?: string | null;
 }
 
 function rowToRecord(row: CampaignRow): CampaignRecord {
@@ -131,6 +133,7 @@ function rowToRecord(row: CampaignRow): CampaignRecord {
     archivedAt: row.archived_at ?? null,
     campaignCode: row.campaign_code ?? null,
     googleAdsCampaignIds: row.google_ads_campaign_ids ? (JSON.parse(row.google_ads_campaign_ids) as string[]) : [],
+    ga4CampaignNames: row.ga4_campaign_names ? (JSON.parse(row.ga4_campaign_names) as string[]) : [],
   };
 }
 
@@ -177,6 +180,7 @@ export interface NewCampaignInput {
   trackingLinks?: TrackingLink[];
   campaignCode?: string | null;
   googleAdsCampaignIds?: string[];
+  ga4CampaignNames?: string[];
 }
 
 export function insertCampaign(input: NewCampaignInput): CampaignRecord {
@@ -189,12 +193,12 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
       start_date, end_date, budget, spend, conversions, leads, engagement, colour,
       reactive, notes, results, created_at, updated_at, industry, recipients, value_generated,
       vendor, scheme, cofund_rate, claim_status, schedule, tracking_links,
-      campaign_code, google_ads_campaign_ids
+      campaign_code, google_ads_campaign_ids, ga4_campaign_names
     ) VALUES (@id, @name, @brand, @entities, @primaryIndustry, @secondaryIndustry, @theme, @status,
       @startDate, @endDate, @budget, @spend, @conversions, @leads, @engagement, @colour,
       @reactive, @notes, @results, @createdAt, @updatedAt, @industry, @recipients, @valueGenerated,
       @vendor, @scheme, @cofundRate, @claimStatus, @schedule, @trackingLinks,
-      @campaignCode, @googleAdsCampaignIds)`
+      @campaignCode, @googleAdsCampaignIds, @ga4CampaignNames)`
   ).run({
     id,
     name: input.name,
@@ -228,6 +232,7 @@ export function insertCampaign(input: NewCampaignInput): CampaignRecord {
     trackingLinks: JSON.stringify(input.trackingLinks ?? []),
     campaignCode: input.campaignCode ?? null,
     googleAdsCampaignIds: JSON.stringify(input.googleAdsCampaignIds ?? []),
+    ga4CampaignNames: JSON.stringify(input.ga4CampaignNames ?? []),
   });
 
   return getCampaignById(id)!;
@@ -246,6 +251,7 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     trackingLinks: updates.trackingLinks !== undefined ? updates.trackingLinks : existing.trackingLinks,
     campaignCode: updates.campaignCode !== undefined ? updates.campaignCode : existing.campaignCode,
     googleAdsCampaignIds: updates.googleAdsCampaignIds !== undefined ? updates.googleAdsCampaignIds : existing.googleAdsCampaignIds,
+    ga4CampaignNames: updates.ga4CampaignNames !== undefined ? updates.ga4CampaignNames : existing.ga4CampaignNames,
     updatedAt: new Date().toISOString(),
   } as CampaignRecord;
 
@@ -259,7 +265,8 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
       industry = @industry, recipients = @recipients, value_generated = @valueGenerated,
       vendor = @vendor, scheme = @scheme, cofund_rate = @cofundRate, claim_status = @claimStatus,
       schedule = @schedule, tracking_links = @trackingLinks,
-      campaign_code = @campaignCode, google_ads_campaign_ids = @googleAdsCampaignIds
+      campaign_code = @campaignCode, google_ads_campaign_ids = @googleAdsCampaignIds,
+      ga4_campaign_names = @ga4CampaignNames
     WHERE id = @id`
   ).run({
     id: merged.id,
@@ -293,6 +300,7 @@ export function updateCampaignRow(id: string, updates: Partial<NewCampaignInput>
     trackingLinks: JSON.stringify(merged.trackingLinks ?? []),
     campaignCode: merged.campaignCode ?? null,
     googleAdsCampaignIds: JSON.stringify(merged.googleAdsCampaignIds ?? []),
+    ga4CampaignNames: JSON.stringify(merged.ga4CampaignNames ?? []),
   });
 
   return getCampaignById(id);

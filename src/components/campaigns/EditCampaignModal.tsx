@@ -50,6 +50,11 @@ export function EditCampaignModal({ campaign, onClose }: EditCampaignModalProps)
   // Performance tab.
   const [campaignCode, setCampaignCode] = useState(campaign.campaignCode || '');
   const [googleAdsCampaignIdsText, setGoogleAdsCampaignIdsText] = useState((campaign.googleAdsCampaignIds || []).join(', '));
+  // Comma-separated exact GA4 sessionCampaignName value(s) — never
+  // auto-filled from the campaign name above, since GA4's real campaign
+  // name (however it got tagged) isn't guaranteed to match how this app
+  // names the campaign. See getCampaignGa4Attribution's doc comment.
+  const [ga4CampaignNamesText, setGa4CampaignNamesText] = useState((campaign.ga4CampaignNames || []).join(', '));
 
   const [saving, setSaving] = useState(false);
 
@@ -87,6 +92,10 @@ export function EditCampaignModal({ campaign, onClose }: EditCampaignModalProps)
         .split(',')
         .map((id) => id.trim())
         .filter((id) => id.length > 0),
+      ga4CampaignNames: ga4CampaignNamesText
+        .split(',')
+        .map((n) => n.trim())
+        .filter((n) => n.length > 0),
     });
     setSaving(false);
     onClose();
@@ -175,6 +184,21 @@ export function EditCampaignModal({ campaign, onClose }: EditCampaignModalProps)
               <p className="text-xs text-text-secondary mt-1">
                 Comma-separated real Google Ads campaign IDs (from the Google Ads UI or API). Every Google Ads campaign
                 with a matching ID will be attributed to this campaign on the Performance tab below.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">GA4 campaign name(s)</label>
+              <input
+                type="text"
+                value={ga4CampaignNamesText}
+                onChange={(e) => setGa4CampaignNamesText(e.target.value)}
+                className="input"
+                placeholder="e.g. MTech IRCL - Education Solutions - Brought Data - NI"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                Comma-separated exact GA4 campaign name(s), as they genuinely appear in GA4's own Traffic Acquisition
+                report for this entity (never guessed from the campaign name above — check GA4 directly). Matched
+                exactly, case-insensitive, never a partial match.
               </p>
             </div>
           </div>

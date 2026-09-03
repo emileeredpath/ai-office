@@ -374,4 +374,16 @@ addColumnIfMissing('tasks', 'campaign_mapping_source', 'TEXT');
 addColumnIfMissing('campaigns', 'campaign_code', 'TEXT');
 addColumnIfMissing('campaigns', 'google_ads_campaign_ids', "TEXT NOT NULL DEFAULT '[]'");
 
+// Explicit GA4 campaign attribution (Campaign Attribution phase, slice 2) —
+// a JSON array of real GA4 sessionCampaignName values this campaign is
+// known to run under, entered by a user in Edit Campaign -> Attribution.
+// Never auto-populated from the campaign's own display name: GA4's real
+// campaign name (however it got tagged — Campaign Monitor's own
+// auto-tagging, a manual UTM, Google Ads auto-import) is not guaranteed to
+// match how this app names the campaign, so equating them would be exactly
+// the kind of unverified assumption this phase forbids. See
+// getCampaignGa4Attribution in services/ga4.ts for how this is matched
+// (exact, case-insensitive, never CONTAINS).
+addColumnIfMissing('campaigns', 'ga4_campaign_names', "TEXT NOT NULL DEFAULT '[]'");
+
 export default db;

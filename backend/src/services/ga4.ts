@@ -778,6 +778,151 @@ export async function getEducationCampaignAttribution(startDate?: string, endDat
   return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, errors };
 }
 
+// Generic per-AI-Office-campaign GA4 attribution (Campaign Attribution
+// phase, slice 2) — unlike getEducationCampaignAttribution above (which is
+// hardcoded to one named campaign's Campaign Monitor traffic), this serves
+// ANY campaign that has an explicit, user-entered ga4CampaignName on its
+// own record (see campaignRepository.ts). Matching is an EXACT,
+// case-insensitive match against GA4's real sessionCampaignName dimension
+// — never CONTAINS, never a partial/fuzzy match, and never inferred from a
+// landing page. A campaign with no ga4CampaignName configured is never
+// queried at all — the caller (routes/analytics.ts) only calls this once a
+// real value exists, so "Unmatched" is decided before any network call,
+// not derived from an empty result.
+//
+// IMPORTANT — like the rest of this file, the exact runReport shape below
+// (sessionCampaignName via inListFilter with caseSensitive:false) follows
+// GA4's documented Data API filter schema but has not been confirmed
+// against a real property from this sandbox. Verify the first real query
+// against a known campaign name before trusting the figures in production.
+export interface CampaignGa4Attribution {
+  brand: Brand;
+  sessions: number;
+  // Real GA4 activeUsers for the matched sessions — distinct from
+  // `sessions` for the same reason Website traffic (getBrandTraffic) keeps
+  // the two separate.
+  users: number;
+  // null when this brand has no verified GA4 Enquiry definition (mtech,
+  // idaro) — never a fabricated 0. See ENQUIRY_EVENTS_BY_BRAND above.
+  enquiries: number | null;
+}
+
+export interface Ga4CampaignAttributionResult {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  result: CampaignGa4Attribution | null;
+  error: string | null;
+}
+
+async function runCampaignSessionsReport(
+  propertyId: string,
+  token: string,
+  startDate: string,
+  endDate: string,
+  campaignNames: string[]
+): Promise<{ sessions: number; users: number }> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      metrics: [{ name: 'sessions' }, { name: 'activeUsers' }],
+      dimensionFilter: {
+        filter: { fieldName: 'sessionCampaignName', inListFilter: { values: campaignNames, caseSensitive: false } },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 campaign attribution runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { rows?: Ga4RawRow[] };
+  const row = json.rows?.[0];
+  return {
+    sessions: Number(row?.metricValues?.[0]?.value ?? 0),
+    users: Number(row?.metricValues?.[1]?.value ?? 0),
+  };
+}
+
+async function runCampaignEnquiryReport(
+  propertyId: string,
+  token: string,
+  startDate: string,
+  endDate: string,
+  campaignNames: string[],
+  eventNames: string[]
+): Promise<number> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'eventName' }],
+      metrics: [{ name: 'eventCount' }],
+      dimensionFilter: {
+        andGroup: {
+          expressions: [
+            { filter: { fieldName: 'sessionCampaignName', inListFilter: { values: campaignNames, caseSensitive: false } } },
+            { filter: { fieldName: 'eventName', inListFilter: { values: eventNames } } },
+          ],
+        },
+      },
+      limit: 1000,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 campaign enquiry attribution runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { rows?: Ga4RawRow[] };
+  return (json.rows || []).reduce((sum, row) => sum + Number(row.metricValues[0]?.value ?? 0), 0);
+}
+
+// campaignNames is the AI Office campaign's own explicit ga4CampaignName
+// value(s) — passed as an array so a campaign that ran under more than one
+// real GA4 campaign name over its lifetime can still be matched, but never
+// populated from anything but an explicit user entry.
+export async function getCampaignGa4Attribution(
+  brand: Brand,
+  campaignNames: string[],
+  startDate?: string,
+  endDate?: string
+): Promise<Ga4CampaignAttributionResult> {
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
+  const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string | undefined;
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || !propertyId) {
+    return { configured: false, startDate: range.startDate, endDate: range.endDate, result: null, error: 'GA4 is not configured for this brand.' };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to get access token:', msg);
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, result: null, error: msg };
+  }
+
+  try {
+    const { sessions, users } = await runCampaignSessionsReport(propertyId, token, range.startDate, range.endDate, campaignNames);
+
+    const def = ENQUIRY_EVENTS_BY_BRAND[brand];
+    let enquiries: number | null = null;
+    if (def) {
+      const eventNames = [...(def.form ?? []), ...(def.phone ?? []), ...(def.email ?? []), ...(def.livechat ?? [])];
+      enquiries = await runCampaignEnquiryReport(propertyId, token, range.startDate, range.endDate, campaignNames, eventNames);
+    }
+
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, result: { brand, sessions, users, enquiries }, error: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[ga4] failed to fetch campaign attribution for ${brand}:`, msg);
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, result: null, error: msg };
+  }
+}
+
 export interface Wave1PerformanceMetrics {
   clicks: number;
   pageViews: number;

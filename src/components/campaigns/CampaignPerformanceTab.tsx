@@ -9,6 +9,8 @@ import { getEmailPerformanceForCampaign, resolveEmailDateRange } from '@/utils/e
 import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
 import { getGoogleAdsForCampaign, getInfinityForCampaign } from '@/utils/campaignAttribution';
 import { resolveCallDateRange } from '@/utils/callPerformance';
+import { resolveGa4DateRange } from '@/utils/ga4Traffic';
+import { fetchCampaignGa4Attribution, type Ga4CampaignAttribution } from '@/services/ga4Api';
 import { formatDateShort } from '@/utils/dateUtils';
 
 interface CampaignPerformanceTabProps {
@@ -92,6 +94,53 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
     () => getInfinityForCampaign(infinityCalls, campaign),
     [infinityCalls, campaign]
   );
+
+  // GA4 attribution — deterministic only: an exact, case-insensitive match
+  // against this campaign's own explicit ga4CampaignNames (set via Edit
+  // Campaign), queried per brand this campaign runs under. Never derived
+  // from the campaign's display name. Same "all-time" reasoning and same
+  // resolveGa4DateRange() utility the Website/Performance screens use for
+  // GA4 — Campaign Detail deliberately looks across the campaign's whole
+  // lifetime rather than the global Period selector, but never invents its
+  // own date logic.
+  type Ga4AttributionState =
+    | { status: 'loading' | 'unmapped' | 'not-connected' }
+    | { status: 'available'; sessions: number; users: number; enquiries: number | null };
+  const [ga4Attribution, setGa4Attribution] = useState<Ga4AttributionState>({ status: 'unmapped' });
+
+  const ga4CampaignNames = campaign.ga4CampaignNames ?? [];
+  const ga4Brands = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
+
+  useEffect(() => {
+    if (ga4CampaignNames.length === 0) {
+      setGa4Attribution({ status: 'unmapped' });
+      return;
+    }
+    let cancelled = false;
+    setGa4Attribution({ status: 'loading' });
+    const { startDate, endDate } = resolveGa4DateRange('all-time');
+    Promise.all(ga4Brands.map((brand) => fetchCampaignGa4Attribution(brand, ga4CampaignNames, startDate, endDate).catch(() => null)))
+      .then((responses) => {
+        if (cancelled) return;
+        const results = responses.filter((r): r is NonNullable<typeof r> => r != null && r.result != null).map((r) => r.result as Ga4CampaignAttribution);
+        if (results.length === 0) {
+          setGa4Attribution({ status: 'not-connected' });
+          return;
+        }
+        const sessions = results.reduce((sum, r) => sum + r.sessions, 0);
+        const users = results.reduce((sum, r) => sum + r.users, 0);
+        const enquiryResults = results.filter((r) => r.enquiries != null);
+        const enquiries = enquiryResults.length > 0 ? enquiryResults.reduce((sum, r) => sum + (r.enquiries ?? 0), 0) : null;
+        setGa4Attribution({ status: 'available', sessions, users, enquiries });
+      })
+      .catch(() => {
+        if (!cancelled) setGa4Attribution({ status: 'not-connected' });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.id, JSON.stringify(ga4CampaignNames), JSON.stringify(ga4Brands)]);
 
   const [trackingLinkForm, setTrackingLinkForm] = useState(EMPTY_LINK_FORM);
   const [editingTrackingLink, setEditingTrackingLink] = useState<string | null>(null);
@@ -338,6 +387,45 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
               {googleAds.status === 'not-connected'
                 ? 'Google Ads is not connected.'
                 : 'Unmatched — no Google Ads campaign ID is mapped to this campaign yet. Add one via Edit Campaign to attribute real spend, impressions, clicks, CTR, CPC and conversions here.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Website response (GA4) — deterministic only: an exact match
+          against this campaign's own explicit ga4CampaignNames (set via
+          Edit Campaign), never derived from the campaign's own name. GA4
+          Enquiries only shown where the brand has a verified definition —
+          mtech and idaro genuinely have none, shown as "—", never a
+          fabricated 0. See getCampaignGa4Attribution's doc comment. */}
+      <div>
+        <h3 className="v2-section-title">Website Response (GA4)</h3>
+        {ga4Attribution.status === 'available' ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">Sessions</div>
+              <div className="text-2xl font-bold">{ga4Attribution.sessions.toLocaleString('en-GB')}</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">Users</div>
+              <div className="text-2xl font-bold">{ga4Attribution.users.toLocaleString('en-GB')}</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-sm text-text-secondary mb-1">GA4 Enquiries</div>
+              <div className="text-2xl font-bold">{ga4Attribution.enquiries != null ? ga4Attribution.enquiries.toLocaleString('en-GB') : '—'}</div>
+              {ga4Attribution.enquiries == null && (
+                <div className="text-xs text-text-secondary mt-1">No verified enquiry definition for this entity</div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="card p-4">
+            <p className="text-sm text-text-secondary">
+              {ga4Attribution.status === 'loading'
+                ? 'Loading…'
+                : ga4Attribution.status === 'not-connected'
+                  ? 'GA4 is not connected for this campaign’s entities.'
+                  : 'Unmatched — this campaign has no GA4 campaign name mapped yet. Add one via Edit Campaign to attribute real sessions, users and enquiries here.'}
             </p>
           </div>
         )}

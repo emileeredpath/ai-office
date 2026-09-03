@@ -1,16 +1,18 @@
 import { Router, type Request, type Response } from 'express';
-import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution } from '../services/ga4.js';
+import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution, getCampaignGa4Attribution } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance, getCampaignMonitorCoverage } from '../services/emailPerformance.js';
 import { fetchInfinityCalls } from '../services/infinity.js';
 import { getGoogleAdsPerformance } from '../services/googleAds.js';
 import { getSearchConsolePerformance } from '../services/searchConsole.js';
+import type { Brand } from '../types.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
 const router = Router();
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_BRANDS: Brand[] = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'];
 
 // General GA4 website traffic (V2 Overview/Performance/Reports — see
 // getBrandTraffic's own doc comment). startDate/endDate represent the
@@ -68,6 +70,33 @@ router.get('/education-campaign', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getEducationCampaignAttribution(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Generic per-campaign GA4 attribution (Campaign Attribution phase, slice
+// 2) — see getCampaignGa4Attribution's own doc comment. brand and at least
+// one campaignName are required; campaignNames is comma-separated real
+// values a user explicitly entered on the AI Office campaign record
+// (never derived from the campaign's display name). Same startDate/endDate
+// contract as every other analytics route.
+router.get('/campaign-ga4', async (req: Request, res: Response) => {
+  const brand = req.query.brand as string | undefined;
+  const rawNames = req.query.campaignNames as string | undefined;
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+
+  if (!brand || !VALID_BRANDS.includes(brand as Brand)) {
+    res.status(400).json({ configured: false, result: null, error: 'A valid brand is required.' });
+    return;
+  }
+  const campaignNames = (rawNames ?? '').split(',').map((n) => n.trim()).filter((n) => n.length > 0);
+  if (campaignNames.length === 0) {
+    res.status(400).json({ configured: false, result: null, error: 'At least one campaignNames value is required.' });
+    return;
+  }
+
+  const result = await getCampaignGa4Attribution(brand as Brand, campaignNames, validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 

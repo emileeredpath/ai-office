@@ -82,6 +82,7 @@ const createCampaignSchema = z.object({
   // CampaignRecord doc comment. Both entirely manual/user-entered.
   campaignCode: z.string().max(100).nullable().optional(),
   googleAdsCampaignIds: z.array(z.string().max(50)).optional(),
+  ga4CampaignNames: z.array(z.string().max(200)).optional(),
 });
 
 const updateCampaignSchema = createCampaignSchema.partial();

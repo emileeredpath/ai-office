@@ -153,3 +153,37 @@ export async function fetchEducationCampaignAttribution(startDate: string, endDa
   }
   return response.json();
 }
+
+// Generic per-AI-Office-campaign GA4 attribution (Campaign Attribution
+// phase, slice 2) — mirrors backend/src/services/ga4.ts's
+// getCampaignGa4Attribution exactly. campaignNames must be the campaign's
+// own explicit ga4CampaignNames — never derived from its display name.
+export interface Ga4CampaignAttribution {
+  brand: Brand;
+  sessions: number;
+  users: number;
+  // null when this brand has no verified GA4 Enquiry definition (mtech, idaro).
+  enquiries: number | null;
+}
+
+export interface Ga4CampaignAttributionResponse {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  result: Ga4CampaignAttribution | null;
+  error: string | null;
+}
+
+export async function fetchCampaignGa4Attribution(
+  brand: Brand,
+  campaignNames: string[],
+  startDate: string,
+  endDate: string
+): Promise<Ga4CampaignAttributionResponse> {
+  const params = new URLSearchParams({ brand, campaignNames: campaignNames.join(','), startDate, endDate });
+  const response = await apiFetch(`/api/analytics/campaign-ga4?${params.toString()}`);
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch campaign GA4 attribution (${response.status}).`, response.status);
+  }
+  return response.json();
+}

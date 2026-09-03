@@ -228,6 +228,10 @@ export interface Campaign {
   // powers deterministic attribution — see src/utils/campaignAttribution.ts.
   campaignCode?: string | null;
   googleAdsCampaignIds?: string[];
+  // Explicit GA4 sessionCampaignName value(s) this campaign is known to run
+  // under — never derived from the campaign's own display name. See
+  // src/utils/campaignAttribution.ts's getGa4ForCampaign.
+  ga4CampaignNames?: string[];
 }
 
 export interface BriefGeneratorState {
