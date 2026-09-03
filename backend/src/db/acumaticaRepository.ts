@@ -1,8 +1,9 @@
 import { nanoid } from 'nanoid';
 import db from './connection.js';
 import type { Brand } from '../types.js';
+import type { CommercialStatus } from '../services/acumaticaKpiRules.js';
 
-export type CommercialStatus = 'open' | 'won' | 'lost' | 'unclassified';
+export type { CommercialStatus };
 
 export interface AcumaticaOpportunityRecord {
   id: string;

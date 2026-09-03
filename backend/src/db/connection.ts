@@ -400,12 +400,12 @@ addColumnIfMissing('campaigns', 'ga4_campaign_names', "TEXT NOT NULL DEFAULT '[]
 // for management reporting.
 //
 // status/stage are stored verbatim, exactly as exported — commercial_status
-// is a SEPARATE, derived open/won/lost/unclassified classification (see
-// classifyCommercialStatus in acumaticaImport.ts) computed from status only,
-// using Acumatica's own standard tri-state values. This has NOT been
-// confirmed against a real customer export from this sandbox — flagged
-// there for verification before the KPIs it feeds are trusted in
-// production.
+// is a SEPARATE, derived open/won/lost/new/unclassified classification
+// (see classifyCommercialStatus in services/acumaticaKpiRules.ts — the one
+// central place every KPI rule lives) computed from status only, CONFIRMED
+// against a real 1,000-row sample of the actual export. Stage is never
+// used to infer Won/Lost/Open — real rows exist where Status and Stage
+// don't perfectly align.
 db.exec(`
   CREATE TABLE IF NOT EXISTS acumatica_opportunities (
     id TEXT PRIMARY KEY,

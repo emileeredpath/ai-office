@@ -18,7 +18,8 @@
 // employee, not a customer, and the brief explicitly allows retaining
 // owner/employee information for management reporting.
 import type { Brand } from '../types.js';
-import { upsertOpportunity, recordImportLog, type UpsertOpportunityInput, type CommercialStatus } from '../db/acumaticaRepository.js';
+import { upsertOpportunity, recordImportLog, type UpsertOpportunityInput } from '../db/acumaticaRepository.js';
+import { classifyCommercialStatus } from './acumaticaKpiRules.js';
 
 const REJECTED_PERSONAL_DATA_HEADERS = new Set(
   [
@@ -77,21 +78,6 @@ function deriveBrand(raw: string | null): Brand | null {
     if (patterns.some((p) => v.includes(p))) return brand;
   }
   return null;
-}
-
-// Acumatica's own standard Opportunity Status values (Open/Won/Lost) —
-// exact, case-insensitive match only. NOT confirmed against a real
-// customer export from this sandbox — verify this against the real
-// Status values before trusting the Open Pipeline/Won Deals/Won Revenue
-// KPIs this feeds. Anything else (including a genuinely blank Status) is
-// 'unclassified' — never guessed into open/won/lost.
-export function classifyCommercialStatus(rawStatus: string | null): CommercialStatus {
-  if (!rawStatus) return 'unclassified';
-  const s = rawStatus.trim().toLowerCase();
-  if (s === 'open') return 'open';
-  if (s === 'won') return 'won';
-  if (s === 'lost') return 'lost';
-  return 'unclassified';
 }
 
 function normaliseHeader(h: string): string {

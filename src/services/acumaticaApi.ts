@@ -65,10 +65,20 @@ export interface AcumaticaSummary {
   hasImportedData: boolean;
   lastImportedAt: string | null;
   opportunities: number;
-  openPipelineValue: number;
-  openPipelineCount: number;
   wonDeals: number;
   wonRevenue: number;
+  lostDeals: number;
+  // Open Pipeline is deliberately provisional — see backend/src/services/
+  // acumaticaKpiRules.ts's OPEN_PIPELINE_STATUSES doc comment. While
+  // openPipelineDefinitionConfirmed is false, never present
+  // openPipelineValue/openPipelineCount as a settled figure — always show
+  // newStatusCount/newStatusValue alongside it.
+  openPipelineValue: number;
+  openPipelineCount: number;
+  openPipelineDefinitionConfirmed: boolean;
+  openPipelineIncludesStatuses: string[];
+  newStatusCount: number;
+  newStatusValue: number;
   unclassifiedCount: number;
   undated: number;
 }

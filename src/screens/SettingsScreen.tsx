@@ -100,10 +100,10 @@ function AcumaticaSettings() {
         <span className="text-sm font-medium text-text-primary">API status: Not connected</span>
       </div>
       <p className="text-xs text-text-secondary mb-4">
-        AI Office does not connect to a live Acumatica API. Commercial data (Opportunities, Open Pipeline, Won Deals,
-        Won Revenue) comes only from a manually-uploaded Acumatica Opportunities export —{' '}
-        <strong>Source: Acumatica Manual Export</strong>. It is only ever as current as the last successful upload
-        below, never real-time.
+        AI Office does not connect to a live Acumatica API. Commercial data (Opportunities, Won Deals, Won Revenue,
+        and a provisional Open Pipeline — see Leads &amp; CRM) comes only from a manually-uploaded Acumatica
+        Opportunities export — <strong>Source: Acumatica Manual Export</strong>. It is only ever as current as the
+        last successful upload below, never real-time.
       </p>
 
       <div className="flex items-center gap-2 mb-4">

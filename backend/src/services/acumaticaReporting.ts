@@ -1,23 +1,12 @@
 // Genuine commercial KPIs derived from manually-imported Acumatica
 // Opportunities (Discovery & Foundation phase) — see acumaticaImport.ts
-// and db/acumaticaRepository.ts. Every figure here is built only from
-// real imported rows; nothing is inferred or backfilled.
-//
-// KPI definitions (provisional — see classifyCommercialStatus's own doc
-// comment: not yet confirmed against a real customer export):
-//   Opportunities  = every real imported opportunity, regardless of status.
-//   Open Pipeline  = sum of `total` across opportunities whose Status is
-//                    genuinely "Open" (commercialStatus === 'open').
-//   Won Deals      = count of opportunities whose Status is "Won".
-//   Won Revenue    = sum of `total` across those Won opportunities.
-// Opportunities with an unrecognised/blank Status are 'unclassified' —
-// counted in Opportunities, but deliberately excluded from Open
-// Pipeline/Won Deals/Won Revenue rather than guessed into one bucket.
-//
-// Marketing Leads / Qualified Leads are NOT populated from this data —
-// an Acumatica Opportunity is not the same thing as a lead, and this
-// export contains no separate lead-level record.
+// and db/acumaticaRepository.ts. Every figure here is built only from real
+// imported rows; nothing is inferred or backfilled. All Status
+// classification and KPI membership rules live centrally in
+// acumaticaKpiRules.ts — this file only aggregates using those rules, it
+// never re-derives or hardcodes a status string itself.
 import { getAllOpportunities, getLastImportLog, type AcumaticaOpportunityRecord } from '../db/acumaticaRepository.js';
+import { isWonStatus, isLostStatus, isOpenPipelineStatus, OPEN_PIPELINE_STATUSES, PIPELINE_DEFINITION_CONFIRMED } from './acumaticaKpiRules.js';
 import type { Brand } from '../types.js';
 
 export interface AcumaticaSummary {
@@ -26,11 +15,34 @@ export interface AcumaticaSummary {
   // period is never confused with "nothing has been imported yet."
   hasImportedData: boolean;
   lastImportedAt: string | null;
+
+  // Opportunities = every genuine imported Opportunity ID in range,
+  // regardless of Status.
   opportunities: number;
-  openPipelineValue: number;
-  openPipelineCount: number;
+
+  // Won Deals / Won Revenue = Status exactly "Won" — see isWonStatus.
   wonDeals: number;
   wonRevenue: number;
+
+  // Lost = Status exactly "Lost" — see isLostStatus.
+  lostDeals: number;
+
+  // Open Pipeline — DELIBERATELY PROVISIONAL. See acumaticaKpiRules.ts's
+  // OPEN_PIPELINE_STATUSES doc comment: real Status also contains "New"
+  // (confirmed 68 of the first 1,000 real rows) and it is NOT yet decided
+  // whether that counts as open pipeline. openPipelineDefinitionConfirmed
+  // is false until a business decision is made and OPEN_PIPELINE_STATUSES
+  // is updated — every caller (routes, screens) must treat
+  // openPipelineValue/openPipelineCount as provisional while this is
+  // false, and should surface newStatusCount/newStatusValue alongside it
+  // so nobody reads the figure as a settled answer.
+  openPipelineValue: number;
+  openPipelineCount: number;
+  openPipelineDefinitionConfirmed: boolean;
+  openPipelineIncludesStatuses: string[];
+  newStatusCount: number;
+  newStatusValue: number;
+
   unclassifiedCount: number;
   // Opportunities excluded from a date-scoped view because their
   // Created On value couldn't be parsed as a date — reported honestly
@@ -75,18 +87,25 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
     });
   }
 
-  const openOpps = scoped.filter((o) => o.commercialStatus === 'open');
-  const wonOpps = scoped.filter((o) => o.commercialStatus === 'won');
+  const wonOpps = scoped.filter((o) => isWonStatus(o.commercialStatus));
+  const lostOpps = scoped.filter((o) => isLostStatus(o.commercialStatus));
+  const openOpps = scoped.filter((o) => isOpenPipelineStatus(o.commercialStatus));
+  const newOpps = scoped.filter((o) => o.commercialStatus === 'new');
   const unclassifiedOpps = scoped.filter((o) => o.commercialStatus === 'unclassified');
 
   return {
     hasImportedData: all.length > 0,
     lastImportedAt: lastImport?.importedAt ?? null,
     opportunities: scoped.length,
-    openPipelineValue: openOpps.reduce((sum, o) => sum + (o.total ?? 0), 0),
-    openPipelineCount: openOpps.length,
     wonDeals: wonOpps.length,
     wonRevenue: wonOpps.reduce((sum, o) => sum + (o.total ?? 0), 0),
+    lostDeals: lostOpps.length,
+    openPipelineValue: openOpps.reduce((sum, o) => sum + (o.total ?? 0), 0),
+    openPipelineCount: openOpps.length,
+    openPipelineDefinitionConfirmed: PIPELINE_DEFINITION_CONFIRMED,
+    openPipelineIncludesStatuses: OPEN_PIPELINE_STATUSES,
+    newStatusCount: newOpps.length,
+    newStatusValue: newOpps.reduce((sum, o) => sum + (o.total ?? 0), 0),
     unclassifiedCount: unclassifiedOpps.length,
     undated,
   };

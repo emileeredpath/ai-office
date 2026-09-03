@@ -231,10 +231,14 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
             subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export — see Settings for last import' : 'No Acumatica export imported yet'}
           />
           <KpiCard
-            title="Open Pipeline"
+            title="Open Pipeline (provisional)"
             value={acumaticaSummary?.hasImportedData ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined}
             status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
-            subtitle={acumaticaSummary?.hasImportedData ? `${acumaticaSummary.openPipelineCount} open opportunit${acumaticaSummary.openPipelineCount === 1 ? 'y' : 'ies'} — manual Acumatica export` : 'No Acumatica export imported yet'}
+            subtitle={
+              acumaticaSummary?.hasImportedData
+                ? `${acumaticaSummary.openPipelineCount} Status="Open" only — excludes ${acumaticaSummary.newStatusCount} "New" opp(s) worth £${Math.round(acumaticaSummary.newStatusValue).toLocaleString()}, pending confirmation`
+                : 'No Acumatica export imported yet'
+            }
           />
           <KpiCard
             title="Won Deals"
