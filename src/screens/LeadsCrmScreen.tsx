@@ -22,6 +22,7 @@ import { getUnmatchedGoogleAdsCampaigns, getUnmatchedGa4Campaigns } from '@/util
 import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { fetchGa4CampaignNamesInUse } from '@/services/ga4Api';
+import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
 import type { Brand } from '@/types/index';
 
 const GA4_BRANDS: Brand[] = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'];
@@ -138,11 +139,24 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
     };
   }, [ga4NamesInUse, unmatchedGa4Campaigns]);
 
+  // Genuine commercial KPIs from the last manually-imported Acumatica
+  // export (Discovery & Foundation phase) — never live. Respects the
+  // shared Period selector and the selected entity the same way every
+  // other integration on this page does: group view queries across every
+  // entity, a specific entity filters server-side by its own brand.
+  const periodStart = useMemo(() => periodStartDate(period), [period]);
+  const [acumaticaSummary, setAcumaticaSummary] = useState<AcumaticaSummary | null>(null);
+  useEffect(() => {
+    const startDate = periodStart ? periodStart.toISOString().slice(0, 10) : undefined;
+    const endDate = periodStart ? new Date().toISOString().slice(0, 10) : undefined;
+    const brand = isGroupView || selectedEntity === 'all' ? undefined : selectedEntity;
+    fetchAcumaticaSummary(startDate, endDate, brand).then(setAcumaticaSummary).catch(() => setAcumaticaSummary(null));
+  }, [periodStart, isGroupView, selectedEntity]);
+
   const entityCampaigns = useMemo(
     () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const periodStart = useMemo(() => periodStartDate(period), [period]);
   const periodCampaigns = useMemo(
     () => filterCampaignsByPeriod(entityCampaigns, periodStart),
     [entityCampaigns, periodStart]
@@ -180,7 +194,15 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
     infinityConfigured
       ? { label: 'Infinity', status: 'live', detail: 'Connected' }
       : { label: 'Infinity', status: 'not-connected', detail: 'Not connected' },
-    { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
+    acumaticaSummary?.hasImportedData
+      ? {
+          label: 'Acumatica',
+          status: 'stale',
+          detail: acumaticaSummary.lastImportedAt
+            ? `Manual export — last imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')}`
+            : 'Manual export',
+        }
+      : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
   ];
 
   return (
@@ -201,11 +223,31 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
         {/* Headline KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
           <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" />
-          <KpiCard title="Qualified Leads" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Won Deals" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
+          <KpiCard title="Qualified Leads" status="not-connected" subtitle="No lead-level data in the Acumatica export" />
+          <KpiCard
+            title="Opportunities"
+            value={acumaticaSummary?.hasImportedData ? acumaticaSummary.opportunities : undefined}
+            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
+            subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export — see Settings for last import' : 'No Acumatica export imported yet'}
+          />
+          <KpiCard
+            title="Open Pipeline"
+            value={acumaticaSummary?.hasImportedData ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined}
+            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
+            subtitle={acumaticaSummary?.hasImportedData ? `${acumaticaSummary.openPipelineCount} open opportunit${acumaticaSummary.openPipelineCount === 1 ? 'y' : 'ies'} — manual Acumatica export` : 'No Acumatica export imported yet'}
+          />
+          <KpiCard
+            title="Won Deals"
+            value={acumaticaSummary?.hasImportedData ? acumaticaSummary.wonDeals : undefined}
+            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
+            subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export' : 'No Acumatica export imported yet'}
+          />
+          <KpiCard
+            title="Won Revenue"
+            value={acumaticaSummary?.hasImportedData ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
+            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
+            subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export' : 'No Acumatica export imported yet'}
+          />
         </div>
 
         {/* Attribution Health — CRM-side (Acumatica-pending, all "Not
