@@ -17,6 +17,26 @@ import { nanoid } from 'nanoid';
 // by POST /api/actions — same validation, same duplicate detection, same
 // confirmation gate, same audit log. Nothing here talks to the database
 // directly.
+//
+// SECURITY REVIEW REQUIRED before this surface (especially the generic
+// entity-access tools below — describe_schema/list_records/get_record/
+// create_record/update_record/delete_record/restore_record) is allowed to
+// reach any table containing identifiable personal or customer data (e.g.
+// once Acumatica is connected). Today this tool surface is schema-wide with
+// no per-field/per-table sensitivity model — "if it's a registered entity,
+// the tool can touch it." That is not the same thing as being reviewed and
+// approved for personal data. Do not extend the generic tools to a new
+// entity carrying personal data without first confirming: (1) how /mcp
+// itself is authenticated, since it sits outside the EDIT_PASSWORD/
+// VIEW_PASSWORD session wall in backend/src/middleware/session.ts; (2)
+// whether a field-level allow-list or redaction is needed on the generic
+// tools; (3) that every MCP-originated write is distinguishable from a
+// human UI write in audit_log. Treat this as part of the wider GDPR/
+// security work, not something to sign off informally because the tools
+// already work for tasks/campaigns/funding records today. See
+// DATA_INTEGRITY.md for the related data-integrity rule this tool surface
+// must also respect (never let an AI-authored suggestion become a real
+// record without an explicit, authorised creation action).
 
 function toToolResult(result: ActionResult) {
   return {
