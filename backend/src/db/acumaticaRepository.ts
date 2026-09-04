@@ -19,7 +19,13 @@ export interface AcumaticaOpportunityRecord {
   sourceLead: string | null;
   heardAboutUs: string | null;
   productFocus: string | null;
+  // Best-effort numeric parse (see acumaticaImport.ts's parseProbability) —
+  // probabilityRaw always holds the untouched original string alongside
+  // it, so a malformed/unusual value stays a visible data-quality issue
+  // rather than being silently discarded or "repaired". Neither is used
+  // for weighted pipeline anywhere in this codebase.
   probability: number | null;
+  probabilityRaw: string | null;
   industrySector: string | null;
   proposalSent: string | null;
   hireType: string | null;
@@ -47,6 +53,7 @@ interface OpportunityRow {
   heard_about_us: string | null;
   product_focus: string | null;
   probability: number | null;
+  probability_raw: string | null;
   industry_sector: string | null;
   proposal_sent: string | null;
   hire_type: string | null;
@@ -75,6 +82,7 @@ function rowToRecord(row: OpportunityRow): AcumaticaOpportunityRecord {
     heardAboutUs: row.heard_about_us,
     productFocus: row.product_focus,
     probability: row.probability,
+    probabilityRaw: row.probability_raw,
     industrySector: row.industry_sector,
     proposalSent: row.proposal_sent,
     hireType: row.hire_type,
@@ -112,7 +120,7 @@ export function upsertOpportunity(input: UpsertOpportunityInput): { record: Acum
         created_on = @createdOn, status = @status, stage = @stage, commercial_status = @commercialStatus,
         total = @total, estimated_close_date = @estimatedCloseDate, opportunity_class = @opportunityClass,
         owner = @owner, source_lead = @sourceLead, heard_about_us = @heardAboutUs, product_focus = @productFocus,
-        probability = @probability, industry_sector = @industrySector, proposal_sent = @proposalSent,
+        probability = @probability, probability_raw = @probabilityRaw, industry_sector = @industrySector, proposal_sent = @proposalSent,
         hire_type = @hireType, quantity_units = @quantityUnits, brand = @brand,
         source_filename = @sourceFilename, imported_at = @importedAt, updated_at = @updatedAt
       WHERE opportunity_id = @opportunityId`
@@ -124,11 +132,11 @@ export function upsertOpportunity(input: UpsertOpportunityInput): { record: Acum
   db.prepare(
     `INSERT INTO acumatica_opportunities (
       id, opportunity_id, created_on, status, stage, commercial_status, total, estimated_close_date,
-      opportunity_class, owner, source_lead, heard_about_us, product_focus, probability, industry_sector,
+      opportunity_class, owner, source_lead, heard_about_us, product_focus, probability, probability_raw, industry_sector,
       proposal_sent, hire_type, quantity_units, brand, source, source_filename, imported_at, created_at, updated_at
     ) VALUES (
       @id, @opportunityId, @createdOn, @status, @stage, @commercialStatus, @total, @estimatedCloseDate,
-      @opportunityClass, @owner, @sourceLead, @heardAboutUs, @productFocus, @probability, @industrySector,
+      @opportunityClass, @owner, @sourceLead, @heardAboutUs, @productFocus, @probability, @probabilityRaw, @industrySector,
       @proposalSent, @hireType, @quantityUnits, @brand, 'acumatica_manual', @sourceFilename, @importedAt, @createdAt, @updatedAt
     )`
   ).run({ ...input, id, createdAt: now, updatedAt: now });

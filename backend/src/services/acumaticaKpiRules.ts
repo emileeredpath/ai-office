@@ -77,7 +77,14 @@ export function isOpenPipelineStatus(status: CommercialStatus): boolean {
 // NOT computed anywhere yet — the Discovery brief treats Probability data
 // quality as a later exercise. Do not add a weighted-pipeline figure
 // without first auditing real Probability values the same way Status was
-// audited here.
+// audited here. Probability's raw value is always preserved alongside a
+// best-effort numeric parse — see acumaticaImport.ts's parseProbability —
+// so a malformed/unusual value stays a visible data-quality issue rather
+// than being silently discarded or "repaired".
+
+// Shared blank-value display convention for every free-text Acumatica
+// field below — never an empty cell, a dash, or the literal "null".
+export const UNSPECIFIED = 'Unspecified';
 
 // ---- "Where Did You Hear About Us?" — CONFIRMED rule (2026-09-04) ----
 //
@@ -103,6 +110,44 @@ export function isOpenPipelineStatus(status: CommercialStatus): boolean {
 //     formatSalesReportedSource() below wherever this field is rendered,
 //     rather than showing an empty cell, a dash, or "null".
 export function formatSalesReportedSource(rawHeardAboutUs: string | null): string {
-  return rawHeardAboutUs ?? 'Unspecified';
+  return rawHeardAboutUs ?? UNSPECIFIED;
+}
+
+// ---- Other confirmed field-handling rules (2026-09-04) ----------------
+// All of the following are enforced in acumaticaImport.ts/
+// acumaticaRepository.ts at the point each field is read/stored — this
+// block is the single index of what's confirmed, so a future change to
+// any of them starts here rather than being rediscovered from scratch:
+//
+// - Source Lead: raw value preserved only. Sparsely populated and
+//   inconsistently used in the real export — never treated as a reliable
+//   lead -> opportunity relationship, and never used to populate Marketing
+//   Leads or Qualified Leads.
+// - Opportunity Class: raw value preserved unchanged. May later be grouped
+//   for reporting (e.g. Sales/Hire/Events/Service/AV/Licence Renewal) —
+//   any such grouping must be computed from the raw value on read, never
+//   by overwriting it.
+// - Product Focus: raw value preserved unchanged, suitable for commercial/
+//   product reporting as-is. Blank -> UNSPECIFIED on display (never
+//   inferred) — use formatUnspecified() below.
+// - Industry Sector: raw value preserved unchanged. A literal "Not
+//   Applicable" is a genuine reported value, never treated as missing —
+//   only a genuinely empty cell becomes null. Not used as a headline KPI.
+// - Estimated Close Date: raw date string only. Many real open/new
+//   opportunities carry a historic close date, so this is not reliable
+//   enough for forecasting/projected-revenue figures yet — not used for
+//   that anywhere in this codebase.
+// - £0 / missing Total: a valid Opportunity ID counts as an Opportunity
+//   regardless of Total. A blank/unparseable Total stays null (see
+//   acumaticaImport.ts's parseNumber) — never converted into a meaningful
+//   commercial value — while a genuine "£0" parses to the real number 0.
+//   Revenue/pipeline sums only ever add real numeric totals.
+// - Entity/brand: derived ONLY from a genuine Entity/Branch/Business Unit/
+//   Company column (see acumaticaImport.ts's deriveBrand) — never from the
+//   Opportunity ID. The real export's "RL-"/"MC-" ID prefixes are
+//   deliberately not parsed; their business meaning isn't yet confirmed.
+//   No matching entity column value leaves brand null/unclassified.
+export function formatUnspecified(raw: string | null): string {
+  return raw ?? UNSPECIFIED;
 }
 

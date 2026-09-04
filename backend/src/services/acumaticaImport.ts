@@ -62,6 +62,15 @@ const FIELD_ALIASES: Record<string, string[]> = {
 // contains match only, never a fuzzy guess. A value that doesn't match any
 // of these leaves brand null (genuinely unattributed), never defaulted to
 // "mtech".
+//
+// CONFIRMED (2026-09-04): brand is derived ONLY from a genuine Entity/
+// Branch/Business Unit/Company column — never from the Opportunity ID
+// itself. The real export's Opportunity IDs carry prefixes like "RL-" and
+// "MC-", but their business meaning hasn't been confirmed (they may or may
+// not map cleanly to Radio Links/Capcom), so they are deliberately never
+// parsed or matched here. If no genuine entity column value is present (or
+// it matches nothing above), brand stays null/unclassified — never guessed
+// from the ID.
 const BRAND_MATCH: Array<{ brand: Brand; patterns: string[] }> = [
   { brand: 'brentwood', patterns: ['brentwood'] },
   { brand: 'radio-links', patterns: ['radio links', 'radio-links'] },
@@ -130,12 +139,37 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => !(r.length === 1 && r[0].trim() === ''));
 }
 
+// Used for Total and Quantity of Units — a blank or genuinely unparseable
+// value stays null (never defaulted to 0 or invented), which is what
+// distinguishes it from a real "£0" (parses to the finite number 0, a
+// genuine reported zero). CONFIRMED (2026-09-04): a null total never
+// blocks the row from counting as a real Opportunity — Opportunities
+// counts every valid imported Opportunity ID regardless of Total — and
+// revenue/pipeline sums only ever add real numeric totals (see
+// acumaticaReporting.ts).
 function parseNumber(raw: string | undefined): number | null {
   if (!raw) return null;
   const cleaned = raw.replace(/[£$,\s]/g, '').trim();
   if (cleaned === '') return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
+}
+
+// Probability of Conversion — CONFIRMED (2026-09-04): the raw string is
+// ALWAYS preserved verbatim (probabilityRaw) so a malformed/unusual value
+// remains a visible data-quality issue, never silently discarded or
+// "repaired". The numeric parse here is deliberately narrow — it accepts a
+// plain number or a number with a single trailing "%" (the two genuinely
+// unambiguous real-world formats for a percentage) and nothing else; any
+// other format (blank, text, multiple values, stray characters) leaves
+// probability null while probabilityRaw still shows exactly what was
+// there. Never used for weighted pipeline anywhere in this codebase.
+function parseProbability(raw: string | undefined): { value: number | null; raw: string | null } {
+  const trimmed = raw?.trim() ?? '';
+  if (trimmed === '') return { value: null, raw: null };
+  const match = trimmed.match(/^(-?\d+(?:\.\d+)?)\s*%?$/);
+  const value = match ? Number(match[1]) : null;
+  return { value: value !== null && Number.isFinite(value) ? value : null, raw: trimmed };
 }
 
 function cell(row: string[], index: number | undefined): string | null {
@@ -226,6 +260,11 @@ export function importAcumaticaCsv(filename: string, csvText: string): ImportRes
     }
 
     const status = cell(row, fieldIndex.status);
+    // commercialStatus is derived from `status` ONLY — see
+    // classifyCommercialStatus's own doc comment (acumaticaKpiRules.ts).
+    // stage is stored verbatim immediately below and never feeds this
+    // classification, even when it appears to conflict with status.
+    const { value: probability, raw: probabilityRaw } = parseProbability(cell(row, fieldIndex.probability) ?? undefined);
     const input: UpsertOpportunityInput = {
       opportunityId,
       createdOn: cell(row, fieldIndex.createdOn),
@@ -233,13 +272,38 @@ export function importAcumaticaCsv(filename: string, csvText: string): ImportRes
       stage: cell(row, fieldIndex.stage),
       commercialStatus: classifyCommercialStatus(status),
       total: parseNumber(cell(row, fieldIndex.total) ?? undefined),
+      // Estimated Close Date: raw date string only. CONFIRMED (2026-09-04)
+      // — many real open/new opportunities carry a historic close date, so
+      // this is not reliable enough to drive forecasting/projected-revenue
+      // figures yet. Not used for that anywhere in this codebase.
       estimatedCloseDate: cell(row, fieldIndex.estimatedCloseDate),
+      // Opportunity Class: raw Acumatica value only — may later be grouped
+      // for reporting (e.g. Sales/Hire/Events/Service/AV/Licence Renewal),
+      // but that grouping must always be computed from this raw value on
+      // read, never by overwriting it.
       opportunityClass: cell(row, fieldIndex.opportunityClass),
       owner: cell(row, fieldIndex.owner),
+      // Source Lead: raw Acumatica value only. Sparsely populated and
+      // inconsistently used in the real export — never treated as a
+      // reliable lead -> opportunity relationship, and never used to
+      // populate Marketing Leads or Qualified Leads (those remain
+      // campaign.leads and a permanent Acumatica-pending stub respectively
+      // — see KPI_DEFINITIONS.md).
       sourceLead: cell(row, fieldIndex.sourceLead),
+      // "Where Did You Hear About Us?" — see formatSalesReportedSource in
+      // acumaticaKpiRules.ts for the confirmed handling rule.
       heardAboutUs: cell(row, fieldIndex.heardAboutUs),
+      // Product Focus: raw Acumatica value only, suitable for commercial/
+      // product reporting as-is. A blank cell is stored as null here —
+      // display code must render that as "Unspecified", never infer a
+      // value (see acumaticaKpiRules.ts's UNSPECIFIED constant).
       productFocus: cell(row, fieldIndex.productFocus),
-      probability: parseNumber(cell(row, fieldIndex.probability) ?? undefined),
+      probability,
+      probabilityRaw,
+      // Industry Sector: raw Acumatica value only. A literal "Not
+      // Applicable" is a genuine reported value here, not treated as
+      // missing/blank — `cell()` only nulls a genuinely empty string.
+      // Not used as a headline KPI anywhere in this codebase.
       industrySector: cell(row, fieldIndex.industrySector),
       proposalSent: cell(row, fieldIndex.proposalSent),
       hireType: cell(row, fieldIndex.hireType),

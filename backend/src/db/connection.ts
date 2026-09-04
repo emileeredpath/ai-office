@@ -402,10 +402,18 @@ addColumnIfMissing('campaigns', 'ga4_campaign_names', "TEXT NOT NULL DEFAULT '[]
 // status/stage are stored verbatim, exactly as exported — commercial_status
 // is a SEPARATE, derived open/won/lost/new/unclassified classification
 // (see classifyCommercialStatus in services/acumaticaKpiRules.ts — the one
-// central place every KPI rule lives) computed from status only, CONFIRMED
-// against a real 1,000-row sample of the actual export. Stage is never
-// used to infer Won/Lost/Open — real rows exist where Status and Stage
-// don't perfectly align.
+// central place every KPI rule lives) computed from status ONLY, CONFIRMED
+// against a real 1,000-row sample of the actual export. Stage is
+// descriptive sales-process data only and is NEVER used to infer or
+// override Status-based classification — confirmed real rows exist where
+// Status and Stage don't align; both raw values are always preserved
+// regardless of any conflict between them.
+//
+// probability is a best-effort numeric parse (see acumaticaImport.ts) —
+// probability_raw always holds the untouched original string alongside it,
+// since a malformed/unusual Probability value must remain a visible
+// data-quality issue, never silently "repaired" into a number. Neither is
+// used for weighted pipeline anywhere in this codebase.
 db.exec(`
   CREATE TABLE IF NOT EXISTS acumatica_opportunities (
     id TEXT PRIMARY KEY,
@@ -422,6 +430,7 @@ db.exec(`
     heard_about_us TEXT,
     product_focus TEXT,
     probability REAL,
+    probability_raw TEXT,
     industry_sector TEXT,
     proposal_sent TEXT,
     hire_type TEXT,
@@ -449,5 +458,9 @@ db.exec(`
     imported_at TEXT NOT NULL
   );
 `);
+
+// Safety net for a deployment whose acumatica_opportunities table was
+// already created before probability_raw existed in the CREATE TABLE above.
+addColumnIfMissing('acumatica_opportunities', 'probability_raw', 'TEXT');
 
 export default db;
