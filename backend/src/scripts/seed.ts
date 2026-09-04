@@ -46,29 +46,80 @@ function task(overrides: Partial<TaskRecord> & Pick<TaskRecord, 'id' | 'title' |
 }
 
 const seedCampaigns = [
+  // CONFIRMED (2026-09) directly against production's live database via a
+  // read-only Railway SQLite connection — this replaces the old 'campaign-0'
+  // entry, which was never a real production record (it was added by an
+  // earlier commit explicitly "for cascade testing"). Using production's
+  // real id/fields here means a genuinely fresh/empty database (this
+  // never re-runs against a populated one — see the file-level doc
+  // comment) seeds the correct baseline instead of resurrecting that
+  // reconstructed record. See backend/src/scripts/campaignRestoration.ts
+  // for the one-time preview migration that corrects an already-seeded
+  // database from the old id to this one.
   {
-    id: 'campaign-0',
+    id: 'campaign-ggzz19_80Y',
     name: 'Q3 Education Campaign',
     brand: 'mtech' as const,
-    entities: ['mtech' as const],
+    entities: ['brentwood' as const, 'radio-links' as const, 'capcom' as const, 'ircl' as const],
     primaryIndustry: 'Education',
     secondaryIndustry: 'Marketing',
     theme: 'Q3 education initiative',
     status: 'active' as const,
-    startDate: '2026-08-15',
+    startDate: '2026-08-05',
     endDate: '2026-08-31',
-    budget: 30000,
+    budget: 2000,
     spend: 0,
     conversions: 0,
     leads: 0,
     engagement: 0,
     colour: '#8B5CF6',
+    googleAdsCampaignIds: ['24149514165'],
     schedule: [
       { id: 'sched-001', date: '2026-08-15', element: 'Email launch', status: 'scheduled', taskId: 'task-23' },
       { id: 'sched-002', date: '2026-08-20', element: 'Social campaign', status: 'planning', taskId: 'task-24' },
       { id: 'sched-003', date: '2026-08-25', element: 'Landing page live', status: 'planning', taskId: 'task-25' },
       { id: 'sched-004', date: '2026-08-29', element: 'PPC review & adjust', status: 'planning', taskId: 'task-26' },
     ],
+  },
+  // CONFIRMED (2026-09) directly against production's live database —
+  // previously missing entirely from this seed.
+  {
+    id: 'campaign-xkvvYN9Zx8',
+    name: 'YESSS Electrical Webinar',
+    brand: 'mtech' as const,
+    entities: ['mtech' as const],
+    primaryIndustry: '',
+    secondaryIndustry: '',
+    theme: '',
+    status: 'planning' as const,
+    startDate: '2026-08-06',
+    endDate: '2026-09-18',
+    budget: null,
+    spend: 0,
+    conversions: 0,
+    leads: 0,
+    engagement: 0,
+    colour: '#2C7A4B',
+  },
+  // CONFIRMED (2026-09) directly against production's live database —
+  // previously missing entirely from this seed.
+  {
+    id: 'campaign-E2gh6wExaj',
+    name: 'Haven Tender',
+    brand: 'mtech' as const,
+    entities: ['mtech' as const, 'brentwood' as const, 'idaro' as const],
+    primaryIndustry: '',
+    secondaryIndustry: '',
+    theme: '',
+    status: 'active' as const,
+    startDate: '2026-08-07',
+    endDate: '2026-08-17',
+    budget: null,
+    spend: 0,
+    conversions: 0,
+    leads: 0,
+    engagement: 0,
+    colour: '#B23A48',
   },
   {
     id: 'campaign-1',
@@ -191,10 +242,10 @@ const seedTasks: TaskRecord[] = [
   task({ id: 'task-20', title: 'Edit Education Industry page', brand: 'brentwood', priority: 'high', createdAt: '2026-07-27' }),
   task({ id: 'task-21', title: 'Service and Repair Email Campaign — All Brands (Quarterly)', brand: 'mtech', priority: 'high', createdAt: '2026-07-27' }),
   task({ id: 'task-22', title: 'Review Calendly vs Microsoft Bookings', brand: 'mtech', createdAt: '2026-07-27' }),
-  task({ id: 'task-23', title: 'Q3 Education Campaign — MTech Group Email', brand: 'mtech', deadline: '2026-08-15', campaignId: 'campaign-0', scheduleId: 'sched-001', createdAt: '2026-07-27' }),
-  task({ id: 'task-24', title: 'Q3 Education Campaign — Social Posts', brand: 'mtech', deadline: '2026-08-20', campaignId: 'campaign-0', scheduleId: 'sched-002', createdAt: '2026-07-27' }),
-  task({ id: 'task-25', title: 'Q3 Education Campaign — Update landing page', brand: 'mtech', deadline: '2026-08-25', campaignId: 'campaign-0', scheduleId: 'sched-003', createdAt: '2026-07-27' }),
-  task({ id: 'task-26', title: 'Q3 Education Campaign — Landing page PPC review', brand: 'mtech', deadline: '2026-08-29', campaignId: 'campaign-0', scheduleId: 'sched-004', createdAt: '2026-07-27' }),
+  task({ id: 'task-23', title: 'Q3 Education Campaign — MTech Group Email', brand: 'mtech', deadline: '2026-08-15', campaignId: 'campaign-ggzz19_80Y', scheduleId: 'sched-001', createdAt: '2026-07-27' }),
+  task({ id: 'task-24', title: 'Q3 Education Campaign — Social Posts', brand: 'mtech', deadline: '2026-08-20', campaignId: 'campaign-ggzz19_80Y', scheduleId: 'sched-002', createdAt: '2026-07-27' }),
+  task({ id: 'task-25', title: 'Q3 Education Campaign — Update landing page', brand: 'mtech', deadline: '2026-08-25', campaignId: 'campaign-ggzz19_80Y', scheduleId: 'sched-003', createdAt: '2026-07-27' }),
+  task({ id: 'task-26', title: 'Q3 Education Campaign — Landing page PPC review', brand: 'mtech', deadline: '2026-08-29', campaignId: 'campaign-ggzz19_80Y', scheduleId: 'sched-004', createdAt: '2026-07-27' }),
   task({ id: 'task-27', title: 'Account Manager Email — Garreth Breen', brand: 'ircl', status: 'complete', startDate: '2026-07-02', createdAt: '2026-07-02', completedAt: '2026-07-05' }),
   task({ id: 'task-28', title: 'Account Manager Email — Sue Gunnell', brand: 'brentwood', status: 'complete', startDate: '2026-07-02', campaignId: 'campaign-2', createdAt: '2026-07-02', completedAt: '2026-07-06' }),
   task({ id: 'task-29', title: 'Account Manager Email — Sateen Baxter', brand: 'radio-links', status: 'complete', startDate: '2026-07-08', campaignId: 'campaign-2', createdAt: '2026-07-08', completedAt: '2026-07-11' }),

@@ -14,7 +14,7 @@
 // are deliberately independent: a flag can be copy-pasted into the wrong
 // service's env vars, and a path can be misconfigured, but both would have
 // to be wrong together for this to run somewhere it shouldn't.
-import { getCampaignById, insertCampaign } from '../db/campaignRepository.js';
+import { getCampaignById, insertCampaign, archiveCampaign } from '../db/campaignRepository.js';
 import { getAllTasks, insertTask } from '../db/taskRepository.js';
 import { getFundingRecordById, insertFundingRecord } from '../db/fundingRepository.js';
 import db from '../db/connection.js';
@@ -223,6 +223,16 @@ export function runPreviewSeed() {
     colour: '#5b6472',
     results: { enquiriesReceived: 19, loggedAt: daysFromNow(-5) },
   });
+
+  // These four are fictional demo data, not genuine campaigns — see
+  // DATA_INTEGRITY.md's rule that test/seed data must be clearly
+  // identifiable and excluded from real reporting. Archiving them
+  // immediately keeps every repository's default getAll(includeArchived =
+  // false) — what every normal screen uses — excluding them automatically,
+  // while they're still there (and un-archivable-back-into-view via their
+  // preview- prefix) for exercising Needs Your Attention on a preview
+  // deployment.
+  for (const id of PREVIEW_CAMPAIGN_IDS) archiveCampaign(id);
 
   // --- Tasks: a few upcoming items + one example of each existing
   // Needs-Your-Attention rule (overdue, waiting-approval, due-within-48h) ---
