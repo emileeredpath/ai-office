@@ -13,7 +13,7 @@ import type { Brand } from '../types.js';
 const router = Router();
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const VALID_BRANDS: Brand[] = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'];
+const VALID_BRANDS: Brand[] = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro', 'brentwood-marine'];
 
 // General GA4 website traffic (V2 Overview/Performance/Reports — see
 // getBrandTraffic's own doc comment). startDate/endDate represent the

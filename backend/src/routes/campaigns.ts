@@ -13,7 +13,7 @@ import { requireEdit } from '../middleware/session.js';
 
 const router = Router();
 
-const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
+const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro', 'brentwood-marine'] as const;
 const STATUSES = ['planning', 'active', 'on-hold', 'completed'] as const;
 
 const resultsSchema = z

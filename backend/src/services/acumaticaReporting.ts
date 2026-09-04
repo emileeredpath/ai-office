@@ -6,7 +6,7 @@
 // acumaticaKpiRules.ts — this file only aggregates using those rules, it
 // never re-derives or hardcodes a status string itself.
 import { getAllOpportunities, getLastImportLog, type AcumaticaOpportunityRecord } from '../db/acumaticaRepository.js';
-import { isWonStatus, isLostStatus, isOpenPipelineStatus, OPEN_PIPELINE_STATUSES, PIPELINE_DEFINITION_CONFIRMED } from './acumaticaKpiRules.js';
+import { isWonStatus, isLostStatus, isOpenPipelineStatus, OPEN_PIPELINE_STATUSES, PIPELINE_DEFINITION_CONFIRMED, isBrandTrackedInAcumatica } from './acumaticaKpiRules.js';
 import type { Brand } from '../types.js';
 
 export interface AcumaticaSummary {
@@ -47,6 +47,14 @@ export interface AcumaticaSummary {
   // Created On value couldn't be parsed as a date — reported honestly
   // rather than silently dropped or silently included.
   undated: number;
+
+  // CONFIRMED (2026-09-05): some brands (e.g. IRCL) are not held in
+  // Acumatica at all. When notAvailableForBrand is true, every numeric
+  // figure above is 0 by construction (there is no data to sum) but MUST
+  // NOT be presented as a real, verified zero — callers must check this
+  // flag first and show notAvailableReason instead of any KPI figure.
+  notAvailableForBrand: boolean;
+  notAvailableReason: string | null;
 }
 
 function parseExportDate(raw: string | null): Date | null {
@@ -66,6 +74,27 @@ function parseExportDate(raw: string | null): Date | null {
 export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?: Brand): AcumaticaSummary {
   const all = getAllOpportunities();
   const lastImport = getLastImportLog();
+
+  if (brand && !isBrandTrackedInAcumatica(brand)) {
+    return {
+      hasImportedData: all.length > 0,
+      lastImportedAt: lastImport?.importedAt ?? null,
+      opportunities: 0,
+      wonDeals: 0,
+      wonRevenue: 0,
+      lostDeals: 0,
+      openPipelineValue: 0,
+      openPipelineCount: 0,
+      openPipelineDefinitionConfirmed: PIPELINE_DEFINITION_CONFIRMED,
+      openPipelineIncludesStatuses: OPEN_PIPELINE_STATUSES,
+      newStatusCount: 0,
+      newStatusValue: 0,
+      unclassifiedCount: 0,
+      undated: 0,
+      notAvailableForBrand: true,
+      notAvailableReason: 'IRCL is not managed in Acumatica',
+    };
+  }
 
   let scoped: AcumaticaOpportunityRecord[] = all;
   if (brand) {
@@ -107,5 +136,7 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
     newStatusValue: newOpps.reduce((sum, o) => sum + (o.total ?? 0), 0),
     unclassifiedCount: unclassifiedOpps.length,
     undated,
+    notAvailableForBrand: false,
+    notAvailableReason: null,
   };
 }

@@ -81,6 +81,12 @@ export interface AcumaticaSummary {
   newStatusValue: number;
   unclassifiedCount: number;
   undated: number;
+  // CONFIRMED (2026-09-05): true for a brand not held in Acumatica at all
+  // (e.g. IRCL). Every numeric figure above is 0 in that case, but it's
+  // not a real verified zero — check this flag first and show
+  // notAvailableReason instead of any KPI figure.
+  notAvailableForBrand: boolean;
+  notAvailableReason: string | null;
 }
 
 export async function fetchAcumaticaSummary(startDate?: string, endDate?: string, brand?: Brand): Promise<AcumaticaSummary> {

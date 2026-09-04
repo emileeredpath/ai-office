@@ -1,4 +1,4 @@
-export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro';
+export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro' | 'brentwood-marine';
 
 export interface TrackingLink {
   id: string;

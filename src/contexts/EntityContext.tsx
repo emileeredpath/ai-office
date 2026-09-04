@@ -18,6 +18,7 @@ export const ENTITY_OPTIONS: { value: EntitySelection; label: string }[] = [
   { value: 'capcom', label: 'Capcom' },
   { value: 'ircl', label: 'Irish Radio' },
   { value: 'idaro', label: 'IDARO' },
+  { value: 'brentwood-marine', label: 'Brentwood Marine' },
 ];
 
 interface EntityContextType {

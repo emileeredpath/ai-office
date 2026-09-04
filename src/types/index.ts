@@ -1,4 +1,4 @@
-export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro';
+export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro' | 'brentwood-marine';
 
 export type TaskType = 'task' | 'email-send';
 

@@ -59,7 +59,7 @@ import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js
 import db from '../db/connection.js';
 import type { TaskRecord, TrackingLink } from '../types.js';
 
-const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
+const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro', 'brentwood-marine'] as const;
 
 export interface EntityFieldDescriptor {
   name: string;

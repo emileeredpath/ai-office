@@ -15,7 +15,50 @@
 // trusting Stage instead would silently produce a different, unverified
 // answer. Stage is stored verbatim for reference and is not otherwise
 // interpreted anywhere in this codebase.
+import type { Brand } from '../types.js';
+
 export type CommercialStatus = 'open' | 'won' | 'lost' | 'new' | 'unclassified';
+
+// ---- Entity/brand derivation from Opportunity ID prefix — CONFIRMED
+// (2026-09-05) --------------------------------------------------------
+//
+// Supersedes the earlier "never derive brand from the Opportunity ID"
+// stance: the business has now confirmed these four prefixes are a
+// genuine, deterministic Acumatica entity code, not a guess. Exact
+// prefix match only (the text before the first "-", case-insensitive) —
+// never a fuzzy/partial match, never inferred from anything else in the
+// ID. An explicit Entity/Branch/Business Unit/Company column value, when
+// present, still takes precedence over this — see acumaticaImport.ts's
+// deriveBrand, which tries the explicit column first and only falls back
+// to the ID prefix when that column is absent/unmatched. A prefix not in
+// this map leaves brand null/unclassified, never guessed.
+export const ACUMATICA_ID_PREFIX_MAP: Record<string, Brand> = {
+  'rl': 'radio-links',
+  'bc': 'brentwood',
+  'cc': 'capcom',
+  'mc': 'brentwood-marine',
+};
+
+export function deriveBrandFromOpportunityIdPrefix(opportunityId: string | null): Brand | null {
+  if (!opportunityId) return null;
+  const prefix = opportunityId.trim().split('-')[0]?.toLowerCase();
+  if (!prefix) return null;
+  return ACUMATICA_ID_PREFIX_MAP[prefix] ?? null;
+}
+
+// ---- Brands not tracked in Acumatica — CONFIRMED (2026-09-05) --------
+//
+// IRCL is not held in Acumatica at all — it must never be reported as
+// "0 opportunities / £0 pipeline / £0 revenue" (which would read as a
+// real, verified zero) when filtered to it. Callers must check
+// isBrandTrackedInAcumatica() and show an explicit "not available"
+// state instead of any numeric Acumatica figure for such a brand.
+const BRANDS_NOT_IN_ACUMATICA: Brand[] = ['ircl'];
+
+export function isBrandTrackedInAcumatica(brand: Brand | null | undefined): boolean {
+  if (!brand) return true;
+  return !BRANDS_NOT_IN_ACUMATICA.includes(brand);
+}
 
 // Exact, case-insensitive match only — never a partial/fuzzy match, and
 // never inferred from Stage. A Status value not in this list (including

@@ -187,6 +187,14 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   // would understate what this page actually reads from.
   const cmConfigured = emailPerformance?.configured === true;
   const infinityConfigured = infinityCalls?.configured === true;
+  // CONFIRMED (2026-09-05): IRCL isn't held in Acumatica at all — when the
+  // entity filter is scoped to it, acumaticaSummary.notAvailableForBrand
+  // comes back true and every numeric figure is a structural 0, not a real
+  // verified one. Show an explicit "Not available" state instead.
+  const acumaticaNotAvailable = acumaticaSummary?.notAvailableForBrand === true;
+  const acumaticaNotAvailableSubtitle = acumaticaSummary?.notAvailableReason
+    ? `Not available — ${acumaticaSummary.notAvailableReason}`
+    : 'Not available';
   const freshnessEntries: FreshnessEntry[] = [
     cmConfigured
       ? { label: 'Campaign Monitor', status: emailPerformance?.syncState === 'live' ? 'live' : 'error', detail: emailPerformance?.syncState === 'live' ? 'Connected' : 'Sync error' }
@@ -194,15 +202,17 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
     infinityConfigured
       ? { label: 'Infinity', status: 'live', detail: 'Connected' }
       : { label: 'Infinity', status: 'not-connected', detail: 'Not connected' },
-    acumaticaSummary?.hasImportedData
-      ? {
-          label: 'Acumatica',
-          status: 'stale',
-          detail: acumaticaSummary.lastImportedAt
-            ? `Manual export — last imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')}`
-            : 'Manual export',
-        }
-      : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
+    acumaticaNotAvailable
+      ? { label: 'Acumatica', status: 'not-connected', detail: acumaticaNotAvailableSubtitle }
+      : acumaticaSummary?.hasImportedData
+        ? {
+            label: 'Acumatica',
+            status: 'stale',
+            detail: acumaticaSummary.lastImportedAt
+              ? `Manual export — last imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')}`
+              : 'Manual export',
+          }
+        : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
   ];
 
   return (
@@ -226,31 +236,55 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
           <KpiCard title="Qualified Leads" status="not-connected" subtitle="No lead-level data in the Acumatica export" />
           <KpiCard
             title="Opportunities"
-            value={acumaticaSummary?.hasImportedData ? acumaticaSummary.opportunities : undefined}
-            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
-            subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export — see Settings for last import' : 'No Acumatica export imported yet'}
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+            subtitle={
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? 'Manual Acumatica export — see Settings for last import'
+                  : 'No Acumatica export imported yet'
+            }
           />
           <KpiCard
             title="Open Pipeline"
-            value={acumaticaSummary?.hasImportedData ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined}
-            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
             subtitle={
-              acumaticaSummary?.hasImportedData
-                ? `${acumaticaSummary.openPipelineCount} opportunities — Status = Open + New`
-                : 'No Acumatica export imported yet'
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? `${acumaticaSummary.openPipelineCount} opportunities — Status = Open + New`
+                  : 'No Acumatica export imported yet'
             }
           />
           <KpiCard
             title="Won Deals"
-            value={acumaticaSummary?.hasImportedData ? acumaticaSummary.wonDeals : undefined}
-            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
-            subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export' : 'No Acumatica export imported yet'}
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.wonDeals : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+            subtitle={
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? 'Manual Acumatica export'
+                  : 'No Acumatica export imported yet'
+            }
           />
           <KpiCard
             title="Won Revenue"
-            value={acumaticaSummary?.hasImportedData ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
-            status={acumaticaSummary?.hasImportedData ? 'available' : 'not-connected'}
-            subtitle={acumaticaSummary?.hasImportedData ? 'Manual Acumatica export' : 'No Acumatica export imported yet'}
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+            subtitle={
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? 'Manual Acumatica export'
+                  : 'No Acumatica export imported yet'
+            }
           />
         </div>
 

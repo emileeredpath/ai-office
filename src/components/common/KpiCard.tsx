@@ -20,12 +20,18 @@ interface KpiCardProps {
   // previous-period figure" — rendered as an honest "not available", never
   // a fabricated 0% or hidden entirely.
   comparison?: PeriodComparison | null;
+  // Overrides the "Not connected" headline text shown when status is
+  // 'not-connected' — e.g. "Not available" for a source that structurally
+  // doesn't cover this entity (IRCL isn't in Acumatica at all) rather than
+  // one that simply isn't wired up yet. Defaults to "Not connected" so
+  // every existing call site is unaffected.
+  notConnectedLabel?: string;
 }
 
 // Shared V2 KPI tile. Renders an honest "Not connected" state instead of a
 // fabricated £0/0 when the underlying data source doesn't exist yet
 // (see NOT_CONNECTED_METRICS in Overview — Acumatica-sourced metrics).
-export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', status = 'available', onClick, size = 'default', comparison }: KpiCardProps) {
+export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', status = 'available', onClick, size = 'default', comparison, notConnectedLabel = 'Not connected' }: KpiCardProps) {
   const isNotConnected = status === 'not-connected';
   const valueClass = size === 'compact' ? 'text-xl font-bold text-text-primary truncate' : 'text-3xl font-bold text-text-primary truncate';
 
@@ -38,7 +44,7 @@ export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', s
       <div className="text-text-secondary text-sm font-medium mb-3 truncate">{title}</div>
       {isNotConnected ? (
         <>
-          <div className="v2-kpi-not-connected">Not connected</div>
+          <div className="v2-kpi-not-connected">{notConnectedLabel}</div>
           {subtitle && <div className="text-xs text-text-secondary mt-2">{subtitle}</div>}
         </>
       ) : (

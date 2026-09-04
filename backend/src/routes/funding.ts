@@ -10,7 +10,7 @@ import { requireEdit } from '../middleware/session.js';
 
 const router = Router();
 
-const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'] as const;
+const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro', 'brentwood-marine'] as const;
 const REBATE_TYPES = ['marketing-rebate', 'loyalty-rebate', 'loyalty-bonus', 'other'] as const;
 const CLAIM_STATUSES = ['eligible', 'submitted', 'approved', 'paid', 'rejected'] as const;
 

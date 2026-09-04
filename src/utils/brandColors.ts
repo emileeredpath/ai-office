@@ -10,6 +10,7 @@ export const BRAND_COLOR: Record<Brand, string> = {
   capcom: '#7b6fb0',
   ircl: '#5b6472',
   idaro: '#39FF14',
+  'brentwood-marine': '#1B7A8C',
 };
 
 export const BRAND_LABEL: Record<Brand, string> = {
@@ -19,6 +20,7 @@ export const BRAND_LABEL: Record<Brand, string> = {
   capcom: 'Capcom',
   ircl: 'IRCL',
   idaro: 'IDARO',
+  'brentwood-marine': 'Brentwood Marine',
 };
 
 // Text colour for a solid brand-colour background — every brand is dark

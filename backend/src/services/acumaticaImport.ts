@@ -19,7 +19,7 @@
 // owner/employee information for management reporting.
 import type { Brand } from '../types.js';
 import { upsertOpportunity, recordImportLog, type UpsertOpportunityInput } from '../db/acumaticaRepository.js';
-import { classifyCommercialStatus } from './acumaticaKpiRules.js';
+import { classifyCommercialStatus, deriveBrandFromOpportunityIdPrefix } from './acumaticaKpiRules.js';
 
 const REJECTED_PERSONAL_DATA_HEADERS = new Set(
   [
@@ -68,14 +68,8 @@ const FIELD_ALIASES: Record<string, string[]> = {
 // of these leaves brand null (genuinely unattributed), never defaulted to
 // "mtech".
 //
-// CONFIRMED (2026-09-04): brand is derived ONLY from a genuine Entity/
-// Branch/Business Unit/Company column — never from the Opportunity ID
-// itself. The real export's Opportunity IDs carry prefixes like "RL-" and
-// "MC-", but their business meaning hasn't been confirmed (they may or may
-// not map cleanly to Radio Links/Capcom), so they are deliberately never
-// parsed or matched here. If no genuine entity column value is present (or
-// it matches nothing above), brand stays null/unclassified — never guessed
-// from the ID.
+// Matches a genuine Entity/Branch/Business Unit/Company column value, when
+// present — deterministic exact/contains match only, never a fuzzy guess.
 const BRAND_MATCH: Array<{ brand: Brand; patterns: string[] }> = [
   { brand: 'brentwood', patterns: ['brentwood'] },
   { brand: 'radio-links', patterns: ['radio links', 'radio-links'] },
@@ -85,13 +79,23 @@ const BRAND_MATCH: Array<{ brand: Brand; patterns: string[] }> = [
   { brand: 'mtech', patterns: ['mtech', 'mtech group'] },
 ];
 
-function deriveBrand(raw: string | null): Brand | null {
-  if (!raw) return null;
-  const v = raw.trim().toLowerCase();
-  for (const { brand, patterns } of BRAND_MATCH) {
-    if (patterns.some((p) => v.includes(p))) return brand;
+// CONFIRMED (2026-09-05): entity/brand is derived first from a genuine
+// Entity/Branch/Business Unit/Company column, when present — that always
+// takes precedence. Only when no such column value is present (or it
+// matches nothing in BRAND_MATCH) does this fall back to the Opportunity
+// ID prefix, using the now-confirmed deterministic mapping in
+// acumaticaKpiRules.ts's ACUMATICA_ID_PREFIX_MAP (exact prefix match only,
+// never fuzzy). An unrecognised prefix — and a genuinely absent entity
+// column plus an unrecognised/absent prefix — leaves brand null/
+// unclassified, never guessed.
+function deriveBrand(entityColumnRaw: string | null, opportunityId: string | null): Brand | null {
+  if (entityColumnRaw) {
+    const v = entityColumnRaw.trim().toLowerCase();
+    for (const { brand, patterns } of BRAND_MATCH) {
+      if (patterns.some((p) => v.includes(p))) return brand;
+    }
   }
-  return null;
+  return deriveBrandFromOpportunityIdPrefix(opportunityId);
 }
 
 function normaliseHeader(h: string): string {
@@ -313,7 +317,7 @@ export function importAcumaticaCsv(filename: string, csvText: string): ImportRes
       proposalSent: cell(row, fieldIndex.proposalSent),
       hireType: cell(row, fieldIndex.hireType),
       quantityUnits: parseNumber(cell(row, fieldIndex.quantityUnits) ?? undefined),
-      brand: deriveBrand(cell(row, fieldIndex.brand)),
+      brand: deriveBrand(cell(row, fieldIndex.brand), opportunityId),
       sourceFilename: filename,
       importedAt,
     };
