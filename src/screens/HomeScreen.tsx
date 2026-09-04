@@ -1,80 +1,71 @@
-import { useEffect, useMemo } from 'react';
-import { AlertTriangle, CheckCircle2, Info, ArrowRight, ExternalLink } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/contexts/EntityContext';
 import { usePeriod, periodStartDate } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { KpiCard } from '@/components/common/KpiCard';
-import { MarketingFunnel, type FunnelStage } from '@/components/common/MarketingFunnel';
-import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataFreshnessBar';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMarketingEvents } from '@/utils/marketingEvents';
-import { filterCampaignsByPeriod, sumLeads, sumSpend, sumEnquiries } from '@/utils/campaignMetrics';
-import { getCallsSnapshot } from '@/utils/channelSnapshot';
+import { filterCampaignsByPeriod, sumSpend } from '@/utils/campaignMetrics';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
+import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
-import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
-import type { AuditLogEntry } from '@/services/auditLogApi';
-
-const MTECH_AI_PROJECT_URL = 'https://claude.ai/project/019ef9de-64f0-75c3-8a1e-67749db5192e';
+import { resolveEmailDateRange, getEmailPerformance, getEmailHeadlineMetrics, getEmailPerformanceForCampaign } from '@/utils/emailPerformance';
+import { resolveCallDateRange, getCallPerformance } from '@/utils/callPerformance';
+import { resolveSearchConsoleDateRange, getSearchConsoleSummary } from '@/utils/searchConsole';
+import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
+import { getCurrentPeriodRange, getPreviousPeriodRange, compareToPrevious } from '@/utils/periodComparison';
+import { fetchGa4Enquiries, type Ga4EnquiriesResponse } from '@/services/ga4Api';
+import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
+import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
 
 interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
 }
 
-function describeAuditEntry(entry: AuditLogEntry): string {
-  const value = (entry.newValue ?? entry.previousValue) as any;
-  const label = value?.title || value?.name || value?.schemeName || entry.resourceId || entry.resourceType;
-  const resourceLabel = entry.resourceType.replace(/_/g, ' ');
-  const verb = entry.action.startsWith('create')
-    ? 'Created'
-    : entry.action.startsWith('update')
-    ? 'Updated'
-    : entry.action.startsWith('complete')
-    ? 'Completed'
-    : entry.action.startsWith('delete')
-    ? 'Archived'
-    : entry.action.startsWith('restore')
-    ? 'Restored'
-    : entry.action.startsWith('import')
-    ? 'Imported into'
-    : entry.action.startsWith('sync')
-    ? 'Synced'
-    : 'Changed';
-  return `${verb} ${resourceLabel} "${label}"`;
-}
+// A manual Acumatica export older than this is flagged as a genuine data
+// issue in Needs Your Attention — not an invented threshold, just "old
+// enough that the commercial figures on this page may no longer reflect
+// reality." Purely a presentation-layer signal; never changes the
+// underlying data or the Leads & CRM figures themselves.
+const STALE_IMPORT_DAYS = 45;
+// "Coming up" looks roughly two weeks ahead — a marketing diary, not a
+// long-range planner.
+const COMING_UP_DAYS = 14;
 
-// Small type chip for Recent Activity, derived from the audit log's own
-// resource_type — no new data, just a clearer label on what already exists.
-function activityKind(resourceType: string): { kind: string; label: string } {
-  if (resourceType === 'task') return { kind: 'task', label: 'Task' };
-  if (resourceType === 'campaign') return { kind: 'campaign', label: 'Campaign' };
-  if (resourceType === 'funding_record') return { kind: 'funding', label: 'Funding' };
-  return { kind: 'other', label: resourceType.replace(/_/g, ' ') };
+function formatDateRangeLabel(range: { startDate: string; endDate: string }): string {
+  const start = new Date(`${range.startDate}T00:00:00`);
+  const end = new Date(`${range.endDate}T00:00:00`);
+  const monthShort = (d: Date) => d.toLocaleDateString('en-GB', { month: 'short' });
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) return `${start.getDate()}–${end.getDate()} ${monthShort(end)} ${end.getFullYear()}`;
+  return `${start.getDate()} ${monthShort(start)} – ${end.getDate()} ${monthShort(end)} ${end.getFullYear()}`;
 }
 
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const tasks = useAppStore((s) => s.tasks);
   const campaigns = useAppStore((s) => s.campaigns);
   const fundingRecords = useAppStore((s) => s.fundingRecords);
-  const auditLog = useAppStore((s) => s.auditLog);
-  const wave1Performance = useAppStore((s) => s.wave1Performance);
-  const ga4Traffic = useAppStore((s) => s.ga4Traffic);
+  const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
+  const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
+  const infinityCalls = useAppStore((s) => s.infinityCalls);
+  const searchConsolePerformance = useAppStore((s) => s.searchConsolePerformance);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
-  const syncAuditLog = useAppStore((s) => s.syncAuditLog);
-  const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
-  const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
+  const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
   const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
+  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
+  const syncSearchConsolePerformance = useAppStore((s) => s.syncSearchConsolePerformance);
   const selectTask = useAppStore((s) => s.selectTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { isEditor } = useAuth();
@@ -83,11 +74,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   useEffect(() => {
     syncFundingRecordsFromApi();
-    syncAuditLog();
-    syncWave1Performance();
-    syncWave1Calls();
-  }, [syncFundingRecordsFromApi, syncAuditLog, syncWave1Performance, syncWave1Calls]);
+  }, [syncFundingRecordsFromApi]);
 
+  // ---- Live source fetches, all period-aware via the shared resolve*
+  // utilities every other screen already uses — see REPORTING_PERIOD.md
+  // for exactly what each source's period support/caveats are. -----------
   const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
   useEffect(() => {
     syncGa4Traffic(ga4Range.startDate, ga4Range.endDate);
@@ -95,6 +86,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   useEffect(() => {
     syncGa4SocialTraffic(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4SocialTraffic]);
+  useEffect(() => {
+    syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
+  }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
 
   const googleAdsRange = useMemo(() => resolveGoogleAdsDateRange(period), [period]);
   useEffect(() => {
@@ -106,19 +100,32 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     syncEmailPerformance(emailRange.startDate, emailRange.endDate);
   }, [emailRange.startDate, emailRange.endDate, syncEmailPerformance]);
 
-  const today = new Date();
-  const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
-  const dateStr = formatDate(today);
-  const userName = isEditor ? 'Emilee' : 'John';
+  const callRange = useMemo(() => resolveCallDateRange(period), [period]);
+  useEffect(() => {
+    syncInfinityCalls(callRange.startDate, callRange.endDate);
+  }, [callRange.startDate, callRange.endDate, syncInfinityCalls]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
+  const searchConsoleRange = useMemo(() => resolveSearchConsoleDateRange(period), [period]);
+  useEffect(() => {
+    syncSearchConsolePerformance(searchConsoleRange.startDate, searchConsoleRange.endDate);
+  }, [searchConsoleRange.startDate, searchConsoleRange.endDate, syncSearchConsolePerformance]);
 
-  // ---- Entity + period scoped data ----------------------------------
+  // Acumatica manual commercial data — CONFIRMED (Dashboard Completion
+  // Phase 2 audit): the export has Created On and Estimated Close Date but
+  // no trustworthy Won Date, so Won Revenue cannot be honestly assigned to
+  // "this month" (or any period) — filtering by Created On would just
+  // silently misrepresent it as period-scoped Won Revenue. This fetch is
+  // deliberately NOT period-scoped — it always reflects the latest full
+  // import, labelled as such everywhere it's shown, with no previous-period
+  // comparison offered (see KPI_DEFINITIONS.md/REPORTING_PERIOD.md).
+  const [acumaticaSummary, setAcumaticaSummary] = useState<AcumaticaSummary | null>(null);
+  useEffect(() => {
+    const brand = isGroupView || selectedEntity === 'all' ? undefined : selectedEntity;
+    fetchAcumaticaSummary(undefined, undefined, brand).then(setAcumaticaSummary).catch(() => setAcumaticaSummary(null));
+  }, [isGroupView, selectedEntity]);
+  const acumaticaNotAvailable = acumaticaSummary?.notAvailableForBrand === true;
+
+  // ---- Entity-scoped base data -------------------------------------------
   const entityCampaigns = useMemo(
     () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
@@ -131,34 +138,38 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     () => fundingRecords.filter((r) => matchesSelectedEntity(r.brand)),
     [fundingRecords, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
-
   const periodStart = useMemo(() => periodStartDate(period), [period]);
   const periodCampaigns = useMemo(
     () => filterCampaignsByPeriod(entityCampaigns, periodStart),
     [entityCampaigns, periodStart]
   );
-
-  // ---- Headline KPIs (5) — real data only, honest "Not connected" ---
-  // Marketing Leads and Marketing Spend come from manually-logged campaign
-  // fields (campaignRepository `leads`/`spend`) — real numbers, but not
-  // CRM-sourced, so they're labelled accordingly rather than implied to be
-  // Acumatica data. Open Pipeline, Won Revenue, Opportunities and Won Deals
-  // have no data source in the app today (no CRM/Acumatica integration
-  // exists) — they show "Not connected" rather than £0 or an invented figure.
-  // Shared with Performance via src/utils/campaignMetrics.ts so the two
-  // pages can never disagree on these totals.
-  const marketingLeads = useMemo(() => sumLeads(periodCampaigns), [periodCampaigns]);
   const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
-  const liveCampaignsCount = useMemo(() => entityCampaigns.filter((c) => c.status === 'active').length, [entityCampaigns]);
 
-  // ---- Marketing Funnel -----------------------------------------------
-  // Website Users: real GA4 activeUsers (Phase 1) — see
-  // src/utils/ga4Traffic.ts for how the figure is resolved per entity.
-  // Enquiries: real, but manually logged per campaign (CampaignResults),
-  // never previously aggregated — this is a genuine improvement using
-  // existing data, not an invented number.
-  // Opportunities / Won Deals: no CRM data model exists — not connected.
-  const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
+  // ---- Marketing Performance KPIs ----------------------------------------
+  const ga4EnquiriesInfo = useMemo(
+    () => getEnquiries(ga4Enquiries, isGroupView, selectedEntity),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const callPerformance = useMemo(
+    () => getCallPerformance(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
+  );
+  const emailPerf = useMemo(
+    () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
+    [emailPerformance, isGroupView, selectedEntity]
+  );
+  const emailHeadline = useMemo(
+    () => getEmailHeadlineMetrics(emailPerformance, isGroupView, selectedEntity),
+    [emailPerformance, isGroupView, selectedEntity]
+  );
+  const googleAds = useMemo(
+    () => getGoogleAdsSummary(googleAdsPerformance, isGroupView, selectedEntity),
+    [googleAdsPerformance, isGroupView, selectedEntity]
+  );
+  const searchConsole = useMemo(
+    () => getSearchConsoleSummary(searchConsolePerformance, isGroupView, selectedEntity),
+    [searchConsolePerformance, isGroupView, selectedEntity]
+  );
   const websiteUsers = useMemo(
     () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
     [ga4Traffic, isGroupView, selectedEntity]
@@ -167,248 +178,205 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
     [ga4SocialTraffic, isGroupView, selectedEntity]
   );
-  const googleAds = useMemo(
-    () => getGoogleAdsSummary(googleAdsPerformance, isGroupView, selectedEntity),
-    [googleAdsPerformance, isGroupView, selectedEntity]
-  );
-  const funnelStages: FunnelStage[] = [
-    {
-      label: 'Website Users',
-      value: websiteUsers.status === 'available' ? websiteUsers.activeUsers! : null,
-      subtitle: websiteUsers.subtitle,
-    },
-    { label: 'Enquiries', value: enquiriesTotal, subtitle: 'Manually logged per campaign' },
-    { label: 'Marketing Leads', value: marketingLeads, subtitle: 'Manually logged per campaign' },
-    { label: 'Opportunities', value: null, subtitle: 'Awaiting Acumatica integration' },
-    { label: 'Won Deals', value: null, subtitle: 'Awaiting Acumatica integration' },
-  ];
 
-  // ---- Needs Your Attention --------------------------------------------
-  // Real, rule-based triggers only — no invented warnings. Task rules reuse
-  // the original HomeScreen logic; the funding-expiry rule uses the same
-  // real fundingRecords data already fetched on this screen. Each item
-  // carries a short `tag` (what happened) plus `detail` (why it matters) so
-  // the list is scannable without reading full sentences.
-  type AttentionSeverity = 'red' | 'orange' | 'purple';
-  interface AttentionItem {
-    id: string;
-    tag: string;
+  // ---- Previous-period comparisons ---------------------------------------
+  // Only for the two sources REPORTING_PERIOD.md confirms can honestly
+  // support one (GA4 Enquiries, Google Ads) — Calls/Email/Search Console
+  // are deliberately left without a comparison; Acumatica has no period
+  // concept at all here (see above). GA4/Google Ads previous-period data is
+  // fetched directly (bypassing the shared store), same pattern already
+  // established on Performance, so it never touches what any other screen
+  // sees.
+  const previousRange = useMemo(() => getPreviousPeriodRange(period), [period]);
+  const currentRange = useMemo(() => getCurrentPeriodRange(period), [period]);
+  const [previousGa4Enquiries, setPreviousGa4Enquiries] = useState<Ga4EnquiriesResponse | null>(null);
+  const [previousGoogleAds, setPreviousGoogleAds] = useState<GoogleAdsResponse | null>(null);
+  useEffect(() => {
+    if (!previousRange) {
+      setPreviousGa4Enquiries(null);
+      setPreviousGoogleAds(null);
+      return;
+    }
+    let cancelled = false;
+    fetchGa4Enquiries(previousRange.startDate, previousRange.endDate)
+      .then((data) => { if (!cancelled) setPreviousGa4Enquiries(data); })
+      .catch(() => { if (!cancelled) setPreviousGa4Enquiries(null); });
+    fetchGoogleAdsPerformance(previousRange.startDate, previousRange.endDate)
+      .then((data) => { if (!cancelled) setPreviousGoogleAds(data); })
+      .catch(() => { if (!cancelled) setPreviousGoogleAds(null); });
+    return () => { cancelled = true; };
+  }, [previousRange?.startDate, previousRange?.endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ga4EnquiriesComparison = useMemo(() => {
+    const previousInfo = getEnquiries(previousGa4Enquiries, isGroupView, selectedEntity);
+    return compareToPrevious(
+      ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total! : null,
+      previousRange && previousInfo.status === 'available' ? previousInfo.total! : null
+    );
+  }, [ga4EnquiriesInfo, previousGa4Enquiries, previousRange, isGroupView, selectedEntity]);
+
+  const googleAdsSpendComparison = useMemo(() => {
+    const previousInfo = getGoogleAdsSummary(previousGoogleAds, isGroupView, selectedEntity);
+    return compareToPrevious(
+      googleAds.status === 'available' ? googleAds.spend! : null,
+      previousRange && previousInfo.status === 'available' ? previousInfo.spend! : null
+    );
+  }, [googleAds, previousGoogleAds, previousRange, isGroupView, selectedEntity]);
+
+  // ---- Needs Your Attention -----------------------------------------------
+  // Genuine, rule-based conditions only, grouped into the categories a
+  // marketing manager actually needs to triage — never a raw dump of every
+  // task. Each category carries one real example for context.
+  interface AttentionExample {
     title: string;
     detail: string;
-    severity: AttentionSeverity;
     onClick?: () => void;
   }
+  interface AttentionCategory {
+    id: string;
+    label: (count: number) => string;
+    severity: 'red' | 'orange';
+    items: AttentionExample[];
+  }
 
-  const attentionItems = useMemo<AttentionItem[]>(() => {
+  const attentionCategories = useMemo<AttentionCategory[]>(() => {
     const now = new Date();
     const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    const items: AttentionItem[] = [];
+    const in30days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+    const overdue: AttentionExample[] = [];
+    const dueSoon: AttentionExample[] = [];
     for (const t of entityTasks) {
       if (t.status === 'complete') continue;
       if (t.deadline && new Date(t.deadline) < now) {
-        items.push({
-          id: `task-overdue-${t.id}`,
-          tag: 'Overdue',
-          title: t.title,
-          detail: `Since ${formatDateShort(t.deadline)} — needs action`,
-          severity: 'red',
-          onClick: () => selectTask(t.id),
-        });
+        overdue.push({ title: t.title, detail: `Since ${formatDateShort(t.deadline)}`, onClick: () => selectTask(t.id) });
       } else if (t.status === 'waiting-approval' || t.status === 'waiting-john') {
-        items.push({
-          id: `task-waiting-${t.id}`,
-          tag: t.status === 'waiting-approval' ? 'Awaiting approval' : 'Awaiting John',
-          title: t.title,
-          detail: t.deadline ? `Due ${formatDateShort(t.deadline)}` : 'No deadline set',
-          severity: 'orange',
-          onClick: () => selectTask(t.id),
-        });
+        dueSoon.push({ title: t.title, detail: 'Awaiting approval', onClick: () => selectTask(t.id) });
       } else if (t.deadline) {
         const d = new Date(t.deadline);
         if (d >= now && d <= in48h) {
-          items.push({
-            id: `task-due-${t.id}`,
-            tag: 'Due soon',
-            title: t.title,
-            detail: `Due ${formatDateShort(t.deadline)}`,
-            severity: 'orange',
-            onClick: () => selectTask(t.id),
-          });
+          dueSoon.push({ title: t.title, detail: `Due ${formatDateShort(t.deadline)}`, onClick: () => selectTask(t.id) });
         }
       }
     }
 
-    const in30days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    for (const r of entityFundingRecords) {
-      if (r.archived) continue;
-      if (!r.claimDeadline) continue;
-      if (r.claimStatus !== 'eligible' && r.claimStatus !== 'submitted') continue;
-      const deadline = new Date(r.claimDeadline);
-      if (deadline >= now && deadline <= in30days) {
-        items.push({
-          id: `funding-${r.id}`,
-          tag: 'Funding expiring',
-          title: `${r.vendor} — ${r.schemeName}`,
-          detail: `Claim by ${formatDateShort(r.claimDeadline)}`,
-          severity: 'orange',
-          onClick: () => onNavigate?.('funding'),
+    const endedButActive: AttentionExample[] = entityCampaigns
+      .filter((c) => c.status === 'active')
+      .filter((c) => getCampaignProgressInfo(c.status, c.startDate, c.endDate).statusInconsistent)
+      .map((c) => ({ title: c.name, detail: `Ended ${formatDateShort(c.endDate)} — still marked Active`, onClick: () => selectCampaign(c.id) }));
+
+    const fundingDeadlines: AttentionExample[] = entityFundingRecords
+      .filter((r) => !r.archived && r.claimDeadline && (r.claimStatus === 'eligible' || r.claimStatus === 'submitted'))
+      .filter((r) => {
+        const d = new Date(r.claimDeadline!);
+        return d >= now && d <= in30days;
+      })
+      .map((r) => ({ title: `${r.vendor} — ${r.schemeName}`, detail: `Claim by ${formatDateShort(r.claimDeadline!)}`, onClick: () => onNavigate?.('funding') }));
+
+    const dataIssues: AttentionExample[] = [];
+    if (acumaticaSummary?.hasImportedData && acumaticaSummary.lastImportedAt) {
+      const daysOld = Math.floor((now.getTime() - new Date(acumaticaSummary.lastImportedAt).getTime()) / (24 * 60 * 60 * 1000));
+      if (daysOld >= STALE_IMPORT_DAYS) {
+        dataIssues.push({
+          title: 'Acumatica manual export is stale',
+          detail: `Last imported ${daysOld}d ago — commercial figures may be out of date`,
+          onClick: () => onNavigate?.('leads'),
         });
       }
     }
+    if (emailPerformance?.syncState === 'error') {
+      dataIssues.push({ title: 'Campaign Monitor sync failed', detail: 'Email figures may be incomplete', onClick: () => onNavigate?.('email') });
+    }
 
-    return items.sort((a, b) => (a.severity === 'red' ? -1 : b.severity === 'red' ? 1 : 0));
-  }, [entityTasks, entityFundingRecords, selectTask, onNavigate]);
+    const categories: AttentionCategory[] = [
+      { id: 'overdue', label: (n) => `Overdue task${n === 1 ? '' : 's'}`, severity: 'red', items: overdue },
+      { id: 'due-soon', label: (n) => `Task${n === 1 ? '' : 's'} awaiting approval or due soon`, severity: 'orange', items: dueSoon },
+      { id: 'ended-active', label: (n) => `Campaign${n === 1 ? '' : 's'} ended but still active`, severity: 'orange', items: endedButActive },
+      { id: 'funding', label: (n) => `Funding deadline${n === 1 ? '' : 's'} approaching`, severity: 'orange', items: fundingDeadlines },
+      { id: 'data-issue', label: (n) => `Data issue${n === 1 ? '' : 's'}`, severity: 'orange', items: dataIssues },
+    ];
+    return categories.filter((c) => c.items.length > 0);
+  }, [entityTasks, entityCampaigns, entityFundingRecords, acumaticaSummary, emailPerformance, selectTask, selectCampaign, onNavigate]);
 
-  // ---- Coming Up ---------------------------------------------------------
-  // A short marketing diary, not a task manager: merges real upcoming task
-  // deadlines, real campaign milestones (campaign.schedule — previously only
-  // visible inside Campaign Detail's Calendar tab), and real funding claim
-  // deadlines into one sorted feed. Microsoft To Do deadlines are not wired
-  // in yet — Microsoft To Do remains the primary personal task manager.
-  // Computation itself is shared with Content & Calendar via
-  // src/utils/marketingEvents.ts — this block only maps that shared output
-  // to the same three kinds ('task' | 'milestone' | 'funding') and the same
-  // click behaviour this section always had, so its rendered output is
-  // unchanged (email-send tasks render as 'task' here, exactly as before —
-  // Content & Calendar is the only place that distinguishes them).
-  type ComingUpKind = 'task' | 'milestone' | 'funding';
-  interface ComingUpItem {
-    id: string;
-    kind: ComingUpKind;
-    title: string;
-    due: Date;
-    context?: string;
-    onClick?: () => void;
-  }
+  const attentionTotal = useMemo(() => attentionCategories.reduce((sum, c) => sum + c.items.length, 0), [attentionCategories]);
 
-  const comingUp = useMemo<ComingUpItem[]>(() => {
+  // ---- Coming Up (~14 days) ------------------------------------------------
+  const comingUp = useMemo(() => {
     const now = new Date();
+    const rangeEnd = new Date(now.getTime() + COMING_UP_DAYS * 24 * 60 * 60 * 1000);
     const events = getMarketingEvents({
       tasks,
       campaigns,
       fundingRecords,
       matchesSelectedEntity,
       rangeStart: now,
+      rangeEnd,
       includeCompleted: false,
-      includeCampaignMarkers: false,
+      includeCampaignMarkers: true,
     });
-
-    const items: ComingUpItem[] = events.map((e) => ({
+    return events.slice(0, 8).map((e) => ({
       id: e.id,
-      kind: e.kind === 'email' ? 'task' : (e.kind as ComingUpKind),
+      kind: e.kind,
       title: e.title,
       due: e.date,
-      // Tasks (including email-sends, which render as plain 'task' here)
-      // always showed the linked campaign name as context, never the send
-      // stats — matches the original behaviour exactly.
       context: e.kind === 'funding' ? e.subtitle : e.campaignName,
       onClick:
         e.kind === 'funding'
           ? () => onNavigate?.('funding')
-          : e.kind === 'milestone'
-          ? () => selectCampaign(e.campaignId!)
-          : () => selectTask(e.taskId!),
+          : e.kind === 'milestone' || e.kind === 'campaign-start' || e.kind === 'campaign-end'
+            ? () => selectCampaign(e.campaignId!)
+            : () => selectTask(e.taskId!),
     }));
-
-    return items.slice(0, 6);
   }, [tasks, campaigns, fundingRecords, matchesSelectedEntity, selectTask, selectCampaign, onNavigate]);
 
-  // ---- Active Campaigns (compact) ---------------------------------------
-  // Date-based progress, shared with Campaign Detail and the Campaigns
-  // table (src/utils/campaignProgress.ts) — same honest formula everywhere.
-  const activeCampaignsCompact = useMemo(() => {
+  const comingUpKindLabel: Record<string, string> = {
+    task: 'Task',
+    email: 'Task',
+    milestone: 'Milestone',
+    funding: 'Funding',
+    'campaign-start': 'Campaign start',
+    'campaign-end': 'Campaign end',
+  };
+
+  // ---- Active Campaigns table ---------------------------------------------
+  const activeCampaigns = useMemo(() => {
     return entityCampaigns
       .filter((c) => c.status === 'active')
-      .map((c) => ({ ...c, progress: getCampaignProgressInfo(c.status, c.startDate, c.endDate) }))
-      .sort((a, b) => a.progress.percent === b.progress.percent ? 0 : b.progress.percent - a.progress.percent)
-      .slice(0, 3);
-  }, [entityCampaigns]);
-
-  // ---- Channel Snapshot ---------------------------------------------------
-  // Email: real Campaign Monitor data only (source === 'campaign-monitor',
-  // enforced server-side — see src/utils/emailPerformance.ts), genuinely
-  // entity- and period-filtered; otherwise honestly "Not connected". Social
-  // is real GA4 website traffic attributed to Organic/Paid Social (see
-  // src/utils/ga4Traffic.ts's getSocialTraffic) — sessions/users only,
-  // never platform-side metrics like impressions/reach/followers, which
-  // still require a real Hootsuite/platform integration. PPC has no real
-  // data source at all — the PPC page (rebuilt honestly in a later phase)
-  // is itself all "Not connected" today too, awaiting Google Ads. Calls
-  // use the real Infinity wave1Performance
-  // response when configured. Email and Calls are shared with Performance's
-  // Channel Summary via src/utils/emailPerformance.ts and
-  // src/utils/channelSnapshot.ts respectively, so the two pages can never
-  // disagree.
-  const emailPerf = useMemo(
-    () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
-    [emailPerformance, isGroupView, selectedEntity]
-  );
-  const callsSnapshot = useMemo(
-    () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
-    [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  const infinityConfigured = wave1Performance?.infinityConfigured === true;
-
-  // ---- Recent Activity — respect the global entity selector -------------
-  // audit_log rows don't carry a brand column directly, so entity-scoping
-  // cross-references each entry's resourceId against this entity's real
-  // campaigns/tasks/funding records — same pattern as Campaign Detail's
-  // "Recent Campaign Activity".
-  const visibleActivity = useMemo(() => {
-    if (isGroupView) return auditLog.slice(0, 8);
-    const ids = new Set<string>();
-    entityCampaigns.forEach((c) => ids.add(c.id));
-    entityTasks.forEach((t) => ids.add(t.id));
-    entityFundingRecords.forEach((r) => ids.add(r.id));
-    return auditLog.filter((e) => e.resourceId && ids.has(e.resourceId)).slice(0, 8);
-  }, [auditLog, isGroupView, entityCampaigns, entityTasks, entityFundingRecords]);
-
-  // ---- Data freshness -----------------------------------------------------
-  // GA4 freshness reflects the general website-traffic source this page
-  // actually uses (ga4Traffic), not the separate campaign-scoped Wave 1
-  // GA4 query — the two have independent configured/error states and must
-  // never be conflated into one misleading "Live"/"Not connected" signal.
-  const ga4Configured = ga4Traffic?.configured === true;
-  const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
-  // Campaign Monitor freshness reflects the real sync outcome (syncState
-  // comes from the backend's own audit_log of past sync attempts — see
-  // backend/src/services/emailPerformance.ts) — never just "an env var is
-  // set" or "a sync was attempted at some point", which is what this used
-  // to do before the Campaign Monitor V2 audit.
-  const campaignMonitorStatus: FreshnessEntry = (() => {
-    switch (emailPerformance?.syncState) {
-      case 'live':
-        return { label: 'Campaign Monitor', status: 'live', detail: 'Live' };
-      case 'error':
-        return { label: 'Campaign Monitor', status: 'error', detail: 'Sync failed' };
-      case 'never-synced':
-        return { label: 'Campaign Monitor', status: 'stale', detail: 'Never synced' };
-      default:
-        return { label: 'Campaign Monitor', status: 'not-connected', detail: 'Not connected' };
-    }
-  })();
-
-  const freshnessEntries: FreshnessEntry[] = [
-    ga4Configured
-      ? { label: 'GA4', status: ga4HasErrors ? 'error' : 'live', detail: ga4HasErrors ? 'Sync error' : 'Live' }
-      : { label: 'GA4', status: 'not-connected', detail: 'Not connected' },
-    infinityConfigured
-      ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
-      : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
-    campaignMonitorStatus,
-    { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
-    { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
-    googleAdsPerformance?.configured === true
-      ? {
-          label: 'PPC (Google Ads)',
-          status: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'error' : 'live',
-          detail: (googleAdsPerformance?.errors?.length ?? 0) > 0 ? 'Sync error' : 'Connected',
+      .map((c) => {
+        const progress = getCampaignProgressInfo(c.status, c.startDate, c.endDate);
+        const emailResponse = getEmailPerformanceForCampaign(emailPerformance, c.id);
+        const adsResponse = getGoogleAdsForCampaign(googleAdsPerformance, c);
+        let response: { label: string; onClick?: () => void } | null = null;
+        if (emailResponse.status === 'available' && emailResponse.sends.length > 0) {
+          const clicks = emailResponse.sends.reduce((sum, s) => sum + (s.clicks ?? 0), 0);
+          const opens = emailResponse.sends.reduce((sum, s) => sum + (s.opens ?? 0), 0);
+          response = { label: `${opens} opens · ${clicks} clicks`, onClick: () => onNavigate?.('email') };
+        } else if (adsResponse.status === 'available' && adsResponse.clicks > 0) {
+          response = { label: `${adsResponse.clicks} clicks (Google Ads)`, onClick: () => onNavigate?.('ppc') };
         }
-      : { label: 'PPC (Google Ads)', status: 'not-connected', detail: 'Not connected' },
-  ];
 
-  const dataUpdatedLabel = 'Live data — synced on page load';
+        const linkedOverdueTasks = entityTasks.filter(
+          (t) => t.campaignId === c.id && t.status !== 'complete' && t.deadline && new Date(t.deadline) < new Date()
+        );
+        let nextAction: string | null = null;
+        if (progress.statusInconsistent) nextAction = 'Review & close campaign';
+        else if (linkedOverdueTasks.length > 0) nextAction = `${linkedOverdueTasks.length} overdue task${linkedOverdueTasks.length === 1 ? '' : 's'}`;
+
+        return { campaign: c, progress, response, nextAction };
+      })
+      .sort((a, b) => (a.progress.statusInconsistent === b.progress.statusInconsistent ? 0 : a.progress.statusInconsistent ? -1 : 1));
+  }, [entityCampaigns, entityTasks, emailPerformance, googleAdsPerformance, onNavigate]);
+
+  const today = new Date();
+  const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const dateStr = formatDate(today);
+  const userName = isEditor ? 'Emilee' : 'John';
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
     <div className="v2-page">
@@ -420,80 +388,52 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               {getGreeting()}, {userName}
             </h1>
             <p className="text-text-secondary">
-              {dayName} {dateStr} · Here's what's happening across {isGroupView ? 'MTech marketing' : 'this entity'} today.
+              {dayName} {dateStr} · Here's what's happening with MTech marketing this month.
             </p>
           </div>
-          <div className="flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
+          <div className="flex flex-col items-end gap-1">
             <PeriodSelector />
-            <span className="v2-page-updated">{dataUpdatedLabel}</span>
+            {currentRange && (
+              <div className="text-xs text-text-secondary" style={{ textAlign: 'right' }}>
+                <span>{formatDateRangeLabel(currentRange)}</span>
+                {previousRange && <span> · vs {formatDateRangeLabel(previousRange)}</span>}
+              </div>
+            )}
           </div>
         </div>
 
-        <DataFreshnessBar entries={freshnessEntries} />
-
-        {/* Headline KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 xl:gap-6 mb-8">
-          <KpiCard title="Marketing Leads" value={marketingLeads} subtitle="Manually logged, not yet CRM-linked" />
-          <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Live Campaigns" value={liveCampaignsCount} subtitle={isGroupView ? 'Across all entities' : 'This entity'} accent="var(--v2-green)" />
-          <KpiCard
-            title="Marketing Spend"
-            value={`£${Math.round(marketingSpend).toLocaleString()}`}
-            subtitle="Manually logged campaign spend"
-            onClick={() => onNavigate?.('campaigns')}
-          />
-        </div>
-
-        {/* Marketing Funnel + Needs Your Attention + Coming Up */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="card">
-            <h2 className="v2-section-title">Marketing Funnel</h2>
-            <MarketingFunnel stages={funnelStages} />
-          </div>
-
+        {/* Needs Your Attention + Coming Up */}
+        <div className="grid grid-cols-2 gap-6 mb-8">
           <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding: '1.5rem 1.5rem 0.75rem' }}>
-              <h2 className="v2-section-title" style={{ marginBottom: 0 }}>
-                Needs Your Attention
-              </h2>
+            <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
+              <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Needs Your Attention</h2>
+              {attentionTotal > 0 && (
+                <p className="text-sm text-text-secondary" style={{ marginTop: 2 }}>{attentionTotal} thing{attentionTotal === 1 ? '' : 's'} need{attentionTotal === 1 ? 's' : ''} your attention</p>
+              )}
             </div>
-            <div style={{ padding: '0 1.5rem 1.5rem' }}>
-              {attentionItems.length > 0 ? (
-                <div className="space-y-2">
-                  {attentionItems.slice(0, 5).map((item) => (
+            <div style={{ padding: '0 1.25rem 1.25rem' }}>
+              {attentionCategories.length > 0 ? (
+                <div className="space-y-3">
+                  {attentionCategories.map((cat) => (
                     <button
-                      key={item.id}
-                      onClick={item.onClick}
+                      key={cat.id}
+                      onClick={cat.items[0]?.onClick}
                       className="v2-attention-item w-full flex items-start gap-2 text-left px-3 py-2 rounded"
-                      data-severity={item.severity}
+                      data-severity={cat.severity}
                     >
-                      {item.severity === 'red' ? (
-                        <AlertTriangle size={14} color="var(--v2-red)" style={{ marginTop: 2, flexShrink: 0 }} />
-                      ) : item.severity === 'orange' ? (
-                        <AlertTriangle size={14} color="var(--v2-orange)" style={{ marginTop: 2, flexShrink: 0 }} />
-                      ) : (
-                        <Info size={14} color="var(--v2-purple)" style={{ marginTop: 2, flexShrink: 0 }} />
-                      )}
+                      <AlertTriangle size={14} color={cat.severity === 'red' ? 'var(--v2-red)' : 'var(--v2-orange)'} style={{ marginTop: 2, flexShrink: 0 }} />
                       <span style={{ flex: 1 }}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="text-xs font-bold"
-                            style={{ color: item.severity === 'red' ? 'var(--v2-red)' : item.severity === 'orange' ? 'var(--v2-orange)' : 'var(--v2-purple)' }}
-                          >
-                            {item.tag}
-                          </span>
+                        <span className="text-sm font-semibold text-text-primary block">
+                          {cat.items.length} {cat.label(cat.items.length)}
                         </span>
-                        <span className="text-sm font-medium text-text-primary block">{item.title}</span>
-                        <span className="text-xs text-text-secondary">{item.detail}</span>
+                        {cat.items[0] && (
+                          <span className="text-xs text-text-secondary">
+                            {cat.items[0].title} — {cat.items[0].detail}
+                          </span>
+                        )}
                       </span>
                     </button>
                   ))}
-                  {attentionItems.length > 5 && (
-                    <div className="text-xs text-text-secondary" style={{ paddingTop: 4 }}>
-                      +{attentionItems.length - 5} more
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -504,210 +444,288 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             </div>
           </div>
 
-          <div className="card">
-            <h2 className="v2-section-title">Coming Up</h2>
-            {comingUp.length > 0 ? (
-              <div className="space-y-3">
-                {comingUp.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={item.onClick}
-                    className="w-full text-left"
-                    style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', background: 'none', border: 'none', cursor: item.onClick ? 'pointer' : 'default' }}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="v2-coming-up-kind" data-kind={item.kind}>
-                        {item.kind === 'task' ? 'Task' : item.kind === 'milestone' ? 'Milestone' : 'Funding'}
-                      </span>
-                      <span className="text-xs text-text-secondary">{formatDateShort(item.due)}</span>
-                    </div>
-                    <div className="text-sm font-medium text-text-primary">{item.title}</div>
-                    {item.context && <div className="text-xs text-text-secondary">{item.context}</div>}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-text-secondary text-sm">Nothing scheduled</p>
-            )}
-            <p className="text-xs text-text-secondary" style={{ marginTop: '0.75rem' }}>
-              Microsoft To Do deadlines are not connected yet.
-            </p>
-          </div>
-        </div>
-
-        {/* Active Campaigns + Recent Activity */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="v2-section-title" style={{ marginBottom: 0 }}>
-                Active Campaigns
-              </h2>
-              <button
-                onClick={() => onNavigate?.('campaigns')}
-                className="text-sm font-medium flex items-center gap-1"
-                style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                View all campaigns <ArrowRight size={14} />
-              </button>
+          <div className="card" style={{ padding: 0 }}>
+            <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
+              <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Coming Up</h2>
+              <p className="text-sm text-text-secondary" style={{ marginTop: 2 }}>Next {COMING_UP_DAYS} days</p>
             </div>
-            {activeCampaignsCompact.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {activeCampaignsCompact.map((c) => (
-                  <div key={c.id} className="card v2-mini-campaign-card" onClick={() => selectCampaign(c.id)}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="font-semibold text-text-primary text-sm" style={{ lineHeight: 1.3 }}>{c.name}</div>
-                      <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[c.status], fontSize: '10px', flexShrink: 0 }}>
-                        {CAMPAIGN_STATUS_LABEL[c.status]}
-                      </span>
-                    </div>
-                    <div className="mt-1">
-                      <BrandBadge brand={c.brand} />
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className="v2-progress-mini-track" style={{ width: 60 }}>
-                        <span
-                          className="v2-progress-mini-fill"
-                          style={{ width: `${c.progress.percent}%`, display: 'block', backgroundColor: c.progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}
-                        />
-                      </span>
-                      <span
-                        className="text-xs"
-                        style={{ color: c.progress.statusInconsistent ? 'var(--v2-orange)' : 'var(--color-text-secondary)', fontWeight: c.progress.statusInconsistent ? 600 : 400 }}
-                      >
-                        {c.progress.percent}% · {c.progress.label}
-                      </span>
-                    </div>
-                    <div className="v2-mini-campaign-stats">
-                      <div>
-                        <div className="v2-mini-campaign-stat-label">Marketing Leads</div>
-                        <div className="v2-mini-campaign-stat-value">{c.leads}</div>
+            <div style={{ padding: '0 1.25rem 1.25rem' }}>
+              {comingUp.length > 0 ? (
+                <div className="space-y-2">
+                  {comingUp.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={item.onClick}
+                      className="w-full text-left"
+                      style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.4rem', background: 'none', border: 'none', cursor: item.onClick ? 'pointer' : 'default' }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="v2-coming-up-kind" data-kind={item.kind === 'email' ? 'task' : item.kind}>
+                          {comingUpKindLabel[item.kind] ?? 'Event'}
+                        </span>
+                        <span className="text-xs text-text-secondary">{formatDateShort(item.due)}</span>
                       </div>
-                      <div>
-                        <div className="v2-mini-campaign-stat-label">Spend / Budget</div>
-                        <div className="v2-mini-campaign-stat-value">
-                          £{Math.round(c.spend).toLocaleString()}{c.budget != null ? ` / £${c.budget.toLocaleString()}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-text-secondary">No active campaigns{isGroupView ? '' : ' for this entity'}</p>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <h2 className="v2-section-title">Recent Activity</h2>
-            <div className="card" style={{ flex: 1 }}>
-              {visibleActivity.length > 0 ? (
-                <div className="space-y-3">
-                  {visibleActivity.map((entry) => {
-                    const { kind, label } = activityKind(entry.resourceType);
-                    return (
-                      <div key={entry.id} className="text-sm" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="v2-coming-up-kind" data-kind={kind}>{label}</span>
-                          <span className="text-xs text-text-secondary">{formatDateShort(entry.createdAt)}</span>
-                        </div>
-                        <div className="text-text-primary">{describeAuditEntry(entry)}</div>
-                      </div>
-                    );
-                  })}
+                      <div className="text-sm font-medium text-text-primary">{item.title}</div>
+                      {item.context && <div className="text-xs text-text-secondary">{item.context}</div>}
+                    </button>
+                  ))}
                 </div>
               ) : (
-                <p className="text-text-secondary text-sm">No recent activity{isGroupView ? '' : ' for this entity'}</p>
+                <p className="text-text-secondary text-sm">Nothing scheduled in the next {COMING_UP_DAYS} days</p>
               )}
+              <button
+                onClick={() => onNavigate?.('calendar')}
+                className="text-xs font-medium flex items-center gap-1"
+                style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.75rem' }}
+              >
+                Content & Calendar <ArrowRight size={12} />
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Channel Snapshot */}
+        {/* Marketing Performance */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Channel Snapshot (This Period)</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+          <h2 className="v2-section-title" style={{ marginBottom: 2 }}>Marketing Performance</h2>
+          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>Key activity this month vs previous period</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <KpiCard
+              title="Website Enquiries"
+              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
+              status={ga4EnquiriesInfo.status}
+              subtitle={ga4EnquiriesInfo.subtitle}
+              comparison={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesComparison : undefined}
+            />
+            <KpiCard
+              title="Calls"
+              value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
+              status={callPerformance.status}
+              subtitle={callPerformance.subtitle}
+              onClick={() => onNavigate?.('infinity')}
+            />
+            <KpiCard
+              title="Email Clicks"
+              value={emailPerf.status === 'available' ? emailPerf.clicks : undefined}
+              status={emailPerf.status}
+              subtitle={emailPerf.subtitle}
+              onClick={() => onNavigate?.('email')}
+            />
+            <KpiCard
+              title="Google Ads Spend"
+              value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.subtitle}
+              comparison={googleAds.status === 'available' ? googleAdsSpendComparison : undefined}
+              onClick={() => onNavigate?.('ppc')}
+            />
+            <KpiCard
+              title="Opportunities"
+              value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined}
+              status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+              subtitle={
+                acumaticaNotAvailable
+                  ? `Not available — ${acumaticaSummary?.notAvailableReason}`
+                  : acumaticaSummary?.hasImportedData
+                    ? 'Latest Acumatica export'
+                    : 'No Acumatica export imported yet'
+              }
+              onClick={() => onNavigate?.('leads')}
+            />
+            <KpiCard
+              title="Won Revenue"
+              value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
+              status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+              subtitle={
+                acumaticaNotAvailable
+                  ? `Not available — ${acumaticaSummary?.notAvailableReason}`
+                  : acumaticaSummary?.hasImportedData
+                    ? 'Latest Acumatica export — no reliable Won Date to scope by period'
+                    : 'No Acumatica export imported yet'
+              }
+              onClick={() => onNavigate?.('leads')}
+            />
+          </div>
+        </div>
+
+        {/* Marketing Impact */}
+        <div className="mb-8">
+          <div className="card">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-3">Marketing Response</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-xs text-text-secondary mb-1">Google Ads Spend</div>
+                    <div className="text-xl font-bold text-text-primary">
+                      {googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-text-secondary mb-1">Enquiries + Calls</div>
+                    <div className="text-xl font-bold text-text-primary">
+                      {(ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total! : 0) +
+                        (callPerformance.status === 'available' ? callPerformance.totalCalls! : 0) || (ga4EnquiriesInfo.status !== 'available' && callPerformance.status !== 'available' ? '—' : 0)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-text-secondary mb-1">Marketing Leads</div>
+                    <div className="text-xl font-bold text-text-primary">{campaigns.length > 0 ? periodCampaigns.reduce((sum, c) => sum + (c.leads || 0), 0) : '—'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: '1.5rem' }}>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-3">Overall Commercial Performance</h3>
+                {acumaticaNotAvailable ? (
+                  <p className="text-sm text-text-secondary">Not available — {acumaticaSummary?.notAvailableReason}</p>
+                ) : acumaticaSummary?.hasImportedData ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <div className="text-xs text-text-secondary mb-1">Opportunities</div>
+                      <div className="text-xl font-bold text-text-primary">{acumaticaSummary.opportunities}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-text-secondary mb-1">Open Pipeline</div>
+                      <div className="text-xl font-bold text-text-primary">£{Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-text-secondary mb-1">Won Revenue</div>
+                      <div className="text-xl font-bold text-text-primary">£{Math.round(acumaticaSummary.wonRevenue).toLocaleString()}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-secondary">No Acumatica export imported yet</p>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
+              <p className="text-xs text-text-secondary">
+                Commercial figures are from the latest Acumatica manual export
+                {acumaticaSummary?.lastImportedAt ? ` (imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')})` : ''} and are not yet fully attributed to marketing campaigns.
+                {isGroupView && ' Acumatica covers Brentwood, Radio Links, Capcom and Brentwood Marine. IRCL is not managed in Acumatica.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Campaigns */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Active Campaigns</h2>
+            <button
+              onClick={() => onNavigate?.('campaigns')}
+              className="text-sm font-medium flex items-center gap-1"
+              style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              View all campaigns <ArrowRight size={14} />
+            </button>
+          </div>
+          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>Campaigns that need monitoring or action</p>
+          {activeCampaigns.length > 0 ? (
+            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+              <table className="table" style={{ width: '100%', minWidth: 640 }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem 1rem' }}>Campaign</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Status</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Response (this period)</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Spend</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Next Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeCampaigns.map(({ campaign: c, progress, response, nextAction }) => (
+                    <tr key={c.id} onClick={() => selectCampaign(c.id)} style={{ cursor: 'pointer' }}>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <div className="font-medium text-text-primary text-sm">{c.name}</div>
+                        <BrandBadge brand={c.brand} />
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        {progress.statusInconsistent ? (
+                          <span className="badge" style={{ background: 'var(--v2-orange)', color: 'white', fontSize: '10px' }}>{progress.label}</span>
+                        ) : (
+                          <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[c.status], fontSize: '10px' }}>{CAMPAIGN_STATUS_LABEL[c.status]}</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        {response ? <span className="text-sm">{response.label}</span> : <span className="v2-not-connected-text">— / Not linked</span>}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                        <div className="text-sm">£{Math.round(c.spend || 0).toLocaleString()}<span className="text-xs text-text-secondary"> manual</span></div>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        {nextAction ? <span className="text-sm" style={{ color: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}>{nextAction}</span> : <span className="v2-not-connected-text">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-text-secondary">No active campaigns{isGroupView ? '' : ' for this entity'}</p>
+          )}
+        </div>
+
+        {/* Channel Performance */}
+        <div className="mb-4">
+          <h2 className="v2-section-title" style={{ marginBottom: 2 }}>Channel Performance</h2>
+          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>Key metrics from connected channels (this month)</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
             <KpiCard
               title="Website"
-              value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
+              value={websiteUsers.status === 'available' ? websiteUsers.sessions : undefined}
               status={websiteUsers.status}
-              subtitle={websiteUsers.subtitle}
+              subtitle={
+                websiteUsers.status === 'available'
+                  ? `${ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : 0} enquiries`
+                  : websiteUsers.subtitle
+              }
               size="compact"
+              onClick={() => onNavigate?.('website')}
             />
-            {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
-              <KpiCard
-                title="Email"
-                value={`${emailPerf.opens} opens`}
-                subtitle={`${emailPerf.campaignsSent} send(s) · ${emailPerf.clicks} clicks`}
-                size="compact"
-              />
-            ) : (
-              <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} size="compact" />
-            )}
-            {socialTraffic.status === 'available' ? (
-              <KpiCard
-                title="Social"
-                value={`${socialTraffic.sessions} sessions`}
-                subtitle={`${socialTraffic.users} users · GA4 website traffic from social`}
-                size="compact"
-              />
-            ) : (
-              <KpiCard title="Social" status="not-connected" subtitle={socialTraffic.subtitle} size="compact" />
-            )}
-            {googleAds.status === 'available' ? (
-              <KpiCard
-                title="PPC"
-                value={`£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-                subtitle={`${googleAds.clicks} clicks · real Google Ads spend`}
-                onClick={() => onNavigate?.('ppc')}
-                size="compact"
-              />
-            ) : (
-              <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
-            )}
-            {callsSnapshot ? (
-              <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered`} onClick={() => onNavigate?.('infinity')} size="compact" />
-            ) : (
-              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" onClick={() => onNavigate?.('infinity')} size="compact" />
-            )}
-          </div>
-        </div>
-
-        {/* MTech AI Quick Access — preserved from the previous Home screen */}
-        <div className="mb-4">
-          <div className="rounded-lg p-5 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #0D1B2A, #1A3A5C)' }}>
-            <div>
-              <h3 className="text-base font-semibold text-white mb-1">Get AI Help</h3>
-              <p className="text-sm text-white opacity-75">Generate prompts for any marketing task using MTech AI</p>
-            </div>
-            <button
-              onClick={() => window.open(MTECH_AI_PROJECT_URL, '_blank')}
-              className="flex items-center gap-2 whitespace-nowrap text-white font-medium px-5 py-3 rounded-lg transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--v2-purple)' }}
-            >
-              Open MTech AI
-              <ExternalLink size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* MTech HQ entry point — optional secondary way in, alongside the
-            sidebar's "More" section. Purely navigational: opens the same
-            lazy-loaded 3D screen the sidebar link does, so nothing here
-            duplicates data or logic. */}
-        <div className="mb-4">
-          <div className="rounded-lg p-5 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #1A2438, #2A3A5C)' }}>
-            <div>
-              <h3 className="text-base font-semibold text-white mb-1">Enter MTech HQ</h3>
-              <p className="text-sm text-white opacity-75">Explore AI Office as an interactive 3D office (desktop only)</p>
-            </div>
-            <button
-              onClick={() => onNavigate?.('mtech-hq')}
-              className="flex items-center gap-2 whitespace-nowrap text-white font-medium px-5 py-3 rounded-lg transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--v2-purple)' }}
-            >
-              Enter MTech HQ
-              <ArrowRight size={16} />
-            </button>
+            <KpiCard
+              title="Email"
+              value={emailHeadline.status === 'available' ? emailHeadline.recipients : undefined}
+              status={emailHeadline.status}
+              subtitle={emailHeadline.status === 'available' ? `${emailHeadline.clicks} clicks` : emailHeadline.subtitle}
+              size="compact"
+              onClick={() => onNavigate?.('email')}
+            />
+            <KpiCard
+              title="PPC"
+              value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.status === 'available' ? `${googleAds.clicks} clicks` : googleAds.subtitle}
+              size="compact"
+              onClick={() => onNavigate?.('ppc')}
+            />
+            <KpiCard
+              title="Calls"
+              value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
+              status={callPerformance.status}
+              subtitle={callPerformance.status === 'available' ? `${callPerformance.answeredCalls} answered` : callPerformance.subtitle}
+              size="compact"
+              onClick={() => onNavigate?.('infinity')}
+            />
+            <KpiCard
+              title="SEO"
+              value={searchConsole.status === 'available' ? searchConsole.clicks : undefined}
+              status={searchConsole.status}
+              subtitle={searchConsole.status === 'available' ? `${searchConsole.impressions} impressions` : searchConsole.subtitle}
+              size="compact"
+              onClick={() => onNavigate?.('website')}
+            />
+            <KpiCard
+              title="Social"
+              value={socialTraffic.status === 'available' ? socialTraffic.sessions : undefined}
+              status={socialTraffic.status}
+              subtitle={socialTraffic.status === 'available' ? `${socialTraffic.users} users` : socialTraffic.subtitle}
+              size="compact"
+              onClick={() => onNavigate?.('social')}
+            />
           </div>
         </div>
       </div>
