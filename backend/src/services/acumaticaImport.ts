@@ -49,11 +49,16 @@ const FIELD_ALIASES: Record<string, string[]> = {
   sourceLead: ['source lead', 'lead source', 'source campaign'],
   heardAboutUs: ['where did you hear about us?', 'where did you hear about us', 'how did you hear about us?', 'how did you hear about us'],
   productFocus: ['product focus', 'product'],
-  probability: ['probability of conversion', 'probability', 'conversion probability'],
+  probability: ['probability of conversion', 'probability', 'conversion probability', 'probability of conversion %'],
   industrySector: ['industry sector', 'industry'],
   proposalSent: ['proposal sent', 'proposal sent?', 'proposal sent date'],
   hireType: ['hire type'],
-  quantityUnits: ['quantity of units required', 'quantity of units', 'unit quantity', 'quantity'],
+  // 'quanity of units required' (missing the second 't') is CONFIRMED
+  // (2026-09-04) as Acumatica's own exported spelling in the real
+  // export — recognised here exactly as exported, not "corrected"; the
+  // canonical field name (quantityUnits) and its already-correct aliases
+  // are untouched.
+  quantityUnits: ['quantity of units required', 'quantity of units', 'unit quantity', 'quantity', 'quanity of units required'],
   brand: ['entity', 'brand', 'branch', 'business unit', 'company'],
 };
 
