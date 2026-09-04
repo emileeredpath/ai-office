@@ -4,8 +4,7 @@
 // Status means for reporting. Nothing else in the backend or frontend
 // should hardcode a status string or re-derive open/won/lost logic —
 // read through classifyCommercialStatus() and the KPI predicates below
-// instead, so a future rule change (e.g. once "New" is confirmed) only
-// happens here.
+// instead, so any future rule change only happens here.
 //
 // CONFIRMED against a real 1,000-row sample of the actual Acumatica
 // Opportunities export (2026-09-04): the real Status column contains
@@ -42,24 +41,15 @@ export function classifyCommercialStatus(rawStatus: string | null): CommercialSt
 // Won Revenue    = sum of `total` across those Won opportunities.
 // Lost           = count of commercialStatus === 'lost'.
 //
-// Open Pipeline is DELIBERATELY NOT FINALISED. Confirmed real data shows
-// Status also contains "New" (68 of the first 1,000 rows) — a genuinely
-// distinct value from "Open", and it is not yet confirmed with the sales/
-// Acumatica team whether a "New" opportunity should count as open pipeline
-// or is a separate pre-pipeline stage. Until that's confirmed:
-//   - Open Pipeline is computed from Status === 'Open' ONLY (the narrower,
-//     safer reading — never assume "New" counts as pipeline).
-//   - The real "New" count/value is always reported ALONGSIDE it, so no
-//     figure this feeds can be read as "we checked and New doesn't count"
-//     — it visibly says "here's what we excluded, pending confirmation."
-//   - Every consumer of this figure (reporting routes, the Leads & CRM
-//     screen) must surface it as provisional, never as a settled number.
-//
-// To finalise, once confirmed: change OPEN_PIPELINE_STATUSES below (e.g.
-// to ['open', 'new']) and flip PIPELINE_DEFINITION_CONFIRMED to true —
-// nothing else needs to change.
-export const OPEN_PIPELINE_STATUSES: CommercialStatus[] = ['open'];
-export const PIPELINE_DEFINITION_CONFIRMED = false;
+// Open Pipeline — CONFIRMED (2026-09-05): includes both 'open' and 'new'
+// Status. Validated against the real 1,000-row export: Open (255,
+// £2,238,346.62) + New (68, £662,320.43) = 323 opportunities,
+// £2,900,667.05 — matches the confirmed figure exactly. This is now a
+// settled business decision, not a provisional reading — every consumer
+// (reporting routes, the Leads & CRM screen) should present it as a
+// normal, final KPI, no longer flagged provisional.
+export const OPEN_PIPELINE_STATUSES: CommercialStatus[] = ['open', 'new'];
+export const PIPELINE_DEFINITION_CONFIRMED = true;
 
 export function isWonStatus(status: CommercialStatus): boolean {
   return status === 'won';

@@ -27,19 +27,18 @@ export interface AcumaticaSummary {
   // Lost = Status exactly "Lost" — see isLostStatus.
   lostDeals: number;
 
-  // Open Pipeline — DELIBERATELY PROVISIONAL. See acumaticaKpiRules.ts's
-  // OPEN_PIPELINE_STATUSES doc comment: real Status also contains "New"
-  // (confirmed 68 of the first 1,000 real rows) and it is NOT yet decided
-  // whether that counts as open pipeline. openPipelineDefinitionConfirmed
-  // is false until a business decision is made and OPEN_PIPELINE_STATUSES
-  // is updated — every caller (routes, screens) must treat
-  // openPipelineValue/openPipelineCount as provisional while this is
-  // false, and should surface newStatusCount/newStatusValue alongside it
-  // so nobody reads the figure as a settled answer.
+  // Open Pipeline — CONFIRMED (2026-09-05, see acumaticaKpiRules.ts's
+  // OPEN_PIPELINE_STATUSES doc comment): Status 'Open' + 'New' together.
+  // openPipelineDefinitionConfirmed is now true; this is a settled figure,
+  // not provisional.
   openPipelineValue: number;
   openPipelineCount: number;
   openPipelineDefinitionConfirmed: boolean;
   openPipelineIncludesStatuses: string[];
+  // Informational breakdown of the 'New' portion of Open Pipeline above —
+  // New is no longer excluded from openPipelineValue/openPipelineCount,
+  // it's already included in both. These two fields just let a caller
+  // show the Open/New split within the total if useful.
   newStatusCount: number;
   newStatusValue: number;
 
