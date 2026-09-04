@@ -78,3 +78,31 @@ export function isOpenPipelineStatus(status: CommercialStatus): boolean {
 // quality as a later exercise. Do not add a weighted-pipeline figure
 // without first auditing real Probability values the same way Status was
 // audited here.
+
+// ---- "Where Did You Hear About Us?" — CONFIRMED rule (2026-09-04) ----
+//
+// This is a manually completed sales field — a person in the sales team
+// typing a category (e.g. "Google", "Referral", "Website", "Email") into
+// Acumatica while logging the opportunity. It is NOT a marketing-system
+// value, is not guaranteed to be consistently completed, and must never be
+// treated as authoritative campaign attribution:
+//   - It must never override, supplement, or be merged with deterministic
+//     marketing attribution (Campaign Monitor's campaignId, Google Ads'
+//     campaign.id match, GA4's sessionCampaignName match — see
+//     src/utils/campaignAttribution.ts on the frontend). Those remain the
+//     only sources campaign attribution is ever built from.
+//   - The raw Acumatica value is stored and reported completely unmodified
+//     — acumaticaRepository.ts's heard_about_us column already does this
+//     (see acumaticaImport.ts's FIELD_ALIASES/cell() — a genuinely blank
+//     cell is stored as null, never invented).
+//   - Whenever this field is displayed anywhere, it must be labelled
+//     "Sales-reported source" (or equivalent wording making clear it's a
+//     free-text sales entry) — never a bare "Source" that could be read as
+//     equivalent to a real marketing-attributed source/channel.
+//   - A blank/missing value must display as "Unspecified" — use
+//     formatSalesReportedSource() below wherever this field is rendered,
+//     rather than showing an empty cell, a dash, or "null".
+export function formatSalesReportedSource(rawHeardAboutUs: string | null): string {
+  return rawHeardAboutUs ?? 'Unspecified';
+}
+
