@@ -33,7 +33,7 @@
 // "/preview/" (the confirmed live preview path is
 // /data/preview/ai-office.db, on the ai-office-v2-preview-volume). This
 // never runs against production, whose DATABASE_PATH has no such segment.
-import { getCampaignById, insertCampaign, archiveCampaign } from '../db/campaignRepository.js';
+import { getCampaignById, insertCampaign, archiveCampaign, updateCampaignRow } from '../db/campaignRepository.js';
 import db from '../db/connection.js';
 import type { Brand } from '../types.js';
 
@@ -107,6 +107,7 @@ export function runCampaignRestoration() {
   db.exec('BEGIN');
   try {
     restoreEducationCampaign();
+    restoreEducationCampaignCost();
     insertRealCampaignIfMissing(REAL_YESSS);
     insertRealCampaignIfMissing(REAL_HAVEN_TENDER);
     archivePreviewDemoCampaigns();
@@ -202,6 +203,32 @@ function restoreEducationCampaign() {
   if (stillReferenced.n === 0 && reconstructed && !reconstructed.archived) {
     archiveCampaign(RECONSTRUCTED_EDUCATION_ID);
     console.log(`[campaign-restoration] Archived ${RECONSTRUCTED_EDUCATION_ID} (reconstructed test record, superseded by ${REAL_EDUCATION_ID}).`);
+  }
+}
+
+// Q3 Education's Budget (£2,000) and Recorded Spend (£1,791 — the cost of
+// purchased education-sector data, confirmed directly by Emilee) are
+// genuine, preview-only values entered manually through the dashboard.
+// This is NOT a production figure — it must never be compared against, or
+// reconciled with, production's own copy of this campaign, which has its
+// own independent (and much smaller) budget/spend from its own edit
+// history. This step is a safety net only, in case a future preview
+// reseed/reset ever reverts this record to its pre-manual-entry defaults
+// (budget: null, spend: 0) — it only fills those two specific unset
+// states and never overwrites a value that has since been deliberately
+// changed to something else, so re-running it is always a no-op once the
+// real figures are in place.
+function restoreEducationCampaignCost() {
+  const campaign = getCampaignById(REAL_EDUCATION_ID);
+  if (!campaign) return; // restoreEducationCampaign() above creates it first, in the same transaction.
+
+  const updates: { budget?: number; spend?: number } = {};
+  if (campaign.budget == null) updates.budget = 2000;
+  if (campaign.spend === 0) updates.spend = 1791;
+
+  if (Object.keys(updates).length > 0) {
+    updateCampaignRow(REAL_EDUCATION_ID, updates);
+    console.log(`[campaign-restoration] Restored Q3 Education cost field(s): ${JSON.stringify(updates)}.`);
   }
 }
 

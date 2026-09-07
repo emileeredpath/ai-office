@@ -9,6 +9,7 @@ import type { CampaignEmailPerformanceInfo } from '@/utils/emailPerformance';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 import type { DetailTab, Ga4AttributionState } from '@/screens/CampaignDetailScreen';
 import { ACUMATICA_NOT_CAMPAIGN_SCOPED } from '@/screens/CampaignDetailScreen';
+import { CAMPAIGN_SPEND_NOTE } from '@/data/campaignSpendNotes';
 
 interface CampaignOverviewTabProps {
   campaign: Campaign;
@@ -198,7 +199,7 @@ export function CampaignOverviewTab({
           <h3 className="v2-section-title">Key Metrics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : undefined} status={campaign.budget != null ? 'available' : 'not-connected'} notConnectedLabel="Not set" subtitle="Set on this campaign" size="compact" />
-            <KpiCard title="Recorded Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle="Manually logged" size="compact" />
+            <KpiCard title="Recorded Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle={CAMPAIGN_SPEND_NOTE[campaign.id] ?? 'Manually logged'} size="compact" />
             <KpiCard
               title="Google Ads Spend"
               value={googleAdsState === 'available' ? `£${googleAds!.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : undefined}
