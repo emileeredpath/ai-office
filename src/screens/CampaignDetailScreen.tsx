@@ -10,7 +10,15 @@ import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
+import { CAMPAIGN_PLAN_MARKDOWN } from '@/data/campaignPlans';
 import type { AuditLogEntry } from '@/services/auditLogApi';
+
+// Acumatica commercial data has no per-campaign field anywhere in its
+// schema (see the Campaign Detail data-source audit) — only brand/entity
+// level figures exist (Leads & CRM, Overview). This is genuinely
+// different from "not connected" (Acumatica IS connected, via manual
+// import) — never conflate the two states.
+const ACUMATICA_NOT_CAMPAIGN_SCOPED = 'Acumatica has no per-campaign link — see Leads & CRM for this entity’s figures';
 
 type DetailTab = 'overview' | 'performance' | 'leads' | 'opportunities' | 'content' | 'calendar' | 'files' | 'notes';
 
@@ -129,6 +137,13 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
     );
   }
 
+  // Prefer a real uploaded plan (campaign.planDocument, settable via the
+  // generic update_campaign MCP path) over the static reference file — the
+  // static file exists for a handful of campaigns as a fallback so their
+  // original written plan is visible at all, not a live/authoritative copy.
+  const staticPlanMarkdown = CAMPAIGN_PLAN_MARKDOWN[campaign.id];
+  const hasPlan = !!campaign.planDocument || !!staticPlanMarkdown;
+
   const entities = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
   const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
   const recipients = campaign.recipients || emailSends.reduce((sum, t) => sum + (t.recipients || 0), 0);
@@ -228,9 +243,9 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
             }
           />
           <KpiCard title="Marketing Leads" value={campaign.leads} subtitle="Manually logged, not CRM-linked" accent="var(--v2-green)" />
-          <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
+          <KpiCard title="Opportunities" status="not-connected" notConnectedLabel="Not available" subtitle={ACUMATICA_NOT_CAMPAIGN_SCOPED} />
+          <KpiCard title="Open Pipeline" status="not-connected" notConnectedLabel="Not available" subtitle={ACUMATICA_NOT_CAMPAIGN_SCOPED} />
+          <KpiCard title="Won Revenue" status="not-connected" notConnectedLabel="Not available" subtitle={ACUMATICA_NOT_CAMPAIGN_SCOPED} />
           <KpiCard
             title="ROI"
             value={roiValue !== null ? `${roiValue >= 0 ? '+' : ''}${roiValue}%` : undefined}
@@ -284,11 +299,11 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
                   </div>
                   <div>
                     <div className="text-text-secondary text-xs mb-1">Open Pipeline</div>
-                    <div className="text-text-secondary">Not connected</div>
+                    <div className="text-text-secondary">Not available</div>
                   </div>
                   <div>
                     <div className="text-text-secondary text-xs mb-1">Won Revenue</div>
-                    <div className="text-text-secondary">Not connected</div>
+                    <div className="text-text-secondary">Not available</div>
                   </div>
                 </div>
               </div>
@@ -384,7 +399,11 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
         {/* TAB: Opportunities */}
         {activeTab === 'opportunities' && (
           <div className="card">
-            <p className="v2-empty-state">Not connected — awaiting Acumatica integration. No opportunity data exists in AI Office today.</p>
+            <p className="v2-empty-state">
+              Acumatica is connected (manual export) but has no per-campaign link in its data model — opportunities can only be
+              attributed to a brand/entity today, not to an individual campaign. See Leads & CRM for this entity's real
+              Opportunities/Open Pipeline/Won Revenue figures.
+            </p>
           </div>
         )}
 
@@ -433,19 +452,24 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
             updateCampaign={updateCampaign}
             showToast={showToast}
             onViewPlan={() => setShowPlanModal(true)}
+            hasPlan={hasPlan}
           />
         )}
 
         {/* TAB: Files */}
         {activeTab === 'files' && (
           <div className="card">
-            {campaign.planDocument ? (
+            {hasPlan ? (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <FileText size={20} color="var(--v2-purple)" />
                   <div>
-                    <div className="text-sm font-medium text-text-primary">{campaign.planDocument.filename}</div>
-                    <div className="text-xs text-text-secondary">Campaign master plan</div>
+                    <div className="text-sm font-medium text-text-primary">
+                      {campaign.planDocument ? campaign.planDocument.filename : 'Campaign Plan'}
+                    </div>
+                    <div className="text-xs text-text-secondary">
+                      {campaign.planDocument ? 'Campaign master plan' : 'Original plan document (reference file)'}
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => setShowPlanModal(true)} className="btn btn-secondary text-sm">
@@ -480,7 +504,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
 
       {showEditModal && <EditCampaignModal campaign={campaign} onClose={() => setShowEditModal(false)} />}
 
-      {showPlanModal && campaign.planDocument && (
+      {showPlanModal && hasPlan && (
         <div
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
           onClick={() => setShowPlanModal(false)}
@@ -495,9 +519,9 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
                 <X size={24} />
               </button>
             </div>
-            <div className="text-sm text-text-secondary mb-4">{campaign.planDocument.filename}</div>
+            {campaign.planDocument && <div className="text-sm text-text-secondary mb-4">{campaign.planDocument.filename}</div>}
             <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', fontFamily: 'inherit', color: 'var(--color-text-primary)' }}>
-              {campaign.planDocument.content}
+              {campaign.planDocument?.content ?? staticPlanMarkdown}
             </pre>
           </div>
         </div>

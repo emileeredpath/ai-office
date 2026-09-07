@@ -11,6 +11,11 @@ interface CampaignCalendarTabProps {
   updateCampaign: (id: string, updates: Partial<Campaign>) => Promise<void>;
   showToast: (message: string) => void;
   onViewPlan: () => void;
+  // True when a real plan document exists — either an uploaded
+  // campaign.planDocument or a static reference file keyed to this
+  // campaign's id in src/data/campaignPlans.ts. Computed by the parent so
+  // this tab doesn't need to know about both sources itself.
+  hasPlan: boolean;
 }
 
 const ensureScheduleIds = (items: any[]) =>
@@ -27,7 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
 // Unlike the campaign-record fields (now behind Edit Campaign), a marketer
 // actively works in this calendar day-to-day — it stays directly editable
 // here rather than moving behind an edit action.
-export function CampaignCalendarTab({ campaign, campaignTasks, updateCampaign, showToast, onViewPlan }: CampaignCalendarTabProps) {
+export function CampaignCalendarTab({ campaign, campaignTasks, updateCampaign, showToast, onViewPlan, hasPlan }: CampaignCalendarTabProps) {
   const [schedule, setSchedule] = useState(() => ensureScheduleIds(campaign.schedule || []));
 
   useEffect(() => {
@@ -170,7 +175,7 @@ export function CampaignCalendarTab({ campaign, campaignTasks, updateCampaign, s
             <button onClick={handleExportSchedule} className="btn btn-secondary text-sm">
               Export as CSV
             </button>
-            {campaign?.planDocument && (
+            {hasPlan && (
               <button onClick={onViewPlan} className="btn btn-secondary text-sm flex items-center gap-2">
                 <FileText size={16} />
                 View Full Plan
