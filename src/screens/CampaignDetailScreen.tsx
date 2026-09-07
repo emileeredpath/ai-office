@@ -1,52 +1,62 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, MoreHorizontal, FileText, X } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, X } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { BrandBadge } from '@/components/common/BrandBadge';
-import { KpiCard } from '@/components/common/KpiCard';
 import { EditCampaignModal } from '@/components/campaigns/EditCampaignModal';
-import { CampaignCalendarTab } from '@/components/campaigns/CampaignCalendarTab';
+import { CampaignOverviewTab } from '@/components/campaigns/CampaignOverviewTab';
 import { CampaignPerformanceTab } from '@/components/campaigns/CampaignPerformanceTab';
+import { CampaignActivityTasksTab } from '@/components/campaigns/CampaignActivityTasksTab';
 import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
-import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
+import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
+import { resolveEmailDateRange, getEmailPerformanceForCampaign } from '@/utils/emailPerformance';
+import { resolveCallDateRange } from '@/utils/callPerformance';
+import { resolveGa4DateRange } from '@/utils/ga4Traffic';
+import { getGoogleAdsForCampaign, getInfinityForCampaign } from '@/utils/campaignAttribution';
+import { fetchCampaignGa4Attribution, type Ga4CampaignAttribution } from '@/services/ga4Api';
 import { CAMPAIGN_PLAN_MARKDOWN } from '@/data/campaignPlans';
-import type { AuditLogEntry } from '@/services/auditLogApi';
+import type { Task } from '@/types/index';
 
 // Acumatica commercial data has no per-campaign field anywhere in its
 // schema (see the Campaign Detail data-source audit) — only brand/entity
 // level figures exist (Leads & CRM, Overview). This is genuinely
 // different from "not connected" (Acumatica IS connected, via manual
-// import) — never conflate the two states.
-const ACUMATICA_NOT_CAMPAIGN_SCOPED = 'Acumatica has no per-campaign link — see Leads & CRM for this entity’s figures';
+// import) — never conflate the two states, and never insert an
+// entity-level figure here as if it were this campaign's own result.
+export const ACUMATICA_NOT_CAMPAIGN_SCOPED =
+  'Acumatica manual commercial data is available at entity level, but no deterministic campaign-level relationship exists today.';
 
-type DetailTab = 'overview' | 'performance' | 'leads' | 'opportunities' | 'content' | 'calendar' | 'files' | 'notes';
+export type Ga4AttributionState =
+  | { status: 'loading' | 'unmapped' | 'not-connected' }
+  | { status: 'available'; sessions: number; users: number; enquiries: number | null };
+
+export type DetailTab = 'overview' | 'performance' | 'activity' | 'content' | 'plan' | 'notes';
 
 const TABS: { id: DetailTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'performance', label: 'Performance' },
-  { id: 'leads', label: 'Leads' },
-  { id: 'opportunities', label: 'Opportunities' },
+  { id: 'activity', label: 'Activity & Tasks' },
   { id: 'content', label: 'Content' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'files', label: 'Files' },
+  { id: 'plan', label: 'Plan & Files' },
   { id: 'notes', label: 'Notes' },
 ];
 
-function describeAuditEntry(entry: AuditLogEntry): string {
-  const value = (entry.newValue ?? entry.previousValue) as any;
-  const label = value?.title || value?.name || value?.schemeName || entry.resourceId || entry.resourceType;
-  const resourceLabel = entry.resourceType.replace(/_/g, ' ');
-  const verb = entry.action.startsWith('create')
-    ? 'Created'
-    : entry.action.startsWith('update')
-    ? 'Updated'
-    : entry.action.startsWith('complete')
-    ? 'Completed'
-    : entry.action.startsWith('delete')
-    ? 'Archived'
-    : 'Changed';
-  return `${verb} ${resourceLabel} "${label}"`;
+// A legacy tab id (from before this simplification) still used by
+// selectCampaign(id, tab) deep-links elsewhere in the app — mapped onto
+// the new structure so those links keep landing somewhere sensible
+// instead of silently falling back to Overview.
+const LEGACY_TAB_ALIAS: Record<string, DetailTab> = {
+  leads: 'overview',
+  opportunities: 'overview',
+  calendar: 'activity',
+  files: 'plan',
+};
+
+function resolveInitialTab(raw: string | undefined | null): DetailTab {
+  if (!raw) return 'overview';
+  if (TABS.some((t) => t.id === raw)) return raw as DetailTab;
+  return LEGACY_TAB_ALIAS[raw] ?? 'overview';
 }
 
 interface CampaignDetailScreenProps {
@@ -59,6 +69,11 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const tasks = useAppStore((s) => s.tasks);
   const auditLog = useAppStore((s) => s.auditLog);
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
+  const emailPerformance = useAppStore((s) => s.emailPerformance);
+  const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
+  const infinityCalls = useAppStore((s) => s.infinityCalls);
+  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const deleteCampaign = useAppStore((s) => s.deleteCampaign);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
@@ -67,7 +82,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   // instead of always landing on Overview.
   const selectedCampaignInitialTab = useAppStore((s) => s.selectedCampaignInitialTab);
 
-  const [activeTab, setActiveTab] = useState<DetailTab>((selectedCampaignInitialTab as DetailTab) || 'overview');
+  const [activeTab, setActiveTab] = useState<DetailTab>(resolveInitialTab(selectedCampaignInitialTab));
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -75,7 +90,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const [toastId, setToastId] = useState(0);
 
   useEffect(() => {
-    setActiveTab((selectedCampaignInitialTab as DetailTab) || 'overview');
+    setActiveTab(resolveInitialTab(selectedCampaignInitialTab));
     setShowOverflowMenu(false);
     // Only re-run when the campaign actually changes, not on every store
     // update — selectedCampaignInitialTab is read once at navigation time.
@@ -86,6 +101,75 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
     syncAuditLog();
   }, [syncAuditLog]);
 
+  // ---- Shared attribution fetching — lifted here (rather than each tab
+  // fetching its own copy) so switching between Overview and Performance
+  // never issues a second, duplicate set of API calls for the same
+  // campaign. Every fetch below is deterministic-only: Google Ads by exact
+  // campaign.id in googleAdsCampaignIds, GA4 by exact sessionCampaignName
+  // in ga4CampaignNames, Infinity by exact landing-page-path match against
+  // this campaign's own Tracking Links. Same "all-time" reasoning as
+  // before this phase — a campaign's real activity can predate or outlast
+  // whatever the global Period selector happens to be set to. ------------
+  useEffect(() => {
+    const { startDate, endDate } = resolveGoogleAdsDateRange('all-time');
+    syncGoogleAdsPerformance(startDate, endDate);
+  }, [syncGoogleAdsPerformance]);
+  useEffect(() => {
+    const { startDate, endDate } = resolveEmailDateRange('all-time');
+    syncEmailPerformance(startDate, endDate);
+  }, [syncEmailPerformance]);
+  useEffect(() => {
+    const { startDate, endDate } = resolveCallDateRange('all-time');
+    syncInfinityCalls(startDate, endDate);
+  }, [syncInfinityCalls]);
+
+  const googleAds = useMemo(
+    () => (campaign ? getGoogleAdsForCampaign(googleAdsPerformance, campaign) : null),
+    [googleAdsPerformance, campaign]
+  );
+  const emailPerf = useMemo(
+    () => (campaign ? getEmailPerformanceForCampaign(emailPerformance, campaign.id) : null),
+    [emailPerformance, campaign]
+  );
+  const infinityAttribution = useMemo(
+    () => (campaign ? getInfinityForCampaign(infinityCalls, campaign) : null),
+    [infinityCalls, campaign]
+  );
+
+  const ga4CampaignNames = campaign?.ga4CampaignNames ?? [];
+  const ga4Brands = campaign?.entities && campaign.entities.length > 0 ? campaign.entities : campaign ? [campaign.brand] : [];
+  const [ga4Attribution, setGa4Attribution] = useState<Ga4AttributionState>({ status: 'unmapped' });
+  useEffect(() => {
+    if (!campaign || ga4CampaignNames.length === 0) {
+      setGa4Attribution({ status: 'unmapped' });
+      return;
+    }
+    let cancelled = false;
+    setGa4Attribution({ status: 'loading' });
+    const { startDate, endDate } = resolveGa4DateRange('all-time');
+    Promise.all(ga4Brands.map((brand) => fetchCampaignGa4Attribution(brand, ga4CampaignNames, startDate, endDate).catch(() => null)))
+      .then((responses) => {
+        if (cancelled) return;
+        const results = responses.filter((r): r is NonNullable<typeof r> => r != null && r.result != null).map((r) => r.result as Ga4CampaignAttribution);
+        if (results.length === 0) {
+          setGa4Attribution({ status: 'not-connected' });
+          return;
+        }
+        const sessions = results.reduce((sum, r) => sum + r.sessions, 0);
+        const users = results.reduce((sum, r) => sum + r.users, 0);
+        const enquiryResults = results.filter((r) => r.enquiries != null);
+        const enquiries = enquiryResults.length > 0 ? enquiryResults.reduce((sum, r) => sum + (r.enquiries ?? 0), 0) : null;
+        setGa4Attribution({ status: 'available', sessions, users, enquiries });
+      })
+      .catch(() => {
+        if (!cancelled) setGa4Attribution({ status: 'not-connected' });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign?.id, JSON.stringify(ga4CampaignNames), JSON.stringify(ga4Brands)]);
+
   const showToast = (message: string) => {
     const id = toastId;
     setToastId(id + 1);
@@ -94,37 +178,11 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   };
 
   const campaignTasks = useMemo(() => (campaign ? tasks.filter((t) => t.campaignId === campaign.id) : []), [tasks, campaign]);
-  // Google Ads spend is deliberately never summed into the "Spend" KPI
-  // below — that figure is the campaign's own recorded/manually-logged
-  // spend (campaign.spend), which this app has no way to prove is (or
-  // isn't) already inclusive of Google Ads cost. Shown as a clearly
-  // separate tile instead — see getGoogleAdsForCampaign's doc comment.
-  const googleAds = useMemo(
-    () => (campaign ? getGoogleAdsForCampaign(googleAdsPerformance, campaign) : null),
-    [googleAdsPerformance, campaign]
-  );
-  // Content tab shows genuine Campaign Monitor sends only — source ===
-  // 'campaign-monitor' — never 'seed'/'test-seed' fixture rows, matching
-  // the same honesty guarantee the Performance tab's Email Performance
-  // section already has.
-  const emailSends = useMemo(
-    () => campaignTasks.filter((t) => t.type === 'email-send' && t.source === 'campaign-monitor'),
-    [campaignTasks]
-  );
-
   const campaignActivity = useMemo(() => {
     if (!campaign) return [];
     const taskIds = new Set(campaignTasks.map((t) => t.id));
     return auditLog.filter((e) => e.resourceId === campaign.id || (e.resourceId && taskIds.has(e.resourceId))).slice(0, 8);
   }, [auditLog, campaign, campaignTasks]);
-
-  const upcomingActivity = useMemo(() => {
-    const now = new Date();
-    return campaignTasks
-      .filter((t) => t.status !== 'complete' && t.deadline && new Date(t.deadline) >= now)
-      .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
-      .slice(0, 5);
-  }, [campaignTasks]);
 
   if (!campaign) {
     return (
@@ -146,15 +204,15 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
 
   const entities = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
   const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
-  const recipients = campaign.recipients || emailSends.reduce((sum, t) => sum + (t.recipients || 0), 0);
-  const eligibleSpend = campaign.budget || 0;
-  const recoverable = campaign.cofundRate != null && campaign.budget ? Math.round((campaign.budget * campaign.cofundRate) / 100) : 0;
-  const hasFunding = !!(campaign.vendor || campaign.scheme || campaign.claimStatus);
 
-  const roiValue =
-    campaign.valueGenerated != null && campaign.spend > 0
-      ? Math.round(((campaign.valueGenerated - campaign.spend) / campaign.spend) * 100)
-      : null;
+  // Secondary metadata row — only genuinely-populated fields, never an
+  // empty label just to fill space. There is no "Owner" field anywhere in
+  // the Campaign data model today, so it's never shown (not even as a
+  // blank) rather than inventing a stub.
+  const secondaryMeta: { label: string; value: string }[] = [];
+  if (campaign.primaryIndustry) secondaryMeta.push({ label: 'Primary industry', value: campaign.primaryIndustry });
+  if (campaign.secondaryIndustry) secondaryMeta.push({ label: 'Secondary industry', value: campaign.secondaryIndustry });
+  if (campaign.theme) secondaryMeta.push({ label: 'Theme', value: campaign.theme });
 
   return (
     <div className="v2-page">
@@ -171,18 +229,33 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
               {entities.map((entity) => (
                 <BrandBadge key={entity} brand={entity} />
               ))}
-              <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[campaign.status], fontSize: '11px' }}>
-                {CAMPAIGN_STATUS_LABEL[campaign.status]}
-              </span>
-              {(campaign.primaryIndustry || campaign.secondaryIndustry) && (
-                <span className="v2-detail-meta-dot">
-                  {[campaign.primaryIndustry, campaign.secondaryIndustry].filter(Boolean).join(' · ')}
+              {progress.statusInconsistent ? (
+                <span className="badge" style={{ background: 'var(--v2-orange)', color: 'white', fontSize: '11px' }}>
+                  {CAMPAIGN_STATUS_LABEL[campaign.status]}
+                </span>
+              ) : (
+                <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[campaign.status], fontSize: '11px' }}>
+                  {CAMPAIGN_STATUS_LABEL[campaign.status]}
                 </span>
               )}
               <span className="v2-detail-meta-dot">
                 {formatDateShort(campaign.startDate)} – {formatDateShort(campaign.endDate)}
               </span>
             </div>
+            {progress.statusInconsistent && (
+              <p className="text-sm font-semibold" style={{ color: 'var(--v2-orange)', marginTop: '0.4rem' }}>
+                {progress.label} — this is not corrected automatically
+              </p>
+            )}
+            {secondaryMeta.length > 0 && (
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-text-secondary" style={{ marginTop: '0.5rem' }}>
+                {secondaryMeta.map((m) => (
+                  <span key={m.label}>
+                    <span style={{ opacity: 0.75 }}>{m.label}:</span> {m.value}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="v2-detail-actions">
@@ -213,47 +286,6 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
           </div>
         </div>
 
-        {/* Progress */}
-        <div className="v2-progress-wrap">
-          <div className="v2-progress-row">
-            <span className="font-medium text-text-primary">{progress.percent}% complete</span>
-            <span style={{ color: progress.statusInconsistent ? 'var(--v2-orange)' : 'var(--color-text-secondary)', fontWeight: progress.statusInconsistent ? 600 : 400 }}>
-              {progress.label}
-            </span>
-          </div>
-          <div className="v2-progress-track">
-            <div className="v2-progress-fill" style={{ width: `${progress.percent}%`, backgroundColor: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }} />
-          </div>
-        </div>
-
-        {/* KPI strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : '—'} subtitle="Set on this campaign" />
-          <KpiCard title="Recorded Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle="Manually logged — may or may not include Google Ads cost" />
-          <KpiCard
-            title="Google Ads Spend"
-            value={googleAds?.status === 'available' ? `£${googleAds.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : undefined}
-            status={googleAds?.status === 'available' ? 'available' : 'not-connected'}
-            subtitle={
-              googleAds?.status === 'available'
-                ? 'Shown separately — never added to Recorded Spend'
-                : googleAds?.status === 'unmapped'
-                  ? 'Unmatched — no Google Ads campaign ID mapped'
-                  : 'Google Ads not connected'
-            }
-          />
-          <KpiCard title="Marketing Leads" value={campaign.leads} subtitle="Manually logged, not CRM-linked" accent="var(--v2-green)" />
-          <KpiCard title="Opportunities" status="not-connected" notConnectedLabel="Not available" subtitle={ACUMATICA_NOT_CAMPAIGN_SCOPED} />
-          <KpiCard title="Open Pipeline" status="not-connected" notConnectedLabel="Not available" subtitle={ACUMATICA_NOT_CAMPAIGN_SCOPED} />
-          <KpiCard title="Won Revenue" status="not-connected" notConnectedLabel="Not available" subtitle={ACUMATICA_NOT_CAMPAIGN_SCOPED} />
-          <KpiCard
-            title="ROI"
-            value={roiValue !== null ? `${roiValue >= 0 ? '+' : ''}${roiValue}%` : undefined}
-            status={roiValue !== null ? 'available' : 'not-connected'}
-            subtitle={roiValue !== null ? 'Spend vs value generated' : 'No value generated logged yet'}
-          />
-        </div>
-
         {/* Tabs */}
         <div className="v2-detail-tabs">
           {TABS.map((tab) => (
@@ -265,211 +297,68 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
 
         {/* TAB: Overview */}
         {activeTab === 'overview' && (
-          <div className="grid grid-cols-3 gap-6">
-            <div className="col-span-2 space-y-6">
-              <div className="card">
-                <h3 className="v2-section-title">Campaign Summary</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="text-text-secondary text-xs mb-1">Theme</div>
-                    <div className="text-text-primary">{campaign.theme || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-text-secondary text-xs mb-1">Recipients reached</div>
-                    <div className="text-text-primary">{recipients.toLocaleString()}</div>
-                  </div>
-                </div>
-                {campaign.notes && (
-                  <p className="text-sm text-text-secondary mt-4" style={{ whiteSpace: 'pre-wrap' }}>{campaign.notes}</p>
-                )}
-              </div>
-
-              <div className="card">
-                <h3 className="v2-section-title">Performance Summary</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="text-text-secondary text-xs mb-1">Enquiries</div>
-                    <div className="text-text-primary font-semibold">
-                      {campaign.results?.enquiriesReceived != null ? campaign.results.enquiriesReceived : 'Not logged yet'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-text-secondary text-xs mb-1">Marketing Leads</div>
-                    <div className="text-text-primary font-semibold">{campaign.leads}</div>
-                  </div>
-                  <div>
-                    <div className="text-text-secondary text-xs mb-1">Open Pipeline</div>
-                    <div className="text-text-secondary">Not available</div>
-                  </div>
-                  <div>
-                    <div className="text-text-secondary text-xs mb-1">Won Revenue</div>
-                    <div className="text-text-secondary">Not available</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h3 className="v2-section-title">Recent Campaign Activity</h3>
-                {campaignActivity.length > 0 ? (
-                  <div className="space-y-3">
-                    {campaignActivity.map((entry) => (
-                      <div key={entry.id} className="text-sm" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                        <div className="text-text-primary">{describeAuditEntry(entry)}</div>
-                        <div className="text-xs text-text-secondary mt-1">{formatDateShort(entry.createdAt)}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-secondary">No recent activity for this campaign.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="card">
-                <h3 className="v2-section-title">Upcoming Activity</h3>
-                {upcomingActivity.length > 0 ? (
-                  <div className="space-y-3">
-                    {upcomingActivity.map((task) => (
-                      <div key={task.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                        <div className="text-sm font-medium text-text-primary">{task.title}</div>
-                        <div className="text-xs text-text-secondary">Due {formatDateShort(task.deadline!)}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-secondary">Nothing scheduled.</p>
-                )}
-              </div>
-
-              <div className="card">
-                <h3 className="v2-section-title">Funding Status</h3>
-                {hasFunding ? (
-                  <div className="space-y-2 text-sm">
-                    {campaign.vendor && (
-                      <div className="flex justify-between"><span className="text-text-secondary">Vendor</span><span className="text-text-primary font-medium capitalize">{campaign.vendor}</span></div>
-                    )}
-                    {campaign.scheme && (
-                      <div className="flex justify-between"><span className="text-text-secondary">Scheme</span><span className="text-text-primary font-medium">{campaign.scheme}</span></div>
-                    )}
-                    {campaign.claimStatus && (
-                      <div className="flex justify-between"><span className="text-text-secondary">Claim status</span><span className="text-text-primary font-medium capitalize">{campaign.claimStatus}</span></div>
-                    )}
-                    <div className="flex justify-between"><span className="text-text-secondary">Eligible spend</span><span className="text-text-primary font-medium">£{eligibleSpend.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-text-secondary">Recoverable</span><span className="text-text-primary font-medium">£{recoverable.toLocaleString()}</span></div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-secondary">No funding scheme linked to this campaign.</p>
-                )}
-              </div>
-
-              <div className="card">
-                <h3 className="v2-section-title">Tracking & Attribution</h3>
-                {(campaign.trackingLinks || []).length > 0 ? (
-                  <p className="text-sm text-text-primary">
-                    {campaign.trackingLinks!.length} tracking link{campaign.trackingLinks!.length === 1 ? '' : 's'} configured.{' '}
-                    <button onClick={() => setActiveTab('performance')} style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                      View in Performance →
-                    </button>
-                  </p>
-                ) : (
-                  <p className="text-sm text-text-secondary">No tracking links configured yet.</p>
-                )}
-              </div>
-            </div>
-          </div>
+          <CampaignOverviewTab
+            campaign={campaign}
+            campaignTasks={campaignTasks}
+            campaignActivity={campaignActivity}
+            googleAds={googleAds}
+            emailPerf={emailPerf}
+            infinityAttribution={infinityAttribution}
+            ga4Attribution={ga4Attribution}
+            hasPlan={hasPlan}
+            onOpenPlan={() => setShowPlanModal(true)}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+          />
         )}
 
         {/* TAB: Performance */}
         {activeTab === 'performance' && (
-          <CampaignPerformanceTab campaign={campaign} updateCampaign={updateCampaign} showToast={showToast} />
+          <CampaignPerformanceTab
+            campaign={campaign}
+            updateCampaign={updateCampaign}
+            showToast={showToast}
+            googleAds={googleAds}
+            emailPerf={emailPerf}
+            infinityAttribution={infinityAttribution}
+            ga4Attribution={ga4Attribution}
+          />
         )}
 
-        {/* TAB: Leads */}
-        {activeTab === 'leads' && (
-          <div className="card">
-            <h3 className="v2-section-title">Marketing Leads</h3>
-            <div className="text-3xl font-bold text-text-primary mb-2">{campaign.leads}</div>
-            <p className="text-sm text-text-secondary">
-              Manually logged against this campaign — not yet linked to Acumatica or any CRM. Update this figure via Edit Campaign.
-            </p>
-          </div>
-        )}
-
-        {/* TAB: Opportunities */}
-        {activeTab === 'opportunities' && (
-          <div className="card">
-            <p className="v2-empty-state">
-              Acumatica is connected (manual export) but has no per-campaign link in its data model — opportunities can only be
-              attributed to a brand/entity today, not to an individual campaign. See Leads & CRM for this entity's real
-              Opportunities/Open Pipeline/Won Revenue figures.
-            </p>
-          </div>
-        )}
-
-        {/* TAB: Content */}
-        {activeTab === 'content' && (
-          <div className="card p-0">
-            {emailSends.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="table w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th>Send Name</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Campaign Monitor Reference</th>
-                      <th style={{ textAlign: 'right' }}>Cost (£)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {emailSends.map((task) => (
-                      <tr key={task.id}>
-                        <td className="text-text-primary">{task.title}</td>
-                        <td className="text-text-secondary">{task.deadline ? formatDateShort(task.deadline) : '—'}</td>
-                        <td className="text-text-secondary capitalize">{task.status.replace(/-/g, ' ')}</td>
-                        <td className="text-text-secondary text-xs">{task.externalId ?? '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{task.cost != null ? task.cost.toFixed(2) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="text-xs text-text-secondary mt-2">
-                  Full send performance (recipients, opens, clicks, bounces, unsubscribes) is on the Performance tab.
-                </p>
-              </div>
-            ) : (
-              <p className="v2-empty-state">No content sends logged for this campaign.</p>
-            )}
-          </div>
-        )}
-
-        {/* TAB: Calendar */}
-        {activeTab === 'calendar' && (
-          <CampaignCalendarTab
+        {/* TAB: Activity & Tasks */}
+        {activeTab === 'activity' && (
+          <CampaignActivityTasksTab
             campaign={campaign}
             campaignTasks={campaignTasks}
             updateCampaign={updateCampaign}
             showToast={showToast}
-            onViewPlan={() => setShowPlanModal(true)}
-            hasPlan={hasPlan}
           />
         )}
 
-        {/* TAB: Files */}
-        {activeTab === 'files' && (
+        {/* TAB: Content */}
+        {activeTab === 'content' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="v2-section-title">Content Deliverables</h3>
+              <p className="text-sm text-text-secondary mb-3">
+                Tasks representing content/creative deliverables for this campaign — briefs, pages, assets. Real Campaign
+                Monitor send performance (opens, clicks, bounces) lives on the Performance tab, not duplicated here.
+              </p>
+              <ContentDeliverablesTable campaignTasks={campaignTasks} />
+            </div>
+          </div>
+        )}
+
+        {/* TAB: Plan & Files */}
+        {activeTab === 'plan' && (
           <div className="card">
             {hasPlan ? (
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText size={20} color="var(--v2-purple)" />
-                  <div>
-                    <div className="text-sm font-medium text-text-primary">
-                      {campaign.planDocument ? campaign.planDocument.filename : 'Campaign Plan'}
-                    </div>
-                    <div className="text-xs text-text-secondary">
-                      {campaign.planDocument ? 'Campaign master plan' : 'Original plan document (reference file)'}
-                    </div>
+                <div>
+                  <div className="text-sm font-medium text-text-primary">
+                    {campaign.planDocument ? campaign.planDocument.filename : 'Campaign Plan'}
+                  </div>
+                  <div className="text-xs text-text-secondary">
+                    {campaign.planDocument ? 'Campaign master plan' : 'Original plan document (reference file)'}
                   </div>
                 </div>
                 <button onClick={() => setShowPlanModal(true)} className="btn btn-secondary text-sm">
@@ -477,7 +366,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
                 </button>
               </div>
             ) : (
-              <p className="v2-empty-state">No files uploaded yet.</p>
+              <p className="v2-empty-state">No plan document on file for this campaign.</p>
             )}
           </div>
         )}
@@ -534,6 +423,41 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Content tab's deliverable list — genuine campaign tasks only, distinct
+// from Performance's full Campaign Monitor send-metrics table. Shows every
+// linked task that represents content/creative work (email-send tasks
+// included, since those still represent a real content deliverable even
+// though their performance numbers live elsewhere).
+function ContentDeliverablesTable({ campaignTasks }: { campaignTasks: Task[] }) {
+  if (campaignTasks.length === 0) {
+    return <p className="v2-empty-state">No content tasks logged for this campaign.</p>;
+  }
+  return (
+    <div className="card p-0 overflow-x-auto">
+      <table className="table w-full text-sm">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Deadline</th>
+          </tr>
+        </thead>
+        <tbody>
+          {campaignTasks.map((task) => (
+            <tr key={task.id}>
+              <td className="text-text-primary">{task.title}</td>
+              <td className="text-text-secondary capitalize">{task.type === 'email-send' ? 'Email send' : 'Task'}</td>
+              <td className="text-text-secondary capitalize">{task.status.replace(/-/g, ' ')}</td>
+              <td className="text-text-secondary">{task.deadline ? formatDateShort(task.deadline) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -1,22 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Copy, Edit2, Trash2, Mail } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { useAppStore } from '@/store/useAppStore';
 import { Campaign, TrackingLink, Brand } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
-import { isWave1Campaign } from '@/utils/wave1';
-import { getEmailPerformanceForCampaign, resolveEmailDateRange } from '@/utils/emailPerformance';
-import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
-import { getGoogleAdsForCampaign, getInfinityForCampaign } from '@/utils/campaignAttribution';
-import { resolveCallDateRange } from '@/utils/callPerformance';
-import { resolveGa4DateRange } from '@/utils/ga4Traffic';
-import { fetchCampaignGa4Attribution, type Ga4CampaignAttribution } from '@/services/ga4Api';
 import { formatDateShort } from '@/utils/dateUtils';
+import type { CampaignGoogleAdsAttribution, CampaignInfinityAttribution } from '@/utils/campaignAttribution';
+import type { CampaignEmailPerformanceInfo } from '@/utils/emailPerformance';
+import type { Ga4AttributionState } from '@/screens/CampaignDetailScreen';
 
 interface CampaignPerformanceTabProps {
   campaign: Campaign;
   updateCampaign: (id: string, updates: Partial<Campaign>) => Promise<void>;
   showToast: (message: string) => void;
+  googleAds: CampaignGoogleAdsAttribution | null;
+  emailPerf: CampaignEmailPerformanceInfo | null;
+  infinityAttribution: CampaignInfinityAttribution | null;
+  ga4Attribution: Ga4AttributionState;
 }
 
 const EMPTY_LINK_FORM = {
@@ -30,125 +29,24 @@ const EMPTY_LINK_FORM = {
   utmContent: '',
 };
 
-// Wave 1 (GA4 + Infinity) summary, GA4-by-brand breakdown, recent calls, and
-// the full Tracking Links CRUD tool — all moved here from the old panel's
-// separate Summary/GA4 Performance/Call Tracking/Tracking Links tabs.
-// Tracking links stay directly editable in place, same reasoning as the
-// Calendar tab's milestones: this is attribution tooling a marketer
-// actively manages, not a one-off record edit.
-export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: CampaignPerformanceTabProps) {
-  const wave1Performance = useAppStore((s) => s.wave1Performance);
-  const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
-  const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
-  const emailPerformance = useAppStore((s) => s.emailPerformance);
-  const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
-  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
-  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
-  const infinityCalls = useAppStore((s) => s.infinityCalls);
-  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
-
-  useEffect(() => {
-    syncWave1Performance();
-    syncWave1Calls();
-  }, [syncWave1Performance, syncWave1Calls]);
-
-  // Campaign Detail isn't scoped by the global Period selector — a
-  // campaign's real sends can predate or outlast any period window, so
-  // this always looks across everything currently synced (same "All time"
-  // range the Period selector itself uses elsewhere) rather than
-  // approximating from the campaign's own start/end dates.
-  useEffect(() => {
-    const { startDate, endDate } = resolveEmailDateRange('all-time');
-    syncEmailPerformance(startDate, endDate);
-  }, [syncEmailPerformance]);
-
-  const emailPerf = useMemo(
-    () => getEmailPerformanceForCampaign(emailPerformance, campaign.id),
-    [emailPerformance, campaign.id]
-  );
-
-  // Google Ads attribution — same "all-time" reasoning as Email Performance
-  // above: a campaign's real ad spend can predate or outlast whatever the
-  // global Period selector happens to be set to, so this always looks
-  // across everything currently synced. Deterministic only — see
-  // getGoogleAdsForCampaign's own doc comment.
-  useEffect(() => {
-    const { startDate, endDate } = resolveGoogleAdsDateRange('all-time');
-    syncGoogleAdsPerformance(startDate, endDate);
-  }, [syncGoogleAdsPerformance]);
-
-  const googleAds = useMemo(
-    () => getGoogleAdsForCampaign(googleAdsPerformance, campaign),
-    [googleAdsPerformance, campaign]
-  );
-
-  // Infinity call attribution — deterministic landing-page-path match
-  // against this campaign's own Tracking Links only. Same "all-time"
-  // reasoning as Email Performance/Google Ads above.
-  useEffect(() => {
-    const { startDate, endDate } = resolveCallDateRange('all-time');
-    syncInfinityCalls(startDate, endDate);
-  }, [syncInfinityCalls]);
-
-  const infinityAttribution = useMemo(
-    () => getInfinityForCampaign(infinityCalls, campaign),
-    [infinityCalls, campaign]
-  );
-
-  // GA4 attribution — deterministic only: an exact, case-insensitive match
-  // against this campaign's own explicit ga4CampaignNames (set via Edit
-  // Campaign), queried per brand this campaign runs under. Never derived
-  // from the campaign's display name. Same "all-time" reasoning and same
-  // resolveGa4DateRange() utility the Website/Performance screens use for
-  // GA4 — Campaign Detail deliberately looks across the campaign's whole
-  // lifetime rather than the global Period selector, but never invents its
-  // own date logic.
-  type Ga4AttributionState =
-    | { status: 'loading' | 'unmapped' | 'not-connected' }
-    | { status: 'available'; sessions: number; users: number; enquiries: number | null };
-  const [ga4Attribution, setGa4Attribution] = useState<Ga4AttributionState>({ status: 'unmapped' });
-
-  const ga4CampaignNames = campaign.ga4CampaignNames ?? [];
-  const ga4Brands = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
-
-  useEffect(() => {
-    if (ga4CampaignNames.length === 0) {
-      setGa4Attribution({ status: 'unmapped' });
-      return;
-    }
-    let cancelled = false;
-    setGa4Attribution({ status: 'loading' });
-    const { startDate, endDate } = resolveGa4DateRange('all-time');
-    Promise.all(ga4Brands.map((brand) => fetchCampaignGa4Attribution(brand, ga4CampaignNames, startDate, endDate).catch(() => null)))
-      .then((responses) => {
-        if (cancelled) return;
-        const results = responses.filter((r): r is NonNullable<typeof r> => r != null && r.result != null).map((r) => r.result as Ga4CampaignAttribution);
-        if (results.length === 0) {
-          setGa4Attribution({ status: 'not-connected' });
-          return;
-        }
-        const sessions = results.reduce((sum, r) => sum + r.sessions, 0);
-        const users = results.reduce((sum, r) => sum + r.users, 0);
-        const enquiryResults = results.filter((r) => r.enquiries != null);
-        const enquiries = enquiryResults.length > 0 ? enquiryResults.reduce((sum, r) => sum + (r.enquiries ?? 0), 0) : null;
-        setGa4Attribution({ status: 'available', sessions, users, enquiries });
-      })
-      .catch(() => {
-        if (!cancelled) setGa4Attribution({ status: 'not-connected' });
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign.id, JSON.stringify(ga4CampaignNames), JSON.stringify(ga4Brands)]);
-
+// Detailed channel analytics: Google Ads, GA4, Campaign Monitor email,
+// Infinity calls, and the full Tracking Links CRUD tool. All attribution
+// data is fetched once by the parent CampaignDetailScreen and passed down
+// as props here, so switching tabs never issues a duplicate set of API
+// calls. Tracking links stay directly editable in place — this is
+// attribution tooling a marketer actively manages, not a one-off record
+// edit. Acumatica has no campaign-level relationship and is deliberately
+// never referenced on this tab.
+export function CampaignPerformanceTab({ campaign, updateCampaign, showToast, googleAds, emailPerf, infinityAttribution, ga4Attribution }: CampaignPerformanceTabProps) {
   const [trackingLinkForm, setTrackingLinkForm] = useState(EMPTY_LINK_FORM);
   const [editingTrackingLink, setEditingTrackingLink] = useState<string | null>(null);
 
-  const wave1Applies = isWave1Campaign(campaign);
-  const ga4 = wave1Applies ? wave1Performance?.ga4 : null;
-  const infinity = wave1Applies ? wave1Performance?.infinity : null;
-  const analyticsConnected = wave1Applies && wave1Performance?.configured;
+  // Attribution fetches are lifted to the parent and still in flight on
+  // first render — fall back to "not-connected" (never a guessed value)
+  // until the real result arrives.
+  const googleAdsData = googleAds ?? { status: 'not-connected' as const, spend: 0, impressions: 0, clicks: 0, ctr: null, averageCpc: null, conversions: 0, costPerConversion: null, matchedCampaigns: [] };
+  const emailPerfData = emailPerf ?? { status: 'not-connected' as const, sends: [] };
+  const infinityData = infinityAttribution ?? { status: 'not-connected' as const, calls: 0, answered: 0, missed: 0, answerRate: null };
 
   const resetLinkForm = () => {
     setTrackingLinkForm(EMPTY_LINK_FORM);
@@ -157,109 +55,6 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
 
   return (
     <div className="space-y-8">
-      {/* Wave 1 / GA4 / Infinity performance summary */}
-      <div>
-        <h3 className="v2-section-title">Performance Summary</h3>
-        {analyticsConnected ? (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div className="card p-4">
-                <div className="text-sm text-text-secondary mb-1">Total Clicks</div>
-                <div className="text-2xl font-bold">{ga4?.clicks ?? 0}</div>
-              </div>
-              <div className="card p-4">
-                <div className="text-sm text-text-secondary mb-1">Form Submissions</div>
-                <div className="text-2xl font-bold">{ga4?.formSubmissions ?? 0}</div>
-              </div>
-              <div className="card p-4">
-                <div className="text-sm text-text-secondary mb-1">Total Calls</div>
-                <div className="text-2xl font-bold">{infinity?.totalCalls ?? 0}</div>
-              </div>
-              <div className="card p-4">
-                <div className="text-sm text-text-secondary mb-1">Conversion Rate</div>
-                <div className="text-2xl font-bold">{ga4?.conversionRate?.toFixed(1) ?? 0}%</div>
-              </div>
-            </div>
-            {wave1Performance?.lastSynced && (
-              <p className="text-xs text-text-secondary">Last synced: {new Date(wave1Performance.lastSynced).toLocaleString()}</p>
-            )}
-          </>
-        ) : (
-          <div className="card p-4">
-            <p className="text-sm text-text-secondary">
-              Not connected — GA4 and Infinity call tracking are not configured{wave1Applies ? '' : ' for this campaign'}.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* GA4 by brand */}
-      {ga4?.byBrand && Object.keys(ga4.byBrand).length > 0 && (
-        <div>
-          <h3 className="v2-section-title">Channel Performance</h3>
-          <div className="card p-4">
-            <table className="table w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Brand</th>
-                  <th className="text-right">Clicks</th>
-                  <th className="text-right">Page Views</th>
-                  <th className="text-right">Form Subs</th>
-                  <th className="text-right">Conv. Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(ga4.byBrand).map(([brand, metrics]) => (
-                  <tr key={brand}>
-                    <td className="font-medium capitalize">{brand}</td>
-                    <td className="text-right">{metrics.clicks}</td>
-                    <td className="text-right">{metrics.pageViews}</td>
-                    <td className="text-right">{metrics.formSubmissions}</td>
-                    <td className="text-right">{metrics.conversionRate.toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Recent calls */}
-      {infinity?.calls && infinity.calls.length > 0 && (
-        <div>
-          <h3 className="v2-section-title">Recent Calls</h3>
-          <div className="card p-4">
-            <table className="table w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Duration</th>
-                  <th>Caller</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {infinity.calls.slice(0, 50).map((call) => (
-                  <tr key={call.id}>
-                    <td>{call.date}</td>
-                    <td>{call.time}</td>
-                    <td>{call.duration}</td>
-                    <td className="text-text-secondary text-xs">{call.callerNumber}</td>
-                    <td>
-                      <span className="badge" style={{ background: call.answered ? '#10b981' : '#ef4444', color: 'white', fontSize: '11px' }}>
-                        {call.answered ? 'Answered' : 'Missed'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="text-xs text-text-secondary mt-2">Showing latest 50 calls</p>
-          </div>
-        </div>
-      )}
-
       {/* Email Performance — the single source of truth for this campaign's
           send-level email data. Only genuine source: 'campaign-monitor'
           sends whose dashboardCampaignId already matches this campaign
@@ -269,7 +64,7 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
           the only place those figures come from. */}
       <div>
         <h3 className="v2-section-title">Email Performance</h3>
-        {emailPerf.status === 'available' && emailPerf.sends.length > 0 ? (
+        {emailPerfData.status === 'available' && emailPerfData.sends.length > 0 ? (
           <div className="card p-4">
             <div className="overflow-x-auto">
               <table className="table w-full text-sm">
@@ -287,7 +82,7 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                   </tr>
                 </thead>
                 <tbody>
-                  {emailPerf.sends.map((send) => (
+                  {emailPerfData.sends.map((send) => (
                     <tr key={send.taskId}>
                       <td className="text-text-primary">{send.campaignName}</td>
                       <td className="text-text-secondary">{formatDateShort(send.sentDate)}</td>
@@ -309,10 +104,10 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
             <div className="v2-crm-empty">
               <Mail size={28} color="var(--v2-grey)" />
               <p className="v2-crm-empty-title">
-                {emailPerf.status === 'not-connected' ? 'Campaign Monitor is not connected' : 'No Campaign Monitor sends are linked to this campaign'}
+                {emailPerfData.status === 'not-connected' ? 'Campaign Monitor is not connected' : 'No Campaign Monitor sends are linked to this campaign'}
               </p>
               <p className="v2-crm-empty-subtitle">
-                {emailPerf.status === 'not-connected'
+                {emailPerfData.status === 'not-connected'
                   ? 'Email performance will appear here once Campaign Monitor is configured.'
                   : "Sends are linked automatically by the existing Campaign Monitor sync. If a real send for this campaign isn't showing, its name may not have matched — this is never guessed here."}
               </p>
@@ -328,28 +123,28 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
           getGoogleAdsForCampaign's doc comment. */}
       <div>
         <h3 className="v2-section-title">Google Ads</h3>
-        {googleAds.status === 'available' ? (
+        {googleAdsData.status === 'available' ? (
           <div className="card p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div>
                 <div className="text-xs text-text-secondary mb-1">Spend</div>
-                <div className="text-xl font-bold text-text-primary">£{googleAds.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</div>
+                <div className="text-xl font-bold text-text-primary">£{googleAdsData.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</div>
               </div>
               <div>
                 <div className="text-xs text-text-secondary mb-1">Impressions</div>
-                <div className="text-xl font-bold text-text-primary">{googleAds.impressions.toLocaleString('en-GB')}</div>
+                <div className="text-xl font-bold text-text-primary">{googleAdsData.impressions.toLocaleString('en-GB')}</div>
               </div>
               <div>
                 <div className="text-xs text-text-secondary mb-1">Clicks</div>
-                <div className="text-xl font-bold text-text-primary">{googleAds.clicks.toLocaleString('en-GB')}</div>
+                <div className="text-xl font-bold text-text-primary">{googleAdsData.clicks.toLocaleString('en-GB')}</div>
               </div>
               <div>
                 <div className="text-xs text-text-secondary mb-1">CTR</div>
-                <div className="text-xl font-bold text-text-primary">{googleAds.ctr != null ? `${googleAds.ctr}%` : '—'}</div>
+                <div className="text-xl font-bold text-text-primary">{googleAdsData.ctr != null ? `${googleAdsData.ctr}%` : '—'}</div>
               </div>
               <div>
                 <div className="text-xs text-text-secondary mb-1">Avg. CPC</div>
-                <div className="text-xl font-bold text-text-primary">{googleAds.averageCpc != null ? `£${googleAds.averageCpc.toFixed(2)}` : '—'}</div>
+                <div className="text-xl font-bold text-text-primary">{googleAdsData.averageCpc != null ? `£${googleAdsData.averageCpc.toFixed(2)}` : '—'}</div>
               </div>
               <div>
                 {/* Google Ads' own conversions metric — a fractional,
@@ -357,7 +152,7 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                     same population as a GA4 Enquiry — never presented or
                     summed as if it were. */}
                 <div className="text-xs text-text-secondary mb-1">Conversions</div>
-                <div className="text-xl font-bold text-text-primary">{googleAds.conversions.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</div>
+                <div className="text-xl font-bold text-text-primary">{googleAdsData.conversions.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</div>
               </div>
             </div>
             <table className="table w-full text-sm">
@@ -370,7 +165,7 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                 </tr>
               </thead>
               <tbody>
-                {googleAds.matchedCampaigns.map((c) => (
+                {googleAdsData.matchedCampaigns.map((c) => (
                   <tr key={c.campaignId}>
                     <td className="text-text-primary">{c.campaignName}</td>
                     <td className="text-text-secondary capitalize">{c.status.toLowerCase()}</td>
@@ -384,7 +179,7 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
         ) : (
           <div className="card p-4">
             <p className="text-sm text-text-secondary">
-              {googleAds.status === 'not-connected'
+              {googleAdsData.status === 'not-connected'
                 ? 'Google Ads is not connected.'
                 : 'Unmatched — no Google Ads campaign ID is mapped to this campaign yet. Add one via Edit Campaign to attribute real spend, impressions, clicks, CTR, CPC and conversions here.'}
             </p>
@@ -425,7 +220,7 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
                 ? 'Loading…'
                 : ga4Attribution.status === 'not-connected'
                   ? 'GA4 is not connected for this campaign’s entities.'
-                  : 'Unmatched — this campaign has no GA4 campaign name mapped yet. Add one via Edit Campaign to attribute real sessions, users and enquiries here.'}
+                  : 'Unmapped — add the real GA4 campaign name in Edit Campaign.'}
             </p>
           </div>
         )}
@@ -437,31 +232,31 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast }: 
           aggregate counts only. See getInfinityForCampaign's doc comment. */}
       <div>
         <h3 className="v2-section-title">Calls (Infinity)</h3>
-        {infinityAttribution.status === 'available' ? (
+        {infinityData.status === 'available' ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="card p-4">
               <div className="text-sm text-text-secondary mb-1">Calls</div>
-              <div className="text-2xl font-bold">{infinityAttribution.calls}</div>
+              <div className="text-2xl font-bold">{infinityData.calls}</div>
             </div>
             <div className="card p-4">
               <div className="text-sm text-text-secondary mb-1">Answered</div>
-              <div className="text-2xl font-bold">{infinityAttribution.answered}</div>
+              <div className="text-2xl font-bold">{infinityData.answered}</div>
             </div>
             <div className="card p-4">
               <div className="text-sm text-text-secondary mb-1">Missed</div>
-              <div className="text-2xl font-bold">{infinityAttribution.missed}</div>
+              <div className="text-2xl font-bold">{infinityData.missed}</div>
             </div>
             <div className="card p-4">
               <div className="text-sm text-text-secondary mb-1">Answer Rate</div>
-              <div className="text-2xl font-bold">{infinityAttribution.answerRate != null ? `${infinityAttribution.answerRate}%` : '—'}</div>
+              <div className="text-2xl font-bold">{infinityData.answerRate != null ? `${infinityData.answerRate}%` : '—'}</div>
             </div>
           </div>
         ) : (
           <div className="card p-4">
             <p className="text-sm text-text-secondary">
-              {infinityAttribution.status === 'not-connected'
+              {infinityData.status === 'not-connected'
                 ? 'Infinity call tracking is not connected.'
-                : 'Unmatched — this campaign has no Tracking Link with a landing page yet, so calls cannot be reliably linked to it. Add one below to attribute real calls here.'}
+                : 'Unmapped — add a Tracking Link with a landing page.'}
             </p>
           </div>
         )}
