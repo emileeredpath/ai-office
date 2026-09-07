@@ -74,7 +74,17 @@ export function CampaignsScreen() {
       if (filterStatus !== 'all' && c.status !== filterStatus) return false;
       if (filterIndustry !== 'all' && c.primaryIndustry !== filterIndustry && c.secondaryIndustry !== filterIndustry && c.industry !== filterIndustry) return false;
       if (filterVendor !== 'all' && c.vendor !== filterVendor) return false;
-      if (periodStart && c.startDate < periodStart && c.endDate < periodStart) return false;
+      // An operationally Active campaign stays visible regardless of the
+      // reporting period — the period still governs the performance
+      // metrics shown for it (via the KPI totals above, which read
+      // filteredCampaigns), it just must never hide a campaign someone is
+      // still meant to be managing. A campaign whose end date has already
+      // passed while still marked Active shows the existing "ended but
+      // still active" warning treatment (getCampaignProgressInfo, used by
+      // CampaignsTable below) — the period filter is not how that gets
+      // surfaced or resolved. Planning/Completed/on-hold campaigns keep
+      // the original date-window filtering unchanged.
+      if (c.status !== 'active' && periodStart && c.startDate < periodStart && c.endDate < periodStart) return false;
       if (searchTerm && !c.name.toLowerCase().includes(searchTerm.toLowerCase()) && !c.theme.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       return true;
     });
