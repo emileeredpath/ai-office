@@ -34,6 +34,7 @@
 // /data/preview/ai-office.db, on the ai-office-v2-preview-volume). This
 // never runs against production, whose DATABASE_PATH has no such segment.
 import { getCampaignById, insertCampaign, archiveCampaign, updateCampaignRow } from '../db/campaignRepository.js';
+import { getCampaignCosts, insertCampaignCost } from '../db/campaignCostsRepository.js';
 import db from '../db/connection.js';
 import type { Brand } from '../types.js';
 
@@ -108,6 +109,7 @@ export function runCampaignRestoration() {
   try {
     restoreEducationCampaign();
     restoreEducationCampaignCost();
+    restoreEducationStructuredCost();
     insertRealCampaignIfMissing(REAL_YESSS);
     insertRealCampaignIfMissing(REAL_HAVEN_TENDER);
     archivePreviewDemoCampaigns();
@@ -230,6 +232,38 @@ function restoreEducationCampaignCost() {
     updateCampaignRow(REAL_EDUCATION_ID, updates);
     console.log(`[campaign-restoration] Restored Q3 Education cost field(s): ${JSON.stringify(updates)}.`);
   }
+}
+
+// Structured Campaign Costs phase: the real, structured replacement for
+// restoreEducationCampaignCost()'s interim campaign.spend figure above.
+// Creates exactly one campaign_costs row for Q3 Education's confirmed
+// £1,791 purchased-education-data cost — the only campaign with a
+// confirmed cost classification today (see the phase report's legacy
+// spend audit for every other campaign's un-migrated campaign.spend).
+// Idempotent by construction: skips entirely if a cost with this exact
+// campaign/category/description already exists, so a redeploy (or this
+// function running on every boot) never creates a duplicate row. The
+// interim campaign.spend value is left untouched here — it is NOT summed
+// into Fixed Costs anywhere in the app (see src/utils/campaignCosts.ts),
+// so there is no double-counting between the two.
+function restoreEducationStructuredCost() {
+  const category = 'Purchased Data' as const;
+  const description = 'Education campaign data purchase';
+
+  const existing = getCampaignCosts(REAL_EDUCATION_ID);
+  const alreadyPresent = existing.some((c) => c.category === category && c.description === description);
+  if (alreadyPresent) return;
+
+  insertCampaignCost({
+    campaignId: REAL_EDUCATION_ID,
+    category,
+    description,
+    amount: 1791,
+    costDate: REAL_EDUCATION_CORE.endDate,
+    supplierReference: null,
+    notes: 'Migrated from the interim campaign.spend safety net — see commit 652e670e.',
+  });
+  console.log(`[campaign-restoration] Created structured campaign cost for ${REAL_EDUCATION_ID}: ${category} — £1,791.`);
 }
 
 // Fictional demo data from previewSeed.ts is useful for exercising the

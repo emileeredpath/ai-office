@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Task, Campaign, TaskHistoryEntry, FundingRecord } from '@/types/index';
+import { Task, Campaign, TaskHistoryEntry, FundingRecord, CampaignCost } from '@/types/index';
 import {
   fetchTasksFromApi,
   deleteTaskFromApi,
@@ -19,6 +19,12 @@ import {
   createFundingRecordInApi,
   updateFundingRecordInApi,
 } from '@/services/fundingRecordsApi';
+import {
+  fetchCampaignCostsFromApi,
+  createCampaignCostInApi,
+  updateCampaignCostInApi,
+  deleteCampaignCostInApi,
+} from '@/services/campaignCostsApi';
 import { fetchRecentAuditLog, type AuditLogEntry } from '@/services/auditLogApi';
 import { apiFetch } from '@/services/apiConfig';
 import {
@@ -159,6 +165,12 @@ interface AppState {
   // Funding & Rewards records
   fundingRecords: FundingRecord[];
 
+  // Structured Campaign Costs (Structured Campaign Costs phase) — fetched
+  // once (all campaigns) and filtered per-campaign by callers, same
+  // discipline as googleAdsPerformance, so the Campaigns list and Campaign
+  // Detail never issue duplicate requests for overlapping data.
+  campaignCosts: CampaignCost[];
+
   // Recent activity feed (Home screen)
   auditLog: AuditLogEntry[];
 
@@ -206,6 +218,12 @@ interface AppState {
   syncFundingRecordsFromApi: () => Promise<void>;
   addFundingRecord: (record: Omit<FundingRecord, 'id' | 'balanceToClaim' | 'percentOfTarget' | 'createdAt' | 'updatedAt' | 'archived' | 'archivedAt'>) => Promise<void>;
   updateFundingRecord: (id: string, updates: Partial<FundingRecord>) => Promise<void>;
+
+  // Campaign Costs
+  syncCampaignCosts: () => Promise<void>;
+  addCampaignCost: (cost: Omit<CampaignCost, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateCampaignCost: (id: string, updates: Partial<CampaignCost>) => Promise<void>;
+  deleteCampaignCost: (id: string) => Promise<void>;
 
   // Recent activity
   syncAuditLog: () => Promise<void>;
@@ -296,6 +314,7 @@ export const useAppStore = create<AppState>((set, get) => {
     infinityCalls: null,
     infinityCallsSyncing: false,
     fundingRecords: [],
+    campaignCosts: [],
     auditLog: [],
 
     addTask: async (task: Task) => {
@@ -767,6 +786,47 @@ export const useAppStore = create<AppState>((set, get) => {
         delete (payload as any).updatedAt;
         await updateFundingRecordInApi(id, payload as Record<string, unknown>);
         await get().syncFundingRecordsFromApi();
+      } catch (err) {
+        alert(friendlyErrorMessage(err));
+      }
+    },
+
+    syncCampaignCosts: async () => {
+      try {
+        const costs = await fetchCampaignCostsFromApi();
+        set({ campaignCosts: costs });
+      } catch (err) {
+        console.error('Campaign costs sync error:', err);
+      }
+    },
+
+    addCampaignCost: async (cost) => {
+      try {
+        await createCampaignCostInApi(cost as Record<string, unknown>);
+        await get().syncCampaignCosts();
+      } catch (err) {
+        alert(friendlyErrorMessage(err));
+      }
+    },
+
+    updateCampaignCost: async (id: string, updates: Partial<CampaignCost>) => {
+      try {
+        const payload = { ...updates };
+        delete (payload as any).id;
+        delete (payload as any).campaignId;
+        delete (payload as any).createdAt;
+        delete (payload as any).updatedAt;
+        await updateCampaignCostInApi(id, payload as Record<string, unknown>);
+        await get().syncCampaignCosts();
+      } catch (err) {
+        alert(friendlyErrorMessage(err));
+      }
+    },
+
+    deleteCampaignCost: async (id: string) => {
+      try {
+        await deleteCampaignCostInApi(id);
+        await get().syncCampaignCosts();
       } catch (err) {
         alert(friendlyErrorMessage(err));
       }

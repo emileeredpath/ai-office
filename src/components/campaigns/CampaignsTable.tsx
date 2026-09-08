@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { MoreHorizontal, ExternalLink } from 'lucide-react';
-import { Campaign } from '@/types/index';
+import { Campaign, CampaignCost } from '@/types/index';
 import { BrandBadge } from '@/components/common/BrandBadge';
 import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
+import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
+import { getKnownCampaignSpend } from '@/utils/campaignCosts';
+import type { GoogleAdsResponse } from '@/services/googleAdsApi';
 
 interface CampaignsTableProps {
   campaigns: Campaign[];
   isEditor: boolean;
   acumaticaUrl: string;
+  campaignCosts: CampaignCost[];
+  googleAdsPerformance: GoogleAdsResponse | null;
   onSelectCampaign: (id: string) => void;
   onLogResults: (campaign: Campaign) => void;
   onDelete: (campaign: Campaign) => void;
@@ -30,7 +35,7 @@ const isCampaignEnded = (endDate: Date) => {
 // scale to dozens/hundreds of campaigns. Row/name click opens Campaign
 // Detail; everything else (log results, Acumatica, delete) lives in a
 // per-row overflow menu so the table stays scannable.
-export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, onSelectCampaign, onLogResults, onDelete }: CampaignsTableProps) {
+export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCosts, googleAdsPerformance, onSelectCampaign, onLogResults, onDelete }: CampaignsTableProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   if (campaigns.length === 0) {
@@ -55,7 +60,12 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, onSelectCamp
               </th>
               <th style={{ textAlign: 'right' }}>Open Pipeline</th>
               <th style={{ textAlign: 'right' }}>Budget</th>
-              <th style={{ textAlign: 'right' }}>Spend</th>
+              <th style={{ textAlign: 'right' }} title="Fixed costs + connected media spend">
+                Spend
+                <div className="text-xs font-normal" style={{ textTransform: 'none', color: 'var(--color-text-secondary)' }}>
+                  Fixed costs + connected media spend
+                </div>
+              </th>
               <th style={{ textAlign: 'right' }}>ROI</th>
               <th style={{ width: 40 }}></th>
             </tr>
@@ -70,6 +80,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, onSelectCamp
                   : null;
               const ended = isCampaignEnded(campaign.endDate);
               const menuOpen = openMenuId === campaign.id;
+              const knownSpend = getKnownCampaignSpend(campaignCosts, campaign.id, getGoogleAdsForCampaign(googleAdsPerformance, campaign)).knownCampaignSpend;
 
               return (
                 <tr key={campaign.id} onClick={() => onSelectCampaign(campaign.id)}>
@@ -118,7 +129,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, onSelectCamp
                     <span className="v2-not-connected-text">Not connected</span>
                   </td>
                   <td style={{ textAlign: 'right' }}>{formatCurrency(campaign.budget)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatCurrency(campaign.spend)}</td>
+                  <td style={{ textAlign: 'right' }} title="Fixed costs + connected media spend">{formatCurrency(knownSpend)}</td>
                   <td style={{ textAlign: 'right' }}>
                     {roiValue !== null ? (
                       <span style={{ fontWeight: 600, color: roiValue >= 0 ? 'var(--v2-green)' : 'var(--v2-red)' }}>

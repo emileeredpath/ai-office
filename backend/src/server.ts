@@ -7,6 +7,7 @@ import 'dotenv/config';
 import actionsRouter from './routes/actions.js';
 import tasksRouter from './routes/tasks.js';
 import campaignsRouter from './routes/campaigns.js';
+import campaignCostsRouter from './routes/campaignCosts.js';
 import fundingRouter from './routes/funding.js';
 import documentsRouter from './routes/documents.js';
 import auditLogRouter from './routes/auditLog.js';
@@ -107,6 +108,7 @@ app.use('/api/auth/microsoft', msGraphRouter);
 // John = view) — no session, no data, even if you hit the API directly.
 app.use('/api/tasks', requireSession, tasksRouter);
 app.use('/api/campaigns', requireSession, campaignsRouter);
+app.use('/api/campaign-costs', requireSession, campaignCostsRouter);
 app.use('/api/funding', requireSession, fundingRouter);
 app.use('/api/documents', requireSession, documentsRouter);
 app.use('/api/audit-log', requireSession, auditLogRouter);

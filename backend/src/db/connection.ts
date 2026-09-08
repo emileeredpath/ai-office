@@ -463,4 +463,32 @@ db.exec(`
 // already created before probability_raw existed in the CREATE TABLE above.
 addColumnIfMissing('acumatica_opportunities', 'probability_raw', 'TEXT');
 
+// Structured Campaign Costs (Structured Campaign Costs phase) — the manual,
+// fixed/offline half of a campaign's known spend (purchased data, print,
+// postage, creative production, agency fees, events, sponsorship). A real
+// table (not a JSON blob on campaigns, unlike tracking_links) since these
+// are independent, individually editable line items with their own id and
+// timestamps. category is stored as free text, not a SQL CHECK constraint —
+// validated against CAMPAIGN_COST_CATEGORIES in the route layer instead, so
+// adding a category never needs a migration. Paid media spend (Google Ads
+// today) is never stored here — it's summed live from the campaign's own
+// exact googleAdsCampaignIds mapping (see campaignAttribution.ts) and added
+// alongside this table's sum, never into it.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS campaign_costs (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount REAL NOT NULL,
+    cost_date TEXT NOT NULL,
+    supplier_reference TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_campaign_costs_campaign_id ON campaign_costs(campaign_id);
+`);
+
 export default db;

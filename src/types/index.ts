@@ -167,6 +167,35 @@ export interface CampaignSchedule {
   taskId?: string | null; // Linked task for cascade updates
 }
 
+// Structured Campaign Costs (Structured Campaign Costs phase) — the manual,
+// fixed/offline half of a campaign's known spend. The category list here
+// MUST stay in lockstep with backend/src/types.ts's CAMPAIGN_COST_CATEGORIES
+// (the two runtimes have no shared package) — see
+// src/utils/campaignCostCategories.ts, the frontend's single source of
+// truth for it, imported everywhere a category list or label is needed.
+export type CampaignCostCategory =
+  | 'Purchased Data'
+  | 'Print & Production'
+  | 'Postage & Distribution'
+  | 'Creative / Production'
+  | 'Agency / Supplier'
+  | 'Events'
+  | 'Sponsorship'
+  | 'Other';
+
+export interface CampaignCost {
+  id: string;
+  campaignId: string;
+  category: CampaignCostCategory;
+  description: string;
+  amount: number;
+  costDate: string;
+  supplierReference: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TrackingLink {
   id: string;
   entity: Brand;

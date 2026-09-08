@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Copy, Edit2, Trash2, Mail } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { Campaign, TrackingLink, Brand } from '@/types/index';
+import { Campaign, TrackingLink, Brand, CampaignCost } from '@/types/index';
 import { BRAND_COLOR, BRAND_LABEL } from '@/utils/brandColors';
 import { formatDateShort } from '@/utils/dateUtils';
 import type { CampaignGoogleAdsAttribution, CampaignInfinityAttribution } from '@/utils/campaignAttribution';
 import type { CampaignEmailPerformanceInfo } from '@/utils/emailPerformance';
 import type { Ga4AttributionState } from '@/screens/CampaignDetailScreen';
+import { CampaignCostsSection } from '@/components/campaigns/CampaignCostsSection';
 
 interface CampaignPerformanceTabProps {
   campaign: Campaign;
@@ -16,6 +17,10 @@ interface CampaignPerformanceTabProps {
   emailPerf: CampaignEmailPerformanceInfo | null;
   infinityAttribution: CampaignInfinityAttribution | null;
   ga4Attribution: Ga4AttributionState;
+  campaignCosts: CampaignCost[];
+  addCampaignCost: (cost: Omit<CampaignCost, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateCampaignCost: (id: string, updates: Partial<CampaignCost>) => Promise<void>;
+  deleteCampaignCost: (id: string) => Promise<void>;
 }
 
 const EMPTY_LINK_FORM = {
@@ -37,7 +42,7 @@ const EMPTY_LINK_FORM = {
 // attribution tooling a marketer actively manages, not a one-off record
 // edit. Acumatica has no campaign-level relationship and is deliberately
 // never referenced on this tab.
-export function CampaignPerformanceTab({ campaign, updateCampaign, showToast, googleAds, emailPerf, infinityAttribution, ga4Attribution }: CampaignPerformanceTabProps) {
+export function CampaignPerformanceTab({ campaign, updateCampaign, showToast, googleAds, emailPerf, infinityAttribution, ga4Attribution, campaignCosts, addCampaignCost, updateCampaignCost, deleteCampaignCost }: CampaignPerformanceTabProps) {
   const [trackingLinkForm, setTrackingLinkForm] = useState(EMPTY_LINK_FORM);
   const [editingTrackingLink, setEditingTrackingLink] = useState<string | null>(null);
 
@@ -55,6 +60,16 @@ export function CampaignPerformanceTab({ campaign, updateCampaign, showToast, go
 
   return (
     <div className="space-y-8">
+      <CampaignCostsSection
+        campaign={campaign}
+        campaignCosts={campaignCosts}
+        googleAds={googleAds}
+        addCampaignCost={addCampaignCost}
+        updateCampaignCost={updateCampaignCost}
+        deleteCampaignCost={deleteCampaignCost}
+        showToast={showToast}
+      />
+
       {/* Email Performance — the single source of truth for this campaign's
           send-level email data. Only genuine source: 'campaign-monitor'
           sends whose dashboardCampaignId already matches this campaign

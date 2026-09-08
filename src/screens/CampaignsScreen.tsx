@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { Brand, Campaign, CampaignResults, CampaignStatus } from '@/types/index';
@@ -9,6 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod, periodStartDate } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
+import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
+import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
+import { getKnownCampaignSpend } from '@/utils/campaignCosts';
 
 const ACUMATICA_URL = 'https://brentwoodcommunications.acumatica.com/Main?CompanyID=MTECH+Brentwood+Communications+(Live)&ScreenId=DB000055';
 
@@ -31,9 +34,25 @@ export function CampaignsScreen() {
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const deleteCampaign = useAppStore((s) => s.deleteCampaign);
+  const campaignCosts = useAppStore((s) => s.campaignCosts);
+  const syncCampaignCosts = useAppStore((s) => s.syncCampaignCosts);
+  const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
+  const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const { isEditor } = useAuth();
   const { selectedEntity, isGroupView } = useEntity();
   const { period } = usePeriod();
+
+  // Known Campaign Spend is never period-scoped (same reasoning as Campaign
+  // Detail: a campaign's real activity can predate or outlast whatever the
+  // global Period selector happens to be set to), so this always looks
+  // across everything currently synced.
+  useEffect(() => {
+    syncCampaignCosts();
+  }, [syncCampaignCosts]);
+  useEffect(() => {
+    const { startDate, endDate } = resolveGoogleAdsDateRange('all-time');
+    syncGoogleAdsPerformance(startDate, endDate);
+  }, [syncGoogleAdsPerformance]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [loggingCampaign, setLoggingCampaign] = useState<Campaign | null>(null);
@@ -90,13 +109,16 @@ export function CampaignsScreen() {
     });
   }, [campaigns, isGroupView, selectedEntity, filterStatus, filterIndustry, filterVendor, periodStart, searchTerm]);
 
+  const knownSpendFor = (c: Campaign) => getKnownCampaignSpend(campaignCosts, c.id, getGoogleAdsForCampaign(googleAdsPerformance, c)).knownCampaignSpend;
+
   const sortedCampaigns = useMemo(() => {
     const sorted = [...filteredCampaigns];
     if (sortBy === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortBy === 'spend') sorted.sort((a, b) => b.spend - a.spend);
+    else if (sortBy === 'spend') sorted.sort((a, b) => knownSpendFor(b) - knownSpendFor(a));
     else sorted.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     return sorted;
-  }, [filteredCampaigns, sortBy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredCampaigns, sortBy, campaignCosts, googleAdsPerformance]);
 
   const displayedCampaigns = sortedCampaigns.slice(0, displayedCount);
   const hasMore = sortedCampaigns.length > displayedCount;
@@ -108,9 +130,15 @@ export function CampaignsScreen() {
       planned: filteredCampaigns.filter((c) => c.status === 'planning').length,
       completed: filteredCampaigns.filter((c) => c.status === 'completed').length,
       budget: filteredCampaigns.reduce((sum, c) => sum + (c.budget || 0), 0),
-      spend: filteredCampaigns.reduce((sum, c) => sum + c.spend, 0),
+      // Known Campaign Spend = Fixed Costs (campaign_costs) + available
+      // Google Ads spend — see src/utils/campaignCosts.ts, the one place
+      // this calculation lives.
+      spend: filteredCampaigns.reduce(
+        (sum, c) => sum + getKnownCampaignSpend(campaignCosts, c.id, getGoogleAdsForCampaign(googleAdsPerformance, c)).knownCampaignSpend,
+        0
+      ),
     }),
-    [filteredCampaigns]
+    [filteredCampaigns, campaignCosts, googleAdsPerformance]
   );
 
   const handleSaveResults = (campaignId: string, results: CampaignResults) => {
@@ -220,6 +248,8 @@ export function CampaignsScreen() {
               campaigns={displayedCampaigns}
               isEditor={isEditor}
               acumaticaUrl={ACUMATICA_URL}
+              campaignCosts={campaignCosts}
+              googleAdsPerformance={googleAdsPerformance}
               onSelectCampaign={selectCampaign}
               onLogResults={setLoggingCampaign}
               onDelete={handleDelete}

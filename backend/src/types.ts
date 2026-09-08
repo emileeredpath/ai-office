@@ -1,5 +1,39 @@
 export type Brand = 'mtech' | 'brentwood' | 'radio-links' | 'capcom' | 'ircl' | 'idaro' | 'brentwood-marine';
 
+// Structured Campaign Costs (Structured Campaign Costs phase) — the manual,
+// fixed/offline half of a campaign's real spend (purchased data, print,
+// postage, creative production, agency fees, events, sponsorship). Paid
+// media spend from a connected platform (Google Ads today) is never entered
+// here — it's summed live from that platform's own API via the existing
+// exact campaign-id mapping. This central category list is the single
+// source of truth on the backend; src/utils/campaignCostCategories.ts on
+// the frontend must be kept in lockstep with it, same convention already
+// used for Brand between this file and src/types/index.ts.
+export const CAMPAIGN_COST_CATEGORIES = [
+  'Purchased Data',
+  'Print & Production',
+  'Postage & Distribution',
+  'Creative / Production',
+  'Agency / Supplier',
+  'Events',
+  'Sponsorship',
+  'Other',
+] as const;
+export type CampaignCostCategory = (typeof CAMPAIGN_COST_CATEGORIES)[number];
+
+export interface CampaignCost {
+  id: string;
+  campaignId: string;
+  category: CampaignCostCategory;
+  description: string;
+  amount: number;
+  costDate: string;
+  supplierReference: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TrackingLink {
   id: string;
   entity: Brand;

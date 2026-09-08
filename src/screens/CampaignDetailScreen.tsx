@@ -77,6 +77,11 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const updateCampaign = useAppStore((s) => s.updateCampaign);
   const deleteCampaign = useAppStore((s) => s.deleteCampaign);
   const syncAuditLog = useAppStore((s) => s.syncAuditLog);
+  const campaignCosts = useAppStore((s) => s.campaignCosts);
+  const syncCampaignCosts = useAppStore((s) => s.syncCampaignCosts);
+  const addCampaignCost = useAppStore((s) => s.addCampaignCost);
+  const updateCampaignCost = useAppStore((s) => s.updateCampaignCost);
+  const deleteCampaignCost = useAppStore((s) => s.deleteCampaignCost);
   // Set (and consumed) via selectCampaign(id, 'calendar') — lets other
   // screens (Content & Calendar) deep-link straight into a specific tab
   // instead of always landing on Overview.
@@ -100,6 +105,10 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   useEffect(() => {
     syncAuditLog();
   }, [syncAuditLog]);
+
+  useEffect(() => {
+    syncCampaignCosts();
+  }, [syncCampaignCosts]);
 
   // ---- Shared attribution fetching — lifted here (rather than each tab
   // fetching its own copy) so switching between Overview and Performance
@@ -178,6 +187,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   };
 
   const campaignTasks = useMemo(() => (campaign ? tasks.filter((t) => t.campaignId === campaign.id) : []), [tasks, campaign]);
+  const thisCampaignCosts = useMemo(() => (campaign ? campaignCosts.filter((c) => c.campaignId === campaign.id) : []), [campaignCosts, campaign]);
   const campaignActivity = useMemo(() => {
     if (!campaign) return [];
     const taskIds = new Set(campaignTasks.map((t) => t.id));
@@ -301,6 +311,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
             campaign={campaign}
             campaignTasks={campaignTasks}
             campaignActivity={campaignActivity}
+            campaignCosts={thisCampaignCosts}
             googleAds={googleAds}
             emailPerf={emailPerf}
             infinityAttribution={infinityAttribution}
@@ -321,6 +332,10 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
             emailPerf={emailPerf}
             infinityAttribution={infinityAttribution}
             ga4Attribution={ga4Attribution}
+            campaignCosts={thisCampaignCosts}
+            addCampaignCost={addCampaignCost}
+            updateCampaignCost={updateCampaignCost}
+            deleteCampaignCost={deleteCampaignCost}
           />
         )}
 

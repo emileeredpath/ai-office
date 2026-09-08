@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { Campaign, Task } from '@/types/index';
+import { Campaign, Task, CampaignCost } from '@/types/index';
 import { KpiCard } from '@/components/common/KpiCard';
 import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
@@ -9,12 +9,13 @@ import type { CampaignEmailPerformanceInfo } from '@/utils/emailPerformance';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 import type { DetailTab, Ga4AttributionState } from '@/screens/CampaignDetailScreen';
 import { ACUMATICA_NOT_CAMPAIGN_SCOPED } from '@/screens/CampaignDetailScreen';
-import { CAMPAIGN_SPEND_NOTE } from '@/data/campaignSpendNotes';
+import { getKnownCampaignSpend } from '@/utils/campaignCosts';
 
 interface CampaignOverviewTabProps {
   campaign: Campaign;
   campaignTasks: Task[];
   campaignActivity: AuditLogEntry[];
+  campaignCosts: CampaignCost[];
   googleAds: CampaignGoogleAdsAttribution | null;
   emailPerf: CampaignEmailPerformanceInfo | null;
   infinityAttribution: CampaignInfinityAttribution | null;
@@ -50,6 +51,7 @@ export function CampaignOverviewTab({
   campaign,
   campaignTasks,
   campaignActivity,
+  campaignCosts,
   googleAds,
   emailPerf,
   infinityAttribution,
@@ -61,6 +63,7 @@ export function CampaignOverviewTab({
   const selectTask = useAppStore((s) => s.selectTask);
 
   const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
+  const { fixedCosts, mediaSpend, mediaSpendStatus, knownCampaignSpend } = getKnownCampaignSpend(campaignCosts, campaign.id, googleAds);
 
   // ---- Normalised channel states, shared by 3C/3D/3E so they can never
   // disagree about whether a channel is mapped/unmapped/not-connected. ---
@@ -102,10 +105,10 @@ export function CampaignOverviewTab({
       severity: 'red',
     });
   }
-  if (campaign.budget != null && campaign.spend > campaign.budget) {
+  if (campaign.budget != null && knownCampaignSpend > campaign.budget) {
     actionItems.push({
       id: 'over-budget',
-      text: `Recorded spend (£${Math.round(campaign.spend).toLocaleString()}) exceeds budget (£${campaign.budget.toLocaleString()})`,
+      text: `Known campaign spend (£${Math.round(knownCampaignSpend).toLocaleString()}) exceeds budget (£${campaign.budget.toLocaleString()})`,
       severity: 'red',
     });
   }
@@ -199,13 +202,19 @@ export function CampaignOverviewTab({
           <h3 className="v2-section-title">Key Metrics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : undefined} status={campaign.budget != null ? 'available' : 'not-connected'} notConnectedLabel="Not set" subtitle="Set on this campaign" size="compact" />
-            <KpiCard title="Recorded Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} subtitle={CAMPAIGN_SPEND_NOTE[campaign.id] ?? 'Manually logged'} size="compact" />
+            <KpiCard title="Fixed Costs" value={`£${Math.round(fixedCosts).toLocaleString()}`} subtitle="Manually logged" size="compact" />
             <KpiCard
-              title="Google Ads Spend"
-              value={googleAdsState === 'available' ? `£${googleAds!.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : undefined}
-              status={googleAdsState === 'available' ? 'available' : 'not-connected'}
-              notConnectedLabel={googleAdsState === 'unmapped' ? 'Unmapped' : 'Not connected'}
+              title="Media Spend"
+              value={mediaSpendStatus === 'available' ? `£${mediaSpend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : undefined}
+              status={mediaSpendStatus === 'available' ? 'available' : 'not-connected'}
+              notConnectedLabel={mediaSpendStatus === 'unmapped' ? 'Unmapped' : 'Not connected'}
               subtitle="Source: Google Ads"
+              size="compact"
+            />
+            <KpiCard
+              title="Known Campaign Spend"
+              value={`£${Math.round(knownCampaignSpend).toLocaleString()}`}
+              subtitle="Fixed costs + connected media spend"
               size="compact"
             />
             <KpiCard
@@ -339,8 +348,9 @@ export function CampaignOverviewTab({
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-3">Marketing Activity / Response</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <JourneyStat label="Recorded Spend" value={`£${Math.round(campaign.spend).toLocaleString()}`} />
-                  <JourneyStat label="Google Ads Spend" value={googleAdsState === 'available' ? `£${googleAds!.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : googleAdsState === 'unmapped' ? 'Unmapped' : 'Not connected'} />
+                  <JourneyStat label="Fixed Costs" value={`£${Math.round(fixedCosts).toLocaleString()}`} />
+                  <JourneyStat label="Media Spend" value={mediaSpendStatus === 'available' ? `£${mediaSpend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : mediaSpendStatus === 'unmapped' ? 'Unmapped' : 'Not connected'} />
+                  <JourneyStat label="Known Campaign Spend" value={`£${Math.round(knownCampaignSpend).toLocaleString()}`} />
                   <JourneyStat label="Email Response" value={emailState === 'available' ? `${emailPerf!.sends.reduce((s, t) => s + (t.clicks ?? 0), 0)} clicks` : emailState === 'unmapped' ? 'Unmapped' : 'Not connected'} />
                   <JourneyStat label="Website Response" value={ga4State === 'available' && ga4Attribution.status === 'available' ? `${ga4Attribution.sessions} sessions` : ga4State === 'unmapped' ? 'Unmapped' : 'Not connected'} />
                   <JourneyStat label="Calls" value={infinityState === 'available' ? `${infinityAttribution!.calls}` : infinityState === 'unmapped' ? 'Unmapped' : 'Not connected'} />
