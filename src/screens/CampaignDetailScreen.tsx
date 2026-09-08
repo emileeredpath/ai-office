@@ -226,7 +226,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
 
   return (
     <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+      <div className="v2-detail-container mx-auto">
         <button onClick={onBack} className="v2-detail-back">
           <ArrowLeft size={15} /> Back to campaigns
         </button>
@@ -254,7 +254,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
             </div>
             {progress.statusInconsistent && (
               <p className="text-sm font-semibold" style={{ color: 'var(--v2-orange)', marginTop: '0.4rem' }}>
-                {progress.label} — this is not corrected automatically
+                Ended {formatDateShort(campaign.endDate)} — status needs reviewing
               </p>
             )}
             {secondaryMeta.length > 0 && (

@@ -1298,13 +1298,20 @@ h3 {
   color: var(--v2-purple);
 }
 
+/* Wider than the shared .max-w-7xl (80rem) so Campaign Detail's KPI strip
+   and Campaign Journey make better use of wide-desktop width — scoped to
+   this one screen only, never applied elsewhere. */
+.v2-detail-container {
+  max-width: 96rem;
+}
+
 .v2-detail-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .v2-detail-meta {
@@ -1412,7 +1419,7 @@ h3 {
   gap: 4px;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--v2-border);
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .v2-detail-tab {

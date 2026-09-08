@@ -156,17 +156,39 @@ export function CampaignOverviewTab({
   }
 
   // ---- 3G. Activity & Tasks preview -------------------------------------
-  const upcomingTasks = useMemo(
+  // Full upcoming list first (for an accurate count), then a 4-item preview
+  // slice for display — so the "X overdue · Y upcoming" summary below never
+  // undercounts just because the preview itself is capped.
+  const upcomingTasksAll = useMemo(
     () =>
       campaignTasks
         .filter((t) => t.status !== 'complete' && t.deadline && new Date(t.deadline) >= now)
-        .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
-        .slice(0, 4),
+        .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime()),
     [campaignTasks] // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const upcomingTasks = upcomingTasksAll.slice(0, 4);
+  const hasLinkedActivity = overdueTasks.length > 0 || upcomingTasksAll.length > 0;
 
   return (
-    <div className="grid grid-cols-3 gap-6">
+    <div className="space-y-6">
+      {/* 3A. Campaign Snapshot — a full-width compact strip at the very top
+          of Overview (rather than buried in the sidebar), so identity
+          context (theme/audience) is the first thing read, and desktop
+          width is used for it instead of squeezing it into a 1/3 column. */}
+      {snapshotFields.length > 0 && (
+        <div className="card" style={{ padding: '0.85rem 1.25rem' }}>
+          <div className="flex flex-wrap gap-x-10 gap-y-2">
+            {snapshotFields.map((f) => (
+              <div key={f.label}>
+                <div className="text-text-secondary text-xs">{f.label}</div>
+                <div className="text-text-primary text-sm font-medium">{f.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-6">
       <div className="col-span-2 space-y-6">
         {/* 3B. Needs Attention / Next Actions */}
         <div className="card">
@@ -200,7 +222,7 @@ export function CampaignOverviewTab({
         {/* 3C. KPI strip */}
         <div>
           <h3 className="v2-section-title">Key Metrics</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : undefined} status={campaign.budget != null ? 'available' : 'not-connected'} notConnectedLabel="Not set" subtitle="Set on this campaign" size="compact" />
             <KpiCard
               title="Fixed Costs"
@@ -380,21 +402,6 @@ export function CampaignOverviewTab({
       </div>
 
       <div className="space-y-6">
-        {/* 3A. Campaign Snapshot */}
-        {snapshotFields.length > 0 && (
-          <div className="card">
-            <h3 className="v2-section-title">Campaign Snapshot</h3>
-            <div className="space-y-3 text-sm">
-              {snapshotFields.map((f) => (
-                <div key={f.label}>
-                  <div className="text-text-secondary text-xs mb-1">{f.label}</div>
-                  <div className="text-text-primary">{f.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* 3F. Campaign Plan */}
         <div className="card">
           <h3 className="v2-section-title">Campaign Plan</h3>
@@ -415,20 +422,31 @@ export function CampaignOverviewTab({
           <div className="flex items-center justify-between mb-2">
             <h3 className="v2-section-title" style={{ marginBottom: 0 }}>Next Actions / Activity</h3>
           </div>
-          {upcomingTasks.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingTasks.map((task) => (
-                <button
-                  key={task.id}
-                  onClick={() => selectTask(task.id)}
-                  className="w-full text-left"
-                  style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', background: 'none', border: 'none', cursor: 'pointer' }}
-                >
-                  <div className="text-sm font-medium text-text-primary">{task.title}</div>
-                  <div className="text-xs text-text-secondary">Due {formatDateShort(task.deadline!)}</div>
-                </button>
-              ))}
-            </div>
+          {hasLinkedActivity ? (
+            <>
+              <p className="text-xs text-text-secondary mb-3">
+                {overdueTasks.length} overdue · {upcomingTasksAll.length} upcoming
+              </p>
+              {upcomingTasks.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => selectTask(task.id)}
+                      className="w-full text-left"
+                      style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      <div className="text-sm font-medium text-text-primary">{task.title}</div>
+                      <div className="text-xs text-text-secondary">Due {formatDateShort(task.deadline!)}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-text-secondary">
+                  No upcoming items — {overdueTasks.length} overdue task{overdueTasks.length === 1 ? '' : 's'} need{overdueTasks.length === 1 ? 's' : ''} attention.
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-sm text-text-secondary">Nothing scheduled.</p>
           )}
@@ -454,6 +472,7 @@ export function CampaignOverviewTab({
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
