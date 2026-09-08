@@ -319,17 +319,23 @@ export const useAppStore = create<AppState>((set, get) => {
 
     addTask: async (task: Task) => {
       const requestId = `add-${task.id}-${Date.now()}`;
-      let response = await createTaskAction(
-        {
-          title: task.title,
-          notes: task.notes || undefined,
-          brand: task.brand,
-          priority: task.priority,
-          status: task.status,
-          campaign_id: task.campaignId || undefined,
-        },
-        requestId
-      );
+      // Every field here is a genuine, already-accepted field on the
+      // backend's create_task schema (see backend/src/services/
+      // actionService.ts's createTaskSchema) — deadline was previously
+      // collected by AddActivityModal but silently dropped here, so a
+      // task created with a calendar date never actually got one. No new
+      // fields are invented; this just stops discarding ones the caller
+      // already legitimately set on the Task object.
+      const basePayload: Record<string, unknown> = {
+        title: task.title,
+        notes: task.notes || undefined,
+        brand: task.brand,
+        priority: task.priority,
+        status: task.status,
+        campaign_id: task.campaignId || undefined,
+        deadline: task.deadline ? task.deadline.toISOString() : undefined,
+      };
+      let response = await createTaskAction(basePayload, requestId);
 
       if (!response.success && response.possible_duplicates?.length) {
         const names = (response.possible_duplicates as any[]).map((d) => `"${d.title}"`).join(', ');
@@ -338,15 +344,7 @@ export const useAppStore = create<AppState>((set, get) => {
         );
         if (!proceed) return;
         response = await createTaskAction(
-          {
-            title: task.title,
-            notes: task.notes || undefined,
-            brand: task.brand,
-            priority: task.priority,
-            status: task.status,
-            campaign_id: task.campaignId || undefined,
-            confirm_duplicate: true,
-          },
+          { ...basePayload, confirm_duplicate: true },
           requestId
         );
       }

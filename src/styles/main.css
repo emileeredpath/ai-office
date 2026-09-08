@@ -1730,6 +1730,45 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
    V2 Content & Calendar
    ============================================================ */
 
+.v2-cal-summary-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.v2-cal-summary-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s;
+}
+
+.v2-cal-summary-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.v2-cal-summary-link[data-severity='red'] {
+  color: var(--v2-red);
+}
+
+.v2-cal-summary-static {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.v2-cal-summary-dot {
+  color: var(--v2-border);
+}
+
 .v2-cal-toolbar {
   display: flex;
   align-items: center;

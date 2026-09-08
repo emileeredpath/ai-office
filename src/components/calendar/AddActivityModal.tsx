@@ -14,11 +14,13 @@ const toDateInput = (d: Date) => {
   return date.toISOString().split('T')[0];
 };
 
-// "+ Add Activity" on Content & Calendar. Deliberately not labelled
-// "New Content" — there is no content-type/social-platform data model in
-// this app, so this reuses the exact same Task creation the rest of the
-// app already has (same fields as AddTaskModal), just pre-filling the
-// deadline from whichever calendar date was clicked.
+// "+ Add Task" on Content & Calendar — reuses the exact same Task creation
+// the rest of the app already has (same fields as AddTaskModal), just
+// pre-filling the deadline from whichever calendar date was clicked. Named
+// and labelled as a Task (not "Activity"/"Content") because that's
+// genuinely what it creates — there is no separate content-type/
+// social-platform data model in this app. See the Content & Calendar audit
+// for why this was renamed from "Add Activity".
 export function AddActivityModal({ defaultDate, onClose }: AddActivityModalProps) {
   const addTask = useAppStore((s) => s.addTask);
   const campaigns = useAppStore((s) => s.campaigns);
@@ -86,12 +88,15 @@ export function AddActivityModal({ defaultDate, onClose }: AddActivityModalProps
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ zIndex: 200 }}>
       <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Add Activity</h2>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-xl font-semibold">Add Task</h2>
           <button onClick={onClose} className="text-text-secondary hover:text-text-primary" type="button">
             <X size={20} />
           </button>
         </div>
+        <p className="text-xs text-text-secondary mb-6">
+          Creates a task in AI Office. This is not synced with Microsoft To Do.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -155,7 +160,7 @@ export function AddActivityModal({ defaultDate, onClose }: AddActivityModalProps
 
           <div className="flex gap-3 pt-4 border-t">
             <button type="submit" disabled={isSaving} className="btn btn-primary flex-1 disabled:opacity-60">
-              {isSaving ? 'Adding…' : 'Add Activity'}
+              {isSaving ? 'Adding…' : 'Add Task'}
             </button>
             <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary flex-1">
               Cancel

@@ -65,8 +65,26 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalDate, setAddModalDate] = useState<Date | null>(null);
+  const [campaignFilter, setCampaignFilter] = useState('');
+  // Set only via the overdue/upcoming strip below — switches List view to
+  // an open-ended range (independent of currentDate) instead of the usual
+  // current-month window, so overdue work from any past month is actually
+  // reachable. Cleared by any manual view/nav interaction.
+  const [listFocus, setListFocus] = useState<'overdue' | 'upcoming' | null>(null);
 
   const range = useMemo(() => {
+    if (listFocus === 'overdue') {
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      return { start: new Date(0), end };
+    }
+    if (listFocus === 'upcoming') {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setFullYear(end.getFullYear() + 2);
+      return { start, end };
+    }
     if (viewMode === 'week') {
       const start = startOfWeek(currentDate);
       return { start, end: endOfWeek(start) };
@@ -75,7 +93,7 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
       return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
     }
     return monthGridRange(currentDate);
-  }, [viewMode, currentDate]);
+  }, [viewMode, currentDate, listFocus]);
 
   const rawEvents = useMemo(
     () =>
@@ -112,12 +130,65 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
     return undefined;
   };
 
-  const items = useMemo<CalendarActivityItem[]>(
-    () => rawEvents.map((e) => ({ ...e, onClick: getEventClickHandler(e) })),
-    [rawEvents] // eslint-disable-line react-hooks/exhaustive-deps
+  const items = useMemo<CalendarActivityItem[]>(() => {
+    let mapped = rawEvents.map((e) => ({ ...e, onClick: getEventClickHandler(e) }));
+    // A specific campaign selected: only items genuinely linked to it
+    // (task/email, milestone, campaign-start/end all carry campaignId).
+    // Standalone tasks and funding deadlines have no campaignId, so they
+    // naturally drop out here and only ever show under "All Campaigns" —
+    // no inferred relationship, just the real link or its absence.
+    if (campaignFilter) mapped = mapped.filter((i) => i.campaignId === campaignFilter);
+    // Reached only via the overdue/upcoming strip: narrow to exactly what
+    // that count measured — native tasks/emails, incomplete, on the
+    // matching side of "now" — so the list a click lands on always matches
+    // the number that was clicked.
+    if (listFocus) {
+      const now = new Date();
+      mapped = mapped.filter((i) => (i.kind === 'task' || i.kind === 'email') && !i.completed && (listFocus === 'overdue' ? i.date < now : i.date >= now));
+    }
+    return mapped;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawEvents, campaignFilter, listFocus]);
+
+  // Same entities[]-with-brand-fallback convention as CampaignDetailScreen
+  // — c.brand alone missed a multi-entity campaign (e.g. Q3 Education)
+  // whenever a non-primary entity was selected. Feeds both the campaign
+  // filter dropdown and the "active campaigns" badge row below.
+  const entityCampaigns = useMemo(
+    () => campaigns.filter((c) => (c.entities && c.entities.length > 0 ? c.entities : [c.brand]).some((entity) => matchesSelectedEntity(entity))),
+    [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const entityCampaigns = useMemo(() => campaigns.filter((c) => matchesSelectedEntity(c.brand)), [campaigns, selectedEntity]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Overdue/upcoming counts — deliberately computed straight from `tasks`,
+  // not from `items`, so they stay accurate regardless of which month/week
+  // is currently displayed (see the Content & Calendar audit's "Nothing
+  // scheduled while Q3 Education has 4 overdue tasks" finding). Native
+  // tasks only — campaign milestones have no "overdue" concept in the data
+  // model (schedule items carry a workflow status, not a deadline vs. now
+  // comparison), so they are never folded into this count.
+  const overdueUpcomingCounts = useMemo(() => {
+    const now = new Date();
+    const relevant = tasks.filter((t) => {
+      if (!matchesSelectedEntity(t.brand)) return false;
+      if (!t.deadline) return false;
+      if (t.status === 'complete') return false;
+      if (campaignFilter && t.campaignId !== campaignFilter) return false;
+      // Same orphaned-campaign exclusion as the items pipeline above — a
+      // task naming an archived/missing campaign is never one of the
+      // counted items, so clicking the count always lands on a list of
+      // exactly that size.
+      if (t.campaignId && !campaigns.some((c) => c.id === t.campaignId)) return false;
+      return true;
+    });
+    let overdue = 0;
+    let upcoming = 0;
+    for (const t of relevant) {
+      if (new Date(t.deadline!) < now) overdue += 1;
+      else upcoming += 1;
+    }
+    return { overdue, upcoming };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, campaigns, selectedEntity, campaignFilter]);
 
   const activeCampaignsInRange = useMemo(
     () => entityCampaigns.filter((c) => c.status === 'active' && c.startDate <= range.end && c.endDate >= range.start).slice(0, 6),
@@ -138,18 +209,23 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
   }, [tasks, matchesSelectedEntity, currentDate]);
 
   const goPrev = () => {
+    setListFocus(null);
     const d = new Date(currentDate);
     if (viewMode === 'week') d.setDate(d.getDate() - 7);
     else d.setMonth(d.getMonth() - 1);
     setCurrentDate(d);
   };
   const goNext = () => {
+    setListFocus(null);
     const d = new Date(currentDate);
     if (viewMode === 'week') d.setDate(d.getDate() + 7);
     else d.setMonth(d.getMonth() + 1);
     setCurrentDate(d);
   };
-  const goToday = () => setCurrentDate(new Date());
+  const goToday = () => {
+    setListFocus(null);
+    setCurrentDate(new Date());
+  };
 
   const navLabel = useMemo(() => {
     if (viewMode === 'week') {
@@ -163,9 +239,11 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
     return `${getMonthName(currentDate.getMonth())} ${currentDate.getFullYear()}`;
   }, [viewMode, currentDate]);
 
-  const emptyLabel = isGroupView
-    ? `No marketing activity scheduled for this ${viewMode === 'week' ? 'week' : 'month'}.`
-    : `No marketing activity scheduled for ${ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity} this ${viewMode === 'week' ? 'week' : 'month'}.`;
+  const emptyLabel = listFocus
+    ? `No ${listFocus} tasks.`
+    : isGroupView
+      ? `No marketing activity scheduled for this ${viewMode === 'week' ? 'week' : 'month'}.`
+      : `No marketing activity scheduled for ${ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity} this ${viewMode === 'week' ? 'week' : 'month'}.`;
 
   return (
     <div className="v2-page">
@@ -185,8 +263,45 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
             className="btn btn-primary flex items-center gap-2"
           >
             <Plus size={18} />
-            Add Activity
+            Add Task
           </button>
+        </div>
+
+        {/* Overdue/upcoming planning strip — independent of whichever
+            month/week is currently displayed, so overdue work is never
+            silently out of view (see the Content & Calendar audit).
+            Native tasks only; campaign milestones have no overdue concept
+            in the data model. Clicking a count jumps to List view scoped
+            to exactly that set. */}
+        <div className="v2-cal-summary-strip">
+          {overdueUpcomingCounts.overdue > 0 ? (
+            <button
+              className="v2-cal-summary-link"
+              data-severity="red"
+              onClick={() => {
+                setViewMode('list');
+                setListFocus('overdue');
+              }}
+            >
+              {overdueUpcomingCounts.overdue} overdue
+            </button>
+          ) : (
+            <span className="v2-cal-summary-static">0 overdue</span>
+          )}
+          <span className="v2-cal-summary-dot">·</span>
+          {overdueUpcomingCounts.upcoming > 0 ? (
+            <button
+              className="v2-cal-summary-link"
+              onClick={() => {
+                setViewMode('list');
+                setListFocus('upcoming');
+              }}
+            >
+              {overdueUpcomingCounts.upcoming} upcoming
+            </button>
+          ) : (
+            <span className="v2-cal-summary-static">0 upcoming</span>
+          )}
         </div>
 
         <div className="v2-cal-toolbar">
@@ -203,9 +318,29 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
             </button>
           </div>
 
+          <select
+            value={campaignFilter}
+            onChange={(e) => setCampaignFilter(e.target.value)}
+            className="input text-sm"
+            style={{ maxWidth: 220 }}
+          >
+            <option value="">All Campaigns</option>
+            {entityCampaigns.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
           <div className="v2-cal-view-tabs">
             {(['month', 'week', 'list'] as ViewMode[]).map((mode) => (
-              <button key={mode} className="v2-cal-view-tab" data-active={viewMode === mode} onClick={() => setViewMode(mode)}>
+              <button
+                key={mode}
+                className="v2-cal-view-tab"
+                data-active={viewMode === mode}
+                onClick={() => {
+                  setListFocus(null);
+                  setViewMode(mode);
+                }}
+              >
                 {mode === 'month' ? 'Month' : mode === 'week' ? 'Week' : 'List'}
               </button>
             ))}

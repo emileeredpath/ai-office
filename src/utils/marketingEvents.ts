@@ -64,6 +64,14 @@ export function getMarketingEvents({
     const date = new Date(t.deadline);
     if (!inRange(date, rangeStart, rangeEnd)) continue;
     const campaign = t.campaignId ? campaigns.find((c) => c.id === t.campaignId) : undefined;
+    // A task that names a campaign_id but whose campaign isn't in the
+    // loaded (already non-archived) campaigns list is orphaned — its
+    // campaign was archived or removed. Showing it here would both look
+    // like genuine live activity and click through to a "campaign not
+    // found" dead end (see the Content & Calendar audit's leaked
+    // preview-seed example), so it's excluded based on this real data
+    // state rather than any title/name matching.
+    if (t.campaignId && !campaign) continue;
     const isEmail = t.type === 'email-send';
     events.push({
       id: `task-${t.id}`,
@@ -80,7 +88,14 @@ export function getMarketingEvents({
   }
 
   for (const c of campaigns) {
-    if (!matchesSelectedEntity(c.brand)) continue;
+    // A campaign's real entity list is entities[] when set, falling back to
+    // its single brand only when entities[] is empty — same convention
+    // CampaignDetailScreen already uses. Checking c.brand alone here missed
+    // multi-entity campaigns (e.g. Q3 Education: brand 'mtech', entities
+    // spanning Brentwood/Radio Links/Capcom/IRCL) whenever any entity other
+    // than the primary brand was selected.
+    const campaignEntities = c.entities && c.entities.length > 0 ? c.entities : [c.brand];
+    if (!campaignEntities.some((entity) => matchesSelectedEntity(entity))) continue;
 
     for (const s of c.schedule || []) {
       if (!s.date) continue;
