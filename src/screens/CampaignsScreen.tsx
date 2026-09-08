@@ -109,7 +109,7 @@ export function CampaignsScreen() {
     });
   }, [campaigns, isGroupView, selectedEntity, filterStatus, filterIndustry, filterVendor, periodStart, searchTerm]);
 
-  const knownSpendFor = (c: Campaign) => getKnownCampaignSpend(campaignCosts, c.id, getGoogleAdsForCampaign(googleAdsPerformance, c)).knownCampaignSpend;
+  const knownSpendFor = (c: Campaign) => getKnownCampaignSpend(campaignCosts, c.id, c.spend, getGoogleAdsForCampaign(googleAdsPerformance, c)).knownCampaignSpend;
 
   const sortedCampaigns = useMemo(() => {
     const sorted = [...filteredCampaigns];
@@ -134,7 +134,7 @@ export function CampaignsScreen() {
       // Google Ads spend — see src/utils/campaignCosts.ts, the one place
       // this calculation lives.
       spend: filteredCampaigns.reduce(
-        (sum, c) => sum + getKnownCampaignSpend(campaignCosts, c.id, getGoogleAdsForCampaign(googleAdsPerformance, c)).knownCampaignSpend,
+        (sum, c) => sum + getKnownCampaignSpend(campaignCosts, c.id, c.spend, getGoogleAdsForCampaign(googleAdsPerformance, c)).knownCampaignSpend,
         0
       ),
     }),

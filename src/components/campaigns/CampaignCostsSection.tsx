@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import type { Campaign, CampaignCost, CampaignCostCategory } from '@/types/index';
 import type { CampaignGoogleAdsAttribution } from '@/utils/campaignAttribution';
-import { getKnownCampaignSpend } from '@/utils/campaignCosts';
+import { getKnownCampaignSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
 import { CAMPAIGN_COST_CATEGORIES } from '@/utils/campaignCostCategories';
 import { formatDateShort } from '@/utils/dateUtils';
 
@@ -38,7 +38,7 @@ export function CampaignCostsSection({ campaign, campaignCosts, googleAds, addCa
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const { fixedCosts, mediaSpend, mediaSpendStatus, knownCampaignSpend } = getKnownCampaignSpend(campaignCosts, campaign.id, googleAds);
+  const { fixedCosts, isLegacyFallback, mediaSpend, mediaSpendStatus, knownCampaignSpend } = getKnownCampaignSpend(campaignCosts, campaign.id, campaign.spend, googleAds);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -106,9 +106,14 @@ export function CampaignCostsSection({ campaign, campaignCosts, googleAds, addCa
       </p>
 
       <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="card p-4">
+        <div className="card p-4" style={isLegacyFallback ? { borderLeft: '3px solid var(--v2-orange)' } : undefined}>
           <div className="text-xs text-text-secondary mb-1">Fixed Costs</div>
           <div className="text-xl font-bold text-text-primary">{formatCurrency(fixedCosts)}</div>
+          {isLegacyFallback && (
+            <div className="text-xs mt-1" style={{ color: 'var(--v2-orange)' }}>
+              {LEGACY_COST_LABEL}
+            </div>
+          )}
         </div>
         <div className="card p-4">
           <div className="text-xs text-text-secondary mb-1">Media Spend</div>
@@ -185,6 +190,15 @@ export function CampaignCostsSection({ campaign, campaignCosts, googleAds, addCa
               <button onClick={resetForm} className="btn btn-secondary flex-1">Cancel</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {isLegacyFallback && (
+        <div
+          className="text-sm"
+          style={{ background: 'rgba(217, 119, 6, 0.08)', border: '1px solid var(--v2-orange)', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', color: 'var(--color-text-primary)' }}
+        >
+          {formatCurrency(fixedCosts)} is an existing legacy campaign cost and has not yet been classified into structured campaign costs. Add the real cost breakdown below when known.
         </div>
       )}
 

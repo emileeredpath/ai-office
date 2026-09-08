@@ -9,7 +9,7 @@ import type { CampaignEmailPerformanceInfo } from '@/utils/emailPerformance';
 import type { AuditLogEntry } from '@/services/auditLogApi';
 import type { DetailTab, Ga4AttributionState } from '@/screens/CampaignDetailScreen';
 import { ACUMATICA_NOT_CAMPAIGN_SCOPED } from '@/screens/CampaignDetailScreen';
-import { getKnownCampaignSpend } from '@/utils/campaignCosts';
+import { getKnownCampaignSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
 
 interface CampaignOverviewTabProps {
   campaign: Campaign;
@@ -63,7 +63,7 @@ export function CampaignOverviewTab({
   const selectTask = useAppStore((s) => s.selectTask);
 
   const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
-  const { fixedCosts, mediaSpend, mediaSpendStatus, knownCampaignSpend } = getKnownCampaignSpend(campaignCosts, campaign.id, googleAds);
+  const { fixedCosts, isLegacyFallback, mediaSpend, mediaSpendStatus, knownCampaignSpend } = getKnownCampaignSpend(campaignCosts, campaign.id, campaign.spend, googleAds);
 
   // ---- Normalised channel states, shared by 3C/3D/3E so they can never
   // disagree about whether a channel is mapped/unmapped/not-connected. ---
@@ -202,7 +202,13 @@ export function CampaignOverviewTab({
           <h3 className="v2-section-title">Key Metrics</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard title="Budget" value={campaign.budget != null ? `£${campaign.budget.toLocaleString()}` : undefined} status={campaign.budget != null ? 'available' : 'not-connected'} notConnectedLabel="Not set" subtitle="Set on this campaign" size="compact" />
-            <KpiCard title="Fixed Costs" value={`£${Math.round(fixedCosts).toLocaleString()}`} subtitle="Manually logged" size="compact" />
+            <KpiCard
+              title="Fixed Costs"
+              value={`£${Math.round(fixedCosts).toLocaleString()}`}
+              subtitle={isLegacyFallback ? LEGACY_COST_LABEL : 'Manually logged'}
+              accent={isLegacyFallback ? 'var(--v2-orange)' : undefined}
+              size="compact"
+            />
             <KpiCard
               title="Media Spend"
               value={mediaSpendStatus === 'available' ? `£${mediaSpend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : undefined}
@@ -348,7 +354,7 @@ export function CampaignOverviewTab({
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-3">Marketing Activity / Response</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <JourneyStat label="Fixed Costs" value={`£${Math.round(fixedCosts).toLocaleString()}`} />
+                  <JourneyStat label="Fixed Costs" value={`£${Math.round(fixedCosts).toLocaleString()}`} note={isLegacyFallback ? LEGACY_COST_LABEL : undefined} />
                   <JourneyStat label="Media Spend" value={mediaSpendStatus === 'available' ? `£${mediaSpend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}` : mediaSpendStatus === 'unmapped' ? 'Unmapped' : 'Not connected'} />
                   <JourneyStat label="Known Campaign Spend" value={`£${Math.round(knownCampaignSpend).toLocaleString()}`} />
                   <JourneyStat label="Email Response" value={emailState === 'available' ? `${emailPerf!.sends.reduce((s, t) => s + (t.clicks ?? 0), 0)} clicks` : emailState === 'unmapped' ? 'Unmapped' : 'Not connected'} />
@@ -463,11 +469,16 @@ function MappingBadge({ state }: { state: ChannelState }) {
   );
 }
 
-function JourneyStat({ label, value }: { label: string; value: string }) {
+function JourneyStat({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div>
       <div className="text-xs text-text-secondary mb-1">{label}</div>
       <div className="text-sm font-semibold text-text-primary">{value}</div>
+      {note && (
+        <div className="text-xs" style={{ color: 'var(--v2-orange)' }}>
+          {note}
+        </div>
+      )}
     </div>
   );
 }

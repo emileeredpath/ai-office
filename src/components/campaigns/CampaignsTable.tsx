@@ -6,7 +6,7 @@ import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
-import { getKnownCampaignSpend } from '@/utils/campaignCosts';
+import { getKnownCampaignSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
 import type { GoogleAdsResponse } from '@/services/googleAdsApi';
 
 interface CampaignsTableProps {
@@ -80,7 +80,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                   : null;
               const ended = isCampaignEnded(campaign.endDate);
               const menuOpen = openMenuId === campaign.id;
-              const knownSpend = getKnownCampaignSpend(campaignCosts, campaign.id, getGoogleAdsForCampaign(googleAdsPerformance, campaign)).knownCampaignSpend;
+              const spendInfo = getKnownCampaignSpend(campaignCosts, campaign.id, campaign.spend, getGoogleAdsForCampaign(googleAdsPerformance, campaign));
 
               return (
                 <tr key={campaign.id} onClick={() => onSelectCampaign(campaign.id)}>
@@ -129,7 +129,14 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                     <span className="v2-not-connected-text">Not connected</span>
                   </td>
                   <td style={{ textAlign: 'right' }}>{formatCurrency(campaign.budget)}</td>
-                  <td style={{ textAlign: 'right' }} title="Fixed costs + connected media spend">{formatCurrency(knownSpend)}</td>
+                  <td style={{ textAlign: 'right' }} title={spendInfo.isLegacyFallback ? LEGACY_COST_LABEL : 'Fixed costs + connected media spend'}>
+                    {formatCurrency(spendInfo.knownCampaignSpend)}
+                    {spendInfo.isLegacyFallback && (
+                      <div className="text-xs" style={{ color: 'var(--v2-orange)', whiteSpace: 'nowrap' }}>
+                        Needs classification
+                      </div>
+                    )}
+                  </td>
                   <td style={{ textAlign: 'right' }}>
                     {roiValue !== null ? (
                       <span style={{ fontWeight: 600, color: roiValue >= 0 ? 'var(--v2-green)' : 'var(--v2-red)' }}>
