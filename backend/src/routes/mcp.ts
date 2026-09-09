@@ -8,8 +8,12 @@ const router = Router();
 // for low, personal-scale traffic than maintaining session state across
 // requests, at the cost of not supporting server-initiated push between
 // calls (not needed for these tools — they're all request/response).
-// No API key required: all mutations are guarded by confirmation gates (update_task, complete_task),
-// duplicate detection (create_task), or read-only (search_workspace, get_context).
+// Authentication (Bearer MCP_API_KEY) and rate limiting are applied by
+// requireMcpAuth/mcpRateLimit where this router is mounted in server.ts —
+// every request reaching this handler has already been authenticated.
+// Mutations also keep their existing safeguards: confirmation gates
+// (update_task, complete_task), duplicate detection (create_task), or are
+// read-only (search_workspace, get_context).
 router.post('/', async (req: Request, res: Response) => {
   try {
     const server = createAiOfficeMcpServer();

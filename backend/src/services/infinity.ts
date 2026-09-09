@@ -201,6 +201,21 @@ function parseDurationField(value: number | string | undefined): number | null {
   return null;
 }
 
+// Security Hardening Phase 1 (Priority 4): masks all but the last 4 digits,
+// preserving enough of the number for a legitimate user to tell two calls
+// apart (e.g. spotting a repeat caller) without exposing the full number.
+// Applied here, at the single parse boundary from Infinity's raw API
+// response, so the full number never leaves the server in any response —
+// not just hidden in the UI. Digit count is preserved (masked with •) so
+// two masked numbers stay visually distinguishable by length too.
+function maskPhoneNumber(value: string | null): string | null {
+  if (!value) return value;
+  const digitsOnly = value.replace(/\D/g, '');
+  if (digitsOnly.length <= 4) return '•'.repeat(value.length);
+  const visible = value.slice(-4);
+  return '•'.repeat(value.length - 4) + visible;
+}
+
 function toCallRecord(row: RawCallRow): InfinityCallRecord {
   const dgrpName = row.dgrpName ?? null;
   return {
@@ -211,8 +226,8 @@ function toCallRecord(row: RawCallRow): InfinityCallRecord {
     chName: row.chName ?? null,
     chType: row.chType ?? null,
     src: row.src ?? null,
-    dialledPhoneNumber: row.dialledPhoneNumber ?? null,
-    customerPhoneNumber: row.customerPhoneNumber ?? null,
+    dialledPhoneNumber: maskPhoneNumber(row.dialledPhoneNumber ?? null),
+    customerPhoneNumber: maskPhoneNumber(row.customerPhoneNumber ?? null),
     callDuration: parseDurationField(row.callDuration),
     bridgeDuration: parseDurationField(row.bridgeDuration),
     ringTime: parseDurationField(row.ringTime),

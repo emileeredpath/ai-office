@@ -19,6 +19,8 @@ import marketingosRouter from './routes/marketingos.js';
 import authRouter from './routes/auth.js';
 import msGraphRouter from './routes/msGraph.js';
 import { requireSession } from './middleware/session.js';
+import { requireMcpAuth } from './middleware/mcpAuth.js';
+import { mcpRateLimit } from './middleware/rateLimit.js';
 import { initMarketingTables } from './db/marketingRepository.js';
 import { syncCampaignMonitor } from './services/campaignMonitor.js';
 import { syncWave1Ga4, syncWave1Infinity } from './services/wave1Sync.js';
@@ -118,9 +120,11 @@ app.use('/api/analytics', requireSession, analyticsRouter);
 app.use('/api/actions', requireSession, actionsRouter);
 app.use('/api/marketingos', requireSession, marketingosRouter);
 
-// Claude's MCP connection is a separate, already-scoped access path (per the
-// build brief, not part of the dashboard's shared-password wall).
-app.use('/mcp', mcpRouter);
+// Claude's MCP connection is a separate access path from the dashboard's
+// shared edit/view password — authenticated by its own dedicated
+// MCP_API_KEY credential instead (Security Hardening Phase 1, Priority 1),
+// with its own rate limiting (Priority 2).
+app.use('/mcp', mcpRateLimit, requireMcpAuth, mcpRouter);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, '../../dist');

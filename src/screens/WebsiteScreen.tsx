@@ -141,6 +141,11 @@ export function WebsiteScreen() {
         {/* Top Search Queries */}
         <div className="mb-8">
           <h2 className="v2-section-title">Top Search Queries</h2>
+          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+            Real, literal search terms from Google Search Console. Automatic detection of queries that might contain
+            personal information isn't reliable enough to filter without risking hidden or misleading SEO data — treat
+            this table as a reporting view, not one to export or share outside the team.
+          </p>
           {topQueries.status === 'available' ? (
             topQueries.rows.length > 0 ? (
               <div className="card p-0">
@@ -231,7 +236,8 @@ export function WebsiteScreen() {
           <h2 className="v2-section-title">Top Query + Landing Page Combinations</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Which real search terms brought people to which real page — useful for spotting a query that should be
-            ranking for a different page than it currently is.
+            ranking for a different page than it currently is. As with Top Search Queries above, these are shown as
+            entered — treat as a reporting view, not one to export or share outside the team.
           </p>
           {topQueryPages.status === 'available' ? (
             topQueryPages.rows.length > 0 ? (

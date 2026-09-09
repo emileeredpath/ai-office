@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { constantTimeEqual } from '../utils/constantTimeEqual.js';
 import {
   createSession,
   destroySession,
@@ -31,8 +32,8 @@ router.post('/login', rateLimit, (req: Request, res: Response) => {
   }
 
   let role: 'edit' | 'view' | null = null;
-  if (password === editPassword) role = 'edit';
-  else if (password === viewPassword) role = 'view';
+  if (constantTimeEqual(password, editPassword)) role = 'edit';
+  else if (constantTimeEqual(password, viewPassword ?? editPassword)) role = 'view';
 
   if (!role) {
     res.status(401).json({ success: false, message: 'Incorrect password.' });

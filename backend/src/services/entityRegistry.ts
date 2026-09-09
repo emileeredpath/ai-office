@@ -56,7 +56,6 @@ import {
   restoreDocument,
 } from '../db/documentRepository.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
-import db from '../db/connection.js';
 import type { TaskRecord, TrackingLink } from '../types.js';
 
 const BRANDS = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro', 'brentwood-marine'] as const;
@@ -559,17 +558,49 @@ const quickCaptureEntity: EntityConfig = {
 // ---------------------------------------------------------------------------
 // document — generic attachment, entity_type/record_id point at any record
 // ---------------------------------------------------------------------------
+// Security Hardening Phase 1 (Priority 3): generic MCP document creation is
+// a genuine, in-use workflow (e.g. attaching a source file to a funding
+// record), so it stays available rather than being removed — but hardened
+// with an explicit MIME allow-list (business-document types only, no
+// executables/scripts/archives) and a tighter size cap. 12MB of base64 is
+// ~9MB of real file content, comfortably inside the /mcp body limit (15mb)
+// while ruling out using this as bulk/arbitrary file storage.
+const ALLOWED_DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/csv',
+  'text/plain',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+] as const;
+
 const documentCreateSchema = z
   .object({
     entityType: z.string().trim().min(1),
     recordId: z.string().trim().min(1),
     filename: z.string().trim().min(1).max(300),
-    mimeType: z.string().max(200).optional(),
+    mimeType: z
+      .string()
+      .max(200)
+      .refine((v) => (ALLOWED_DOCUMENT_MIME_TYPES as readonly string[]).includes(v), {
+        message: `mimeType must be one of: ${ALLOWED_DOCUMENT_MIME_TYPES.join(', ')}`,
+      })
+      .optional(),
     url: z.string().url().max(2000).nullable().optional(),
-    contentBase64: z.string().max(20_000_000).nullable().optional(),
+    contentBase64: z.string().max(12_000_000).nullable().optional(),
     description: z.string().max(2000).optional(),
   })
-  .refine((v) => !!v.url || !!v.contentBase64, { message: 'Provide either url or contentBase64.' });
+  .refine((v) => !!v.url || !!v.contentBase64, { message: 'Provide either url or contentBase64.' })
+  .refine((v) => !v.contentBase64 || !!v.mimeType, {
+    message: 'mimeType is required when providing contentBase64, so it can be validated against the allow-list.',
+  });
 
 const documentEntity: EntityConfig = {
   displayName: 'Document',
@@ -595,9 +626,9 @@ const documentEntity: EntityConfig = {
       field('entityType', 'string', true, { description: 'Which entity this attaches to, e.g. "funding_record"' }),
       field('recordId', 'string', true, { description: 'id of the record this attaches to' }),
       field('filename', 'string', true),
-      field('mimeType', 'string', false, { description: 'e.g. application/pdf' }),
+      field('mimeType', 'string', false, { description: `Required with contentBase64. One of: ${ALLOWED_DOCUMENT_MIME_TYPES.join(', ')}` }),
       field('url', 'string (URL)', false, { description: 'Provide this OR contentBase64, not both required' }),
-      field('contentBase64', 'base64 string', false, { description: 'Inline file content — stored server-side; download via GET /api/documents/:id/download' }),
+      field('contentBase64', 'base64 string', false, { description: 'Inline file content, max 12MB — stored server-side; download via GET /api/documents/:id/download' }),
       field('description', 'string', false),
     ],
     notes: 'No update — create a new version and archive the old one. Listing/getting never returns contentBase64; use the REST download route for actual bytes.',
@@ -635,84 +666,13 @@ const wave1MetricEntity: EntityConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// audit_log — the change log itself, read-only
-// ---------------------------------------------------------------------------
-interface AuditLogRow {
-  id: string;
-  action: string;
-  resource_type: string;
-  resource_id: string | null;
-  previous_value: string | null;
-  new_value: string | null;
-  source: string;
-  source_conversation_id: string | null;
-  request_id: string | null;
-  confirmed: number;
-  automatic: number;
-  created_at: string;
-}
-
-const auditLogEntity: EntityConfig = {
-  displayName: 'Audit Log Entry',
-  writable: false,
-  supportsArchive: false,
-  list: (filters) => {
-    const conditions: string[] = [];
-    const params: Record<string, string> = {};
-    if (filters.resourceType) {
-      conditions.push('resource_type = @resourceType');
-      params.resourceType = filters.resourceType as string;
-    }
-    if (filters.resourceId) {
-      conditions.push('resource_id = @resourceId');
-      params.resourceId = filters.resourceId as string;
-    }
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limit = typeof filters.limit === 'number' ? Math.min(filters.limit, 200) : 50;
-    const rows = db.prepare(`SELECT * FROM audit_log ${where} ORDER BY created_at DESC LIMIT ${limit}`).all(params) as unknown as AuditLogRow[];
-    return rows.map((r) => ({
-      id: r.id,
-      action: r.action,
-      resourceType: r.resource_type,
-      resourceId: r.resource_id,
-      previousValue: r.previous_value ? JSON.parse(r.previous_value) : null,
-      newValue: r.new_value ? JSON.parse(r.new_value) : null,
-      source: r.source,
-      confirmed: !!r.confirmed,
-      automatic: !!r.automatic,
-      createdAt: r.created_at,
-    }));
-  },
-  get: (id) => {
-    const row = db.prepare('SELECT * FROM audit_log WHERE id = ?').get(id) as unknown as AuditLogRow | undefined;
-    if (!row) return undefined;
-    return {
-      id: row.id,
-      action: row.action,
-      resourceType: row.resource_type,
-      resourceId: row.resource_id,
-      previousValue: row.previous_value ? JSON.parse(row.previous_value) : null,
-      newValue: row.new_value ? JSON.parse(row.new_value) : null,
-      source: row.source,
-      confirmed: !!row.confirmed,
-      automatic: !!row.automatic,
-      createdAt: row.created_at,
-    };
-  },
-  schema: {
-    entity: 'audit_log',
-    displayName: 'Audit Log Entry',
-    writable: false,
-    supportsArchive: false,
-    fields: [
-      field('resourceType', 'string', false, { description: 'Filter, e.g. "funding_record"' }),
-      field('resourceId', 'string', false, { description: 'Filter to one record\'s history' }),
-      field('limit', 'number', false, { description: 'Defaults 50, max 200' }),
-    ],
-    notes: 'Read-only — every create/update/archive/restore through the generic tools (and the bespoke ai_office_* tools) writes a row here.',
-  },
-};
-
+// audit_log is intentionally NOT exposed through generic MCP access (Security
+// Hardening Phase 1, Priority 3). It contains raw before/after JSON of every
+// record change, including free-text fields (e.g. task notes) — unauthenticated-
+// scale exposure of that is not needed for any legitimate MCP workflow. The
+// dashboard's own "Recent activity" feed reads the same table directly via
+// routes/auditLog.ts (a separate, session-authenticated route) and is
+// unaffected by removing this entity.
 // ---------------------------------------------------------------------------
 export const ENTITY_REGISTRY: Record<string, EntityConfig> = {
   task: taskEntity,
@@ -723,7 +683,6 @@ export const ENTITY_REGISTRY: Record<string, EntityConfig> = {
   quick_capture_item: quickCaptureEntity,
   document: documentEntity,
   wave1_metric: wave1MetricEntity,
-  audit_log: auditLogEntity,
 };
 
 export function getEntityConfig(entity: string): EntityConfig | undefined {

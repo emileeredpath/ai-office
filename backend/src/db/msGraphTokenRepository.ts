@@ -1,4 +1,5 @@
 import db from './connection.js';
+import { encryptToken, decryptToken } from '../utils/tokenCrypto.js';
 
 // Singleton row — only one Microsoft account (Emilee's) ever connects.
 const ROW_ID = 'default';
@@ -23,10 +24,19 @@ interface TokenRow {
   updated_at: string;
 }
 
-function rowToRecord(row: TokenRow): MsGraphTokenRecord {
+// access_token/refresh_token are stored encrypted at rest (Security
+// Hardening Phase 1, Priority 7 — see utils/tokenCrypto.ts). A row that
+// fails to decrypt (missing key, or a legacy plaintext value from before
+// this change) is treated as no usable token — the UI shows "not
+// connected" and the user reconnects, rather than the read path crashing
+// or ever exposing a stale/undecryptable value.
+function rowToRecord(row: TokenRow): MsGraphTokenRecord | null {
+  const accessToken = decryptToken(row.access_token);
+  const refreshToken = decryptToken(row.refresh_token);
+  if (!accessToken || !refreshToken) return null;
   return {
-    accessToken: row.access_token,
-    refreshToken: row.refresh_token,
+    accessToken,
+    refreshToken,
     expiresAt: row.expires_at,
     scope: row.scope,
     accountEmail: row.account_email,
@@ -54,6 +64,12 @@ export function saveMsGraphToken(params: {
   const existing = getMsGraphToken();
   const accountEmail = params.accountEmail !== undefined ? params.accountEmail : (existing?.accountEmail ?? null);
 
+  // encryptToken() throws if MS_GRAPH_TOKEN_ENCRYPTION_KEY isn't configured —
+  // deliberately fails closed rather than ever falling back to storing a
+  // token in plaintext.
+  const encryptedAccessToken = encryptToken(params.accessToken);
+  const encryptedRefreshToken = encryptToken(params.refreshToken);
+
   db.prepare(
     `INSERT INTO microsoft_graph_tokens (id, access_token, refresh_token, expires_at, scope, account_email, connected_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -64,7 +80,7 @@ export function saveMsGraphToken(params: {
        scope = excluded.scope,
        account_email = excluded.account_email,
        updated_at = excluded.updated_at`
-  ).run(ROW_ID, params.accessToken, params.refreshToken, params.expiresAt, params.scope, accountEmail, now, now);
+  ).run(ROW_ID, encryptedAccessToken, encryptedRefreshToken, params.expiresAt, params.scope, accountEmail, now, now);
 }
 
 export function clearMsGraphToken(): void {
