@@ -112,6 +112,12 @@ export function getCampaignKnownSpend(
 // warning at the aggregate level rather than silently absorbing it.
 export interface KnownSpendSummary {
   total: number;
+  // Fixed Costs and Media Spend sub-totals across the same campaigns —
+  // just the two components of `total` (already computed per campaign by
+  // getKnownCampaignSpend) summed separately, not a new calculation, so a
+  // caller can show "Fixed £X · Media £Y" without re-deriving anything.
+  fixedCosts: number;
+  mediaSpend: number;
   hasLegacyFallback: boolean;
 }
 
@@ -121,11 +127,15 @@ export function sumKnownCampaignSpend(
   googleAds: GoogleAdsResponse | null
 ): KnownSpendSummary {
   let total = 0;
+  let fixedCosts = 0;
+  let mediaSpend = 0;
   let hasLegacyFallback = false;
   for (const campaign of campaigns) {
     const spend = getCampaignKnownSpend(campaign, costs, googleAds);
     total += spend.knownCampaignSpend;
+    fixedCosts += spend.fixedCosts;
+    mediaSpend += spend.mediaSpend;
     if (spend.isLegacyFallback) hasLegacyFallback = true;
   }
-  return { total, hasLegacyFallback };
+  return { total, fixedCosts, mediaSpend, hasLegacyFallback };
 }

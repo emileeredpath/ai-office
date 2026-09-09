@@ -2102,3 +2102,32 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
     border: 1px solid #ccc;
   }
 }
+
+/* ============================================================
+   V2 Performance — strategic reporting redesign
+   ============================================================ */
+
+.v2-perf-section {
+  margin-bottom: 32px;
+}
+
+.v2-perf-section-subtitle {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+
+/* Overall Commercial Performance — deliberately visually distinct from
+   Marketing Response, so a genuine Acumatica opportunity total is never
+   read at a glance as a marketing-attributed figure. */
+.v2-commercial-panel {
+  background-color: rgba(124, 92, 252, 0.04);
+  border: 1px solid rgba(124, 92, 252, 0.22);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.v2-commercial-panel .v2-kpi-card {
+  background-color: var(--color-bg);
+}

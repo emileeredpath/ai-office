@@ -52,7 +52,7 @@ export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', s
           <div className={valueClass} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {value}
           </div>
-          {subtitle && <div className="text-xs text-text-secondary mt-2 truncate">{subtitle}</div>}
+          {subtitle && <div className="text-xs text-text-secondary mt-2 truncate" title={subtitle}>{subtitle}</div>}
           {comparison && <ComparisonBadge comparison={comparison} />}
         </>
       )}
