@@ -37,6 +37,7 @@ export function ReportsScreen() {
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const infinityCalls = useAppStore((s) => s.infinityCalls);
+  const campaignCosts = useAppStore((s) => s.campaignCosts);
   const syncCampaignsFromApi = useAppStore((s) => s.syncCampaignsFromApi);
   const syncFundingRecordsFromApi = useAppStore((s) => s.syncFundingRecordsFromApi);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
@@ -47,6 +48,7 @@ export function ReportsScreen() {
   const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
+  const syncCampaignCosts = useAppStore((s) => s.syncCampaignCosts);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { isGroupView, selectedEntity, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
@@ -56,7 +58,8 @@ export function ReportsScreen() {
     syncFundingRecordsFromApi();
     syncWave1Performance();
     syncWave1Calls();
-  }, [syncCampaignsFromApi, syncFundingRecordsFromApi, syncWave1Performance, syncWave1Calls]);
+    syncCampaignCosts();
+  }, [syncCampaignsFromApi, syncFundingRecordsFromApi, syncWave1Performance, syncWave1Calls, syncCampaignCosts]);
 
   const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
   useEffect(() => {
@@ -854,6 +857,8 @@ export function ReportsScreen() {
             <CampaignPerformanceTable
               campaigns={periodCampaigns}
               wave1Performance={wave1Performance}
+              campaignCosts={campaignCosts}
+              googleAdsPerformance={googleAdsPerformance}
               showEntityColumn={isGroupView}
               onSelectCampaign={(id) => selectCampaign(id, 'performance')}
             />

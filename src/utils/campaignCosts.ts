@@ -5,8 +5,10 @@
 // Performance, the Campaigns list) must call through here rather than
 // re-deriving its own sum, so the three numbers can never drift or disagree
 // between screens.
-import type { CampaignCost } from '@/types/index';
+import type { Campaign, CampaignCost } from '@/types/index';
 import type { CampaignGoogleAdsAttribution } from '@/utils/campaignAttribution';
+import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
+import type { GoogleAdsResponse } from '@/services/googleAdsApi';
 
 export const LEGACY_COST_LABEL = 'Legacy cost — needs classification';
 
@@ -79,4 +81,51 @@ export function getKnownCampaignSpend(
     mediaSpendStatus,
     knownCampaignSpend: fixed.amount + mediaSpend,
   };
+}
+
+// Single caveat string for any screen presenting a Known Campaign Spend
+// total — see MARKETING_SPEND_CAVEAT in campaignMetrics.ts for the older,
+// legacy-campaign.spend-only wording this deliberately replaces wherever a
+// screen has been migrated to the canonical figure (Performance).
+export const KNOWN_CAMPAIGN_SPEND_CAVEAT = 'Fixed costs + connected media spend';
+
+// Convenience wrapper combining getKnownCampaignSpend with the campaign's
+// own Google Ads attribution — the exact call already used by the
+// Campaigns list (CampaignsTable) and Campaign Detail (CampaignOverviewTab)
+// — so every caller summing Known Campaign Spend across many campaigns
+// (Performance) reads through this one function rather than re-deriving
+// getGoogleAdsForCampaign(...) itself at each call site.
+export function getCampaignKnownSpend(
+  campaign: Campaign,
+  costs: CampaignCost[],
+  googleAds: GoogleAdsResponse | null
+): KnownCampaignSpend {
+  return getKnownCampaignSpend(costs, campaign.id, campaign.spend, getGoogleAdsForCampaign(googleAds, campaign));
+}
+
+// Sum of Known Campaign Spend across a set of campaigns — the canonical
+// replacement for campaignMetrics.ts's legacy sumSpend() wherever a screen
+// needs an aggregate spend figure built from Fixed Costs + connected Media
+// Spend rather than raw campaign.spend. Also reports whether any included
+// campaign is relying on the legacy campaign.spend fallback (no structured
+// campaign_costs row yet), so a caller can surface that classification
+// warning at the aggregate level rather than silently absorbing it.
+export interface KnownSpendSummary {
+  total: number;
+  hasLegacyFallback: boolean;
+}
+
+export function sumKnownCampaignSpend(
+  campaigns: Campaign[],
+  costs: CampaignCost[],
+  googleAds: GoogleAdsResponse | null
+): KnownSpendSummary {
+  let total = 0;
+  let hasLegacyFallback = false;
+  for (const campaign of campaigns) {
+    const spend = getCampaignKnownSpend(campaign, costs, googleAds);
+    total += spend.knownCampaignSpend;
+    if (spend.isLegacyFallback) hasLegacyFallback = true;
+  }
+  return { total, hasLegacyFallback };
 }

@@ -15,11 +15,10 @@ import {
   filterCampaignsByPeriod,
   filterCampaignsByDateRange,
   sumLeads,
-  sumSpend,
   sumEnquiries,
   MARKETING_LEADS_CAVEAT,
-  MARKETING_SPEND_CAVEAT,
 } from '@/utils/campaignMetrics';
+import { sumKnownCampaignSpend, KNOWN_CAMPAIGN_SPEND_CAVEAT } from '@/utils/campaignCosts';
 import { getCallsSnapshot } from '@/utils/channelSnapshot';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
@@ -27,9 +26,40 @@ import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAd
 import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerformance';
 import { getPreviousPeriodRange, compareToPrevious } from '@/utils/periodComparison';
 import { fetchGa4Traffic, fetchGa4Enquiries, type Ga4TrafficResponse, type Ga4EnquiriesResponse } from '@/services/ga4Api';
+import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
+import type { BrandAcumaticaInfo } from '@/components/performance/PerformanceByBrandTable';
 
 interface PerformanceScreenProps {
   onNavigate?: (screen: string) => void;
+}
+
+// Converts a raw AcumaticaSummary fetch (or its absence) into the honest
+// three-state shape PerformanceByBrandTable renders — 'not-available' for
+// a brand structurally outside Acumatica (IRCL), 'not-connected' when no
+// export has been imported yet or the fetch hasn't resolved, 'available'
+// only once real imported data exists. Never presents a missing brand as
+// a genuine £0/0.
+function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined): BrandAcumaticaInfo {
+  if (!summary) {
+    return { status: 'not-connected', subtitle: 'No Acumatica export imported yet' };
+  }
+  if (summary.notAvailableForBrand) {
+    return {
+      status: 'not-available',
+      subtitle: summary.notAvailableReason ? `Not available — ${summary.notAvailableReason}` : 'Not available',
+    };
+  }
+  if (!summary.hasImportedData) {
+    return { status: 'not-connected', subtitle: 'No Acumatica export imported yet' };
+  }
+  return {
+    status: 'available',
+    opportunities: summary.opportunities,
+    openPipelineValue: summary.openPipelineValue,
+    openPipelineCount: summary.openPipelineCount,
+    wonRevenue: summary.wonRevenue,
+    subtitle: 'Manual Acumatica export — see Settings for last import',
+  };
 }
 
 // Cross-channel, cross-entity reporting — the main "how is marketing
@@ -48,6 +78,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
+  const campaignCosts = useAppStore((s) => s.campaignCosts);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
@@ -55,6 +86,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
   const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
+  const syncCampaignCosts = useAppStore((s) => s.syncCampaignCosts);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
@@ -63,6 +95,14 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     syncWave1Performance();
     syncWave1Calls();
   }, [syncWave1Performance, syncWave1Calls]);
+
+  // Campaign Costs — canonical source for Known Campaign Spend (Fixed
+  // Costs + connected Media Spend), same read used by the Campaigns list
+  // and Campaign Detail. Not period/entity-scoped server-side (a small
+  // dataset filtered client-side per campaign, same as those screens).
+  useEffect(() => {
+    syncCampaignCosts();
+  }, [syncCampaignCosts]);
 
   const ga4Range = useMemo(() => resolveGa4DateRange(period), [period]);
   useEffect(() => {
@@ -98,7 +138,16 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
 
   // ---- Headline KPIs ------------------------------------------------------
   const marketingLeads = useMemo(() => sumLeads(periodCampaigns), [periodCampaigns]);
-  const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
+  // Known Campaign Spend (Fixed Costs + connected Media Spend) — the
+  // canonical figure from src/utils/campaignCosts.ts, never raw
+  // campaign.spend. hasLegacyFallback surfaces whether any included
+  // campaign still relies on its un-migrated campaign.spend value (no
+  // structured campaign_costs row yet) rather than silently absorbing it.
+  const marketingSpendInfo = useMemo(
+    () => sumKnownCampaignSpend(periodCampaigns, campaignCosts, googleAdsPerformance),
+    [periodCampaigns, campaignCosts, googleAdsPerformance]
+  );
+  const marketingSpend = marketingSpendInfo.total;
   const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
   const websiteUsers = useMemo(
     () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
@@ -179,8 +228,12 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     [marketingLeads, previousPeriodCampaigns, previousRange]
   );
   const spendComparison = useMemo(
-    () => compareToPrevious(marketingSpend, previousRange ? sumSpend(previousPeriodCampaigns) : null),
-    [marketingSpend, previousPeriodCampaigns, previousRange]
+    () =>
+      compareToPrevious(
+        marketingSpend,
+        previousRange ? sumKnownCampaignSpend(previousPeriodCampaigns, campaignCosts, googleAdsPerformance).total : null
+      ),
+    [marketingSpend, previousPeriodCampaigns, previousRange, campaignCosts, googleAdsPerformance]
   );
 
   // ---- Leads by Brand (group) / Leads by Campaign (single entity) --------
@@ -213,6 +266,55 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
       }));
   }, [periodCampaigns, selectCampaign]);
 
+  // ---- Acumatica — overall commercial performance, not marketing-
+  // attributed ------------------------------------------------------------
+  // Reuses the exact same fetchAcumaticaSummary() API and period/brand
+  // date-range derivation as Leads & CRM (src/screens/LeadsCrmScreen.tsx),
+  // so headline figures here always reconcile exactly with that screen for
+  // the same period/entity — there is only ever one Acumatica calculation,
+  // this just reads it a second time for a second screen.
+  const acumaticaStartDate = periodStart ? periodStart.toISOString().slice(0, 10) : undefined;
+  const acumaticaEndDate = periodStart ? new Date().toISOString().slice(0, 10) : undefined;
+  const acumaticaBrand = isGroupView || selectedEntity === 'all' ? undefined : (selectedEntity as Brand);
+
+  const [acumaticaSummary, setAcumaticaSummary] = useState<AcumaticaSummary | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAcumaticaSummary(acumaticaStartDate, acumaticaEndDate, acumaticaBrand)
+      .then((data) => { if (!cancelled) setAcumaticaSummary(data); })
+      .catch(() => { if (!cancelled) setAcumaticaSummary(null); });
+    return () => { cancelled = true; };
+  }, [acumaticaStartDate, acumaticaEndDate, acumaticaBrand]);
+
+  const acumaticaNotAvailable = acumaticaSummary?.notAvailableForBrand === true;
+  const acumaticaNotAvailableSubtitle = acumaticaSummary?.notAvailableReason
+    ? `Not available — ${acumaticaSummary.notAvailableReason}`
+    : 'Not available';
+
+  // Per-brand Acumatica figures for Performance by Brand (group view
+  // only) — same API, one call per real brand for the current period.
+  const [brandAcumaticaSummaries, setBrandAcumaticaSummaries] = useState<Partial<Record<Brand, AcumaticaSummary>>>({});
+  useEffect(() => {
+    if (!isGroupView) return;
+    let cancelled = false;
+    const brands = ENTITY_OPTIONS.filter((o) => o.value !== 'all').map((o) => o.value as Brand);
+    Promise.all(
+      brands.map((brand) =>
+        fetchAcumaticaSummary(acumaticaStartDate, acumaticaEndDate, brand)
+          .then((data): [Brand, AcumaticaSummary | null] => [brand, data])
+          .catch((): [Brand, AcumaticaSummary | null] => [brand, null])
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const map: Partial<Record<Brand, AcumaticaSummary>> = {};
+      for (const [brand, data] of results) {
+        if (data) map[brand] = data;
+      }
+      setBrandAcumaticaSummaries(map);
+    });
+    return () => { cancelled = true; };
+  }, [isGroupView, acumaticaStartDate, acumaticaEndDate]);
+
   // ---- Performance by Brand (group level only) ----------------------------
   const brandPerformanceRows = useMemo<BrandPerformanceRow[]>(() => {
     return ENTITY_OPTIONS.filter((o) => o.value !== 'all').map((o) => {
@@ -222,16 +324,19 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         periodStart
       );
       const brandWebsiteUsers = getWebsiteUsersForBrand(ga4Traffic, brand);
+      const brandSpend = sumKnownCampaignSpend(brandCampaigns, campaignCosts, googleAdsPerformance);
       return {
         brand,
         label: o.label,
         enquiries: sumEnquiries(brandCampaigns),
         leads: sumLeads(brandCampaigns),
-        spend: sumSpend(brandCampaigns),
+        spend: brandSpend.total,
+        hasLegacySpendFallback: brandSpend.hasLegacyFallback,
         websiteUsers: brandWebsiteUsers.status === 'available' ? brandWebsiteUsers.activeUsers! : null,
+        acumatica: toBrandAcumaticaInfo(brandAcumaticaSummaries[brand]),
       };
     });
-  }, [campaigns, periodStart, ga4Traffic]);
+  }, [campaigns, periodStart, ga4Traffic, campaignCosts, googleAdsPerformance, brandAcumaticaSummaries]);
 
   // ---- Channel Summary — identical logic to Overview ----------------------
   const emailPerf = useMemo(
@@ -274,7 +379,17 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
       ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
     campaignMonitorStatus,
-    { label: 'Acumatica', status: 'not-connected', detail: 'Not connected' },
+    acumaticaNotAvailable
+      ? { label: 'Acumatica', status: 'not-connected', detail: acumaticaNotAvailableSubtitle }
+      : acumaticaSummary?.hasImportedData
+        ? {
+            label: 'Acumatica',
+            status: 'stale',
+            detail: acumaticaSummary.lastImportedAt
+              ? `Manual export — last imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')}`
+              : 'Manual export',
+          }
+        : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
     googleAdsPerformance?.configured === true
       ? {
@@ -303,7 +418,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         <DataFreshnessBar entries={freshnessEntries} />
 
         {/* Headline KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard
             title="Website Users"
             value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
@@ -320,11 +435,56 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             comparison={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesComparison : undefined}
           />
           <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" comparison={leadsComparison} />
-          <KpiCard title="Marketing Spend" value={`£${Math.round(marketingSpend).toLocaleString()}`} subtitle={MARKETING_SPEND_CAVEAT} onClick={() => onNavigate?.('campaigns')} comparison={spendComparison} />
-          <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
+          <KpiCard
+            title="Marketing Spend"
+            value={`£${Math.round(marketingSpend).toLocaleString()}`}
+            subtitle={marketingSpendInfo.hasLegacyFallback ? `${KNOWN_CAMPAIGN_SPEND_CAVEAT} — includes legacy costs needing classification` : KNOWN_CAMPAIGN_SPEND_CAVEAT}
+            onClick={() => onNavigate?.('campaigns')}
+            comparison={spendComparison}
+          />
+          <KpiCard
+            title="Opportunities"
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+            subtitle={
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? 'Manual Acumatica export — see Settings for last import'
+                  : 'No Acumatica export imported yet'
+            }
+          />
+          <KpiCard
+            title="Open Pipeline"
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+            subtitle={
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? `${acumaticaSummary.openPipelineCount} opportunities — Status = Open + New`
+                  : 'No Acumatica export imported yet'
+            }
+          />
+          <KpiCard
+            title="Won Revenue"
+            value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
+            status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
+            notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+            subtitle={
+              acumaticaNotAvailable
+                ? acumaticaNotAvailableSubtitle
+                : acumaticaSummary?.hasImportedData
+                  ? 'Manual Acumatica export'
+                  : 'No Acumatica export imported yet'
+            }
+          />
         </div>
+        <p className="text-xs text-text-secondary mt-2 mb-8">
+          Opportunities, Open Pipeline and Won Revenue are overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked.
+        </p>
 
         {/* Performance Over Time */}
         <div className="mb-8">
@@ -364,6 +524,8 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             <CampaignPerformanceTable
               campaigns={periodCampaigns}
               wave1Performance={wave1Performance}
+              campaignCosts={campaignCosts}
+              googleAdsPerformance={googleAdsPerformance}
               showEntityColumn={isGroupView}
               onSelectCampaign={(id) => selectCampaign(id, 'performance')}
             />
