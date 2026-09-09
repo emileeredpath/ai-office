@@ -6,7 +6,16 @@
 // acumaticaKpiRules.ts — this file only aggregates using those rules, it
 // never re-derives or hardcodes a status string itself.
 import { getAllOpportunities, getLastImportLog, type AcumaticaOpportunityRecord } from '../db/acumaticaRepository.js';
-import { isWonStatus, isLostStatus, isOpenPipelineStatus, OPEN_PIPELINE_STATUSES, PIPELINE_DEFINITION_CONFIRMED, isBrandTrackedInAcumatica } from './acumaticaKpiRules.js';
+import {
+  isWonStatus,
+  isLostStatus,
+  isOpenPipelineStatus,
+  OPEN_PIPELINE_STATUSES,
+  PIPELINE_DEFINITION_CONFIRMED,
+  isBrandTrackedInAcumatica,
+  formatSalesReportedSource,
+  formatUnspecified,
+} from './acumaticaKpiRules.js';
 import type { Brand } from '../types.js';
 
 export interface AcumaticaSummary {
@@ -81,26 +90,32 @@ function parseExportDate(raw: string | null): Date | null {
   return null;
 }
 
-export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?: Brand): AcumaticaSummary {
+// Shared entity/period scoping — the ONE place that decides which real
+// imported opportunities are "in scope" for a given brand/date-range
+// selection, so getAcumaticaSummary and getAcumaticaBreakdowns (below) can
+// never disagree about what they're both summarising. Mirrors
+// getAcumaticaSummary's original inline logic exactly — no behaviour
+// change, just factored out so a second consumer doesn't re-derive it.
+interface AcumaticaScope {
+  scoped: AcumaticaOpportunityRecord[];
+  hasImportedData: boolean;
+  undated: number;
+  lastImportedAt: string | null;
+  notAvailableForBrand: boolean;
+  notAvailableReason: string | null;
+}
+
+function scopeOpportunities(startDate?: string, endDate?: string, brand?: Brand): AcumaticaScope {
   const all = getAllOpportunities();
   const lastImport = getLastImportLog();
+  const lastImportedAt = lastImport?.importedAt ?? null;
 
   if (brand && !isBrandTrackedInAcumatica(brand)) {
     return {
+      scoped: [],
       hasImportedData: all.length > 0,
-      lastImportedAt: lastImport?.importedAt ?? null,
-      opportunities: 0,
-      wonDeals: 0,
-      wonRevenue: 0,
-      lostDeals: 0,
-      openPipelineValue: 0,
-      openPipelineCount: 0,
-      openPipelineDefinitionConfirmed: PIPELINE_DEFINITION_CONFIRMED,
-      openPipelineIncludesStatuses: OPEN_PIPELINE_STATUSES,
-      newStatusCount: 0,
-      newStatusValue: 0,
-      unclassifiedCount: 0,
       undated: 0,
+      lastImportedAt,
       notAvailableForBrand: true,
       notAvailableReason: 'IRCL is not managed in Acumatica',
     };
@@ -134,6 +149,35 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
     });
   }
 
+  return { scoped, hasImportedData, undated, lastImportedAt, notAvailableForBrand: false, notAvailableReason: null };
+}
+
+export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?: Brand): AcumaticaSummary {
+  const scope = scopeOpportunities(startDate, endDate, brand);
+
+  if (scope.notAvailableForBrand) {
+    return {
+      hasImportedData: scope.hasImportedData,
+      lastImportedAt: scope.lastImportedAt,
+      opportunities: 0,
+      wonDeals: 0,
+      wonRevenue: 0,
+      lostDeals: 0,
+      openPipelineValue: 0,
+      openPipelineCount: 0,
+      openPipelineDefinitionConfirmed: PIPELINE_DEFINITION_CONFIRMED,
+      openPipelineIncludesStatuses: OPEN_PIPELINE_STATUSES,
+      newStatusCount: 0,
+      newStatusValue: 0,
+      unclassifiedCount: 0,
+      undated: 0,
+      notAvailableForBrand: true,
+      notAvailableReason: scope.notAvailableReason,
+    };
+  }
+
+  const { scoped, hasImportedData, undated, lastImportedAt } = scope;
+
   const wonOpps = scoped.filter((o) => isWonStatus(o.commercialStatus));
   const lostOpps = scoped.filter((o) => isLostStatus(o.commercialStatus));
   const openOpps = scoped.filter((o) => isOpenPipelineStatus(o.commercialStatus));
@@ -142,7 +186,7 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
 
   return {
     hasImportedData,
-    lastImportedAt: lastImport?.importedAt ?? null,
+    lastImportedAt,
     opportunities: scoped.length,
     wonDeals: wonOpps.length,
     wonRevenue: wonOpps.reduce((sum, o) => sum + (o.total ?? 0), 0),
@@ -157,5 +201,86 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
     undated,
     notAvailableForBrand: false,
     notAvailableReason: null,
+  };
+}
+
+// ---------------------------------------------------------------------
+// Opportunity analysis breakdowns (Leads & CRM Data + Privacy Foundation
+// phase, 2026-09-09) — Commercial Status, Stage, Opportunity Class,
+// Product Focus, Sales-reported Source, and Entity, each as a real
+// count + total value across the same period/entity scope as
+// getAcumaticaSummary above (via the same scopeOpportunities helper, so
+// the two can never disagree about which opportunities are "in scope").
+// Stage is grouped here for genuine display/reporting only — it is never
+// read anywhere in this file (or acumaticaKpiRules.ts) to influence
+// commercialStatus; Status alone remains the sole commercial
+// classification. "Sales-reported Source" groups by heardAboutUs via the
+// same formatSalesReportedSource() used elsewhere, so a blank value
+// groups under "Unspecified" here exactly as it would if rendered
+// per-row — never a separate/looser blank-handling rule.
+export interface AcumaticaBreakdownEntry {
+  key: string;
+  count: number;
+  value: number;
+}
+
+export interface AcumaticaBreakdowns {
+  hasImportedData: boolean;
+  notAvailableForBrand: boolean;
+  notAvailableReason: string | null;
+  byCommercialStatus: AcumaticaBreakdownEntry[];
+  byStage: AcumaticaBreakdownEntry[];
+  byOpportunityClass: AcumaticaBreakdownEntry[];
+  byProductFocus: AcumaticaBreakdownEntry[];
+  bySalesReportedSource: AcumaticaBreakdownEntry[];
+  byEntity: AcumaticaBreakdownEntry[];
+}
+
+function groupBy(
+  scoped: AcumaticaOpportunityRecord[],
+  keyFn: (o: AcumaticaOpportunityRecord) => string
+): AcumaticaBreakdownEntry[] {
+  const totals = new Map<string, { count: number; value: number }>();
+  for (const o of scoped) {
+    const key = keyFn(o);
+    const existing = totals.get(key) ?? { count: 0, value: 0 };
+    existing.count += 1;
+    existing.value += o.total ?? 0;
+    totals.set(key, existing);
+  }
+  return Array.from(totals.entries())
+    .map(([key, t]) => ({ key, count: t.count, value: t.value }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export function getAcumaticaBreakdowns(startDate?: string, endDate?: string, brand?: Brand): AcumaticaBreakdowns {
+  const scope = scopeOpportunities(startDate, endDate, brand);
+
+  if (scope.notAvailableForBrand) {
+    return {
+      hasImportedData: scope.hasImportedData,
+      notAvailableForBrand: true,
+      notAvailableReason: scope.notAvailableReason,
+      byCommercialStatus: [],
+      byStage: [],
+      byOpportunityClass: [],
+      byProductFocus: [],
+      bySalesReportedSource: [],
+      byEntity: [],
+    };
+  }
+
+  const { scoped, hasImportedData } = scope;
+
+  return {
+    hasImportedData,
+    notAvailableForBrand: false,
+    notAvailableReason: null,
+    byCommercialStatus: groupBy(scoped, (o) => o.commercialStatus),
+    byStage: groupBy(scoped, (o) => formatUnspecified(o.stage)),
+    byOpportunityClass: groupBy(scoped, (o) => formatUnspecified(o.opportunityClass)),
+    byProductFocus: groupBy(scoped, (o) => formatUnspecified(o.productFocus)),
+    bySalesReportedSource: groupBy(scoped, (o) => formatSalesReportedSource(o.heardAboutUs)),
+    byEntity: groupBy(scoped, (o) => formatUnspecified(o.brand)),
   };
 }

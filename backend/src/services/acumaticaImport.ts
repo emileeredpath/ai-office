@@ -17,6 +17,15 @@
 // deliberately NOT on this list — it identifies an internal MTech
 // employee, not a customer, and the brief explicitly allows retaining
 // owner/employee information for management reporting.
+//
+// Source Lead is also rejected here (Leads & CRM Data + Privacy
+// Foundation phase, 2026-09-09) — not because it is itself a name/contact
+// field type, but because the real 1,000-row export showed it sparsely
+// populated and capable of containing an individual's name, and it was
+// never an approved Marketing-attribution bridge in the first place (see
+// acumaticaKpiRules.ts). Reusing the same rejected-header mechanism keeps
+// the reporting behaviour (shown to the user as "ignored", never silently
+// dropped) consistent with genuine personal-data columns.
 import type { Brand } from '../types.js';
 import { upsertOpportunity, recordImportLog, type UpsertOpportunityInput } from '../db/acumaticaRepository.js';
 import { classifyCommercialStatus, deriveBrandFromOpportunityIdPrefix } from './acumaticaKpiRules.js';
@@ -29,6 +38,9 @@ const REJECTED_PERSONAL_DATA_HEADERS = new Set(
     'telephone', 'phone', 'phone number', 'telephone number', 'mobile', 'mobile number', 'mobile phone',
     'address', 'postal address', 'street address', 'address line 1', 'address line 2',
     'city', 'postcode', 'post code', 'zip', 'zip code', 'county', 'state',
+    // Source Lead — not a name/contact field type, but rejected here too:
+    // see the header comment above.
+    'source lead', 'lead source', 'source campaign',
   ].map((h) => h.toLowerCase())
 );
 
@@ -46,7 +58,6 @@ const FIELD_ALIASES: Record<string, string[]> = {
   estimatedCloseDate: ['estimated close date', 'est. close date', 'close date', 'expected close date'],
   opportunityClass: ['opportunity class', 'class', 'class id'],
   owner: ['owner', 'opportunity owner', 'sales rep', 'sales person', 'salesperson'],
-  sourceLead: ['source lead', 'lead source', 'source campaign'],
   heardAboutUs: ['where did you hear about us?', 'where did you hear about us', 'how did you hear about us?', 'how did you hear about us'],
   productFocus: ['product focus', 'product'],
   probability: ['probability of conversion', 'probability', 'conversion probability', 'probability of conversion %'],
@@ -292,13 +303,6 @@ export function importAcumaticaCsv(filename: string, csvText: string): ImportRes
       // read, never by overwriting it.
       opportunityClass: cell(row, fieldIndex.opportunityClass),
       owner: cell(row, fieldIndex.owner),
-      // Source Lead: raw Acumatica value only. Sparsely populated and
-      // inconsistently used in the real export — never treated as a
-      // reliable lead -> opportunity relationship, and never used to
-      // populate Marketing Leads or Qualified Leads (those remain
-      // campaign.leads and a permanent Acumatica-pending stub respectively
-      // — see KPI_DEFINITIONS.md).
-      sourceLead: cell(row, fieldIndex.sourceLead),
       // "Where Did You Hear About Us?" — see formatSalesReportedSource in
       // acumaticaKpiRules.ts for the confirmed handling rule.
       heardAboutUs: cell(row, fieldIndex.heardAboutUs),

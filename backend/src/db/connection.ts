@@ -186,6 +186,20 @@ function addColumnIfMissing(table: string, column: string, definition: string) {
   }
 }
 
+// Removal counterpart — used sparingly and only for a column that must
+// stop being persisted (never for routine schema cleanup). Node's bundled
+// SQLite (3.51+) supports ALTER TABLE ... DROP COLUMN natively without
+// rebuilding the table, so this is safe to run on every boot: a fresh
+// database never has the column to begin with (it's absent from the
+// CREATE TABLE above), and an existing database has it dropped — and any
+// values it held discarded — exactly once, the first time this runs
+// against it.
+function dropColumnIfExists(table: string, column: string) {
+  if (columnExists(table, column)) {
+    db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  }
+}
+
 addColumnIfMissing('campaigns', 'entities', "TEXT NOT NULL DEFAULT '[]'");
 addColumnIfMissing('campaigns', 'results', 'TEXT');
 addColumnIfMissing('campaigns', 'created_at', "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'");
@@ -426,7 +440,6 @@ db.exec(`
     estimated_close_date TEXT,
     opportunity_class TEXT,
     owner TEXT,
-    source_lead TEXT,
     heard_about_us TEXT,
     product_focus TEXT,
     probability REAL,
@@ -462,6 +475,13 @@ db.exec(`
 // Safety net for a deployment whose acumatica_opportunities table was
 // already created before probability_raw existed in the CREATE TABLE above.
 addColumnIfMissing('acumatica_opportunities', 'probability_raw', 'TEXT');
+
+// Leads & CRM Data + Privacy Foundation phase (2026-09-09): Source Lead is
+// no longer an approved field to persist — see acumaticaKpiRules.ts's
+// "Other confirmed field-handling rules" and acumaticaImport.ts's header
+// comment for why. Drops the column (and any values it held) from a
+// database created before this change; a no-op once already dropped.
+dropColumnIfExists('acumatica_opportunities', 'source_lead');
 
 // Structured Campaign Costs (Structured Campaign Costs phase) — the manual,
 // fixed/offline half of a campaign's known spend (purchased data, print,

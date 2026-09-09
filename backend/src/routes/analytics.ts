@@ -6,7 +6,7 @@ import { getEmailPerformance, getCampaignMonitorCoverage } from '../services/ema
 import { fetchInfinityCalls } from '../services/infinity.js';
 import { getGoogleAdsPerformance } from '../services/googleAds.js';
 import { getSearchConsolePerformance } from '../services/searchConsole.js';
-import { getAcumaticaSummary } from '../services/acumaticaReporting.js';
+import { getAcumaticaSummary, getAcumaticaBreakdowns } from '../services/acumaticaReporting.js';
 import type { Brand } from '../types.js';
 
 // Wave 1 analytics routes — GA4 and Infinity integration
@@ -255,6 +255,23 @@ router.get('/acumatica', (req: Request, res: Response) => {
 
   const summary = getAcumaticaSummary(validRange ? rawStart : undefined, validRange ? rawEnd : undefined, validBrand);
   res.json(summary);
+});
+
+// Opportunity analysis breakdowns (Commercial Status, Stage, Opportunity
+// Class, Product Focus, Sales-reported Source, Entity) — same manual
+// Acumatica data and the same startDate/endDate/brand scoping contract as
+// /acumatica above, via the shared scopeOpportunities() helper. Reporting
+// support only; Leads & CRM does not yet render this (see the Leads & CRM
+// Data + Privacy Foundation phase report).
+router.get('/acumatica-breakdown', (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const brand = req.query.brand as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const validBrand = brand && VALID_BRANDS.includes(brand as Brand) ? (brand as Brand) : undefined;
+
+  const breakdowns = getAcumaticaBreakdowns(validRange ? rawStart : undefined, validRange ? rawEnd : undefined, validBrand);
+  res.json(breakdowns);
 });
 
 export default router;

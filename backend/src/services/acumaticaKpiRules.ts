@@ -152,10 +152,14 @@ export function formatSalesReportedSource(rawHeardAboutUs: string | null): strin
 // block is the single index of what's confirmed, so a future change to
 // any of them starts here rather than being rediscovered from scratch:
 //
-// - Source Lead: raw value preserved only. Sparsely populated and
-//   inconsistently used in the real export — never treated as a reliable
-//   lead -> opportunity relationship, and never used to populate Marketing
-//   Leads or Qualified Leads.
+// - Source Lead: NOT imported/persisted (Leads & CRM Data + Privacy
+//   Foundation phase, 2026-09-09) — sparsely populated and inconsistently
+//   used in the real export, and confirmed capable of containing an
+//   individual's name. It was never an approved attribution bridge and
+//   was never used to populate Marketing Leads or Qualified Leads even
+//   while stored; acumaticaImport.ts now rejects its column header the
+//   same way as a personal-data field, and any previously-stored value
+//   was removed via the source_lead column drop in db/connection.ts.
 // - Opportunity Class: raw value preserved unchanged. May later be grouped
 //   for reporting (e.g. Sales/Hire/Events/Service/AV/Licence Renewal) —
 //   any such grouping must be computed from the raw value on read, never

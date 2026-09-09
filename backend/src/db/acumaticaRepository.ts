@@ -16,7 +16,6 @@ export interface AcumaticaOpportunityRecord {
   estimatedCloseDate: string | null;
   opportunityClass: string | null;
   owner: string | null;
-  sourceLead: string | null;
   heardAboutUs: string | null;
   productFocus: string | null;
   // Best-effort numeric parse (see acumaticaImport.ts's parseProbability) —
@@ -49,7 +48,6 @@ interface OpportunityRow {
   estimated_close_date: string | null;
   opportunity_class: string | null;
   owner: string | null;
-  source_lead: string | null;
   heard_about_us: string | null;
   product_focus: string | null;
   probability: number | null;
@@ -78,7 +76,6 @@ function rowToRecord(row: OpportunityRow): AcumaticaOpportunityRecord {
     estimatedCloseDate: row.estimated_close_date,
     opportunityClass: row.opportunity_class,
     owner: row.owner,
-    sourceLead: row.source_lead,
     heardAboutUs: row.heard_about_us,
     productFocus: row.product_focus,
     probability: row.probability,
@@ -119,7 +116,7 @@ export function upsertOpportunity(input: UpsertOpportunityInput): { record: Acum
       `UPDATE acumatica_opportunities SET
         created_on = @createdOn, status = @status, stage = @stage, commercial_status = @commercialStatus,
         total = @total, estimated_close_date = @estimatedCloseDate, opportunity_class = @opportunityClass,
-        owner = @owner, source_lead = @sourceLead, heard_about_us = @heardAboutUs, product_focus = @productFocus,
+        owner = @owner, heard_about_us = @heardAboutUs, product_focus = @productFocus,
         probability = @probability, probability_raw = @probabilityRaw, industry_sector = @industrySector, proposal_sent = @proposalSent,
         hire_type = @hireType, quantity_units = @quantityUnits, brand = @brand,
         source_filename = @sourceFilename, imported_at = @importedAt, updated_at = @updatedAt
@@ -132,11 +129,11 @@ export function upsertOpportunity(input: UpsertOpportunityInput): { record: Acum
   db.prepare(
     `INSERT INTO acumatica_opportunities (
       id, opportunity_id, created_on, status, stage, commercial_status, total, estimated_close_date,
-      opportunity_class, owner, source_lead, heard_about_us, product_focus, probability, probability_raw, industry_sector,
+      opportunity_class, owner, heard_about_us, product_focus, probability, probability_raw, industry_sector,
       proposal_sent, hire_type, quantity_units, brand, source, source_filename, imported_at, created_at, updated_at
     ) VALUES (
       @id, @opportunityId, @createdOn, @status, @stage, @commercialStatus, @total, @estimatedCloseDate,
-      @opportunityClass, @owner, @sourceLead, @heardAboutUs, @productFocus, @probability, @probabilityRaw, @industrySector,
+      @opportunityClass, @owner, @heardAboutUs, @productFocus, @probability, @probabilityRaw, @industrySector,
       @proposalSent, @hireType, @quantityUnits, @brand, 'acumatica_manual', @sourceFilename, @importedAt, @createdAt, @updatedAt
     )`
   ).run({ ...input, id, createdAt: now, updatedAt: now });

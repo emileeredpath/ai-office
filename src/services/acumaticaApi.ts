@@ -68,11 +68,11 @@ export interface AcumaticaSummary {
   wonDeals: number;
   wonRevenue: number;
   lostDeals: number;
-  // Open Pipeline is deliberately provisional — see backend/src/services/
-  // acumaticaKpiRules.ts's OPEN_PIPELINE_STATUSES doc comment. While
-  // openPipelineDefinitionConfirmed is false, never present
-  // openPipelineValue/openPipelineCount as a settled figure — always show
-  // newStatusCount/newStatusValue alongside it.
+  // Open Pipeline = Status Open + New — CONFIRMED, a settled figure (see
+  // backend/src/services/acumaticaKpiRules.ts's OPEN_PIPELINE_STATUSES doc
+  // comment; openPipelineDefinitionConfirmed is always true today).
+  // newStatusCount/newStatusValue remain available alongside it purely as
+  // an informational Open/New split, not because the total is provisional.
   openPipelineValue: number;
   openPipelineCount: number;
   openPipelineDefinitionConfirmed: boolean;
@@ -98,6 +98,48 @@ export async function fetchAcumaticaSummary(startDate?: string, endDate?: string
   const response = await apiFetch(`/api/analytics/acumatica${query ? `?${query}` : ''}`);
   if (!response.ok) {
     throw new ApiError(`Failed to fetch Acumatica summary (${response.status}).`, response.status);
+  }
+  return response.json();
+}
+
+// Opportunity analysis breakdowns (Leads & CRM Data + Privacy Foundation
+// phase) — Commercial Status, Stage, Opportunity Class, Product Focus,
+// Sales-reported Source, and Entity, each as real opportunity count +
+// total value for the same period/entity scope as fetchAcumaticaSummary
+// above. Reporting/typing support only — not yet rendered anywhere; see
+// that phase's report for why (no Leads & CRM redesign this phase).
+// `key` for bySalesReportedSource is already "Unspecified" for a blank
+// value (never a bare "Source" label — display code presenting these
+// rows must still label the field "Sales-reported source"). `key` for
+// byStage/byOpportunityClass/byProductFocus/byEntity is "Unspecified" for
+// a genuinely blank/null value, never inferred.
+export interface AcumaticaBreakdownEntry {
+  key: string;
+  count: number;
+  value: number;
+}
+
+export interface AcumaticaBreakdowns {
+  hasImportedData: boolean;
+  notAvailableForBrand: boolean;
+  notAvailableReason: string | null;
+  byCommercialStatus: AcumaticaBreakdownEntry[];
+  byStage: AcumaticaBreakdownEntry[];
+  byOpportunityClass: AcumaticaBreakdownEntry[];
+  byProductFocus: AcumaticaBreakdownEntry[];
+  bySalesReportedSource: AcumaticaBreakdownEntry[];
+  byEntity: AcumaticaBreakdownEntry[];
+}
+
+export async function fetchAcumaticaBreakdowns(startDate?: string, endDate?: string, brand?: Brand): Promise<AcumaticaBreakdowns> {
+  const params = new URLSearchParams();
+  if (startDate) params.set('startDate', startDate);
+  if (endDate) params.set('endDate', endDate);
+  if (brand) params.set('brand', brand);
+  const query = params.toString();
+  const response = await apiFetch(`/api/analytics/acumatica-breakdown${query ? `?${query}` : ''}`);
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch Acumatica breakdowns (${response.status}).`, response.status);
   }
   return response.json();
 }
