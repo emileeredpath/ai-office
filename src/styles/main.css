@@ -1476,65 +1476,6 @@ h3 {
 
 /* V2 Performance page */
 
-.v2-leads-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.v2-leads-breakdown-row {
-  display: grid;
-  grid-template-columns: 120px 1fr 56px;
-  align-items: center;
-  gap: 12px;
-  background: none;
-  border: none;
-  padding: 0;
-  width: 100%;
-  text-align: left;
-  cursor: default;
-}
-
-button.v2-leads-breakdown-row {
-  cursor: pointer;
-}
-
-button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
-  color: var(--v2-purple);
-}
-
-.v2-leads-breakdown-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.v2-leads-breakdown-track {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--v2-surface);
-  border: 1px solid var(--v2-border);
-  overflow: hidden;
-  display: block;
-}
-
-.v2-leads-breakdown-fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-}
-
-.v2-leads-breakdown-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .v2-over-time-empty {
   display: flex;
   flex-direction: column;
@@ -1558,42 +1499,57 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
   margin: 0;
 }
 
-@media (max-width: 900px) {
-  .v2-leads-breakdown-row {
-    grid-template-columns: 90px 1fr 48px;
-  }
-}
+/* V2 Leads & CRM — Pipeline & Opportunity Analysis breakdowns */
 
-/* V2 Leads & CRM */
-
-.v2-crm-empty {
+.v2-acu-breakdown {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  padding: 56px 24px;
+  gap: 10px;
 }
 
-.v2-crm-empty-title {
-  font-size: 15px;
+.v2-acu-breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 110px) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.v2-acu-breakdown-label {
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.v2-crm-empty-subtitle {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  max-width: 520px;
-  margin: 0;
+.v2-acu-breakdown-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  overflow: hidden;
+  display: block;
 }
 
-.v2-crm-empty-note {
+.v2-acu-breakdown-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.v2-acu-breakdown-meta {
   font-size: 12px;
-  color: var(--v2-grey);
-  max-width: 480px;
-  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .v2-acu-breakdown-row {
+    grid-template-columns: 64px 1fr auto;
+  }
 }
 
 /* V2 PPC — measurement journey */
