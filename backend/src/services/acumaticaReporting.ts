@@ -10,9 +10,19 @@ import { isWonStatus, isLostStatus, isOpenPipelineStatus, OPEN_PIPELINE_STATUSES
 import type { Brand } from '../types.js';
 
 export interface AcumaticaSummary {
-  // Whether ANY opportunity has ever been imported — distinct from
-  // "zero opportunities in this filtered range," so a genuinely empty
-  // period is never confused with "nothing has been imported yet."
+  // Per-entity Availability (2026-09-09) — when `brand` is passed, this is
+  // whether ANY opportunity has ever been imported for THAT brand
+  // specifically (checked against the full imported dataset, before the
+  // date-range filter is applied) — never the global "something was
+  // imported for some entity" flag. That distinction matters: two
+  // entities can both show `opportunities: 0` for a period, but one has
+  // real imported data with a genuine zero result (hasImportedData:
+  // true) and the other has never had a single row imported for it
+  // (hasImportedData: false) — collapsing those into one flag would
+  // silently present "no coverage" as "genuine zero" for the second
+  // entity. When no `brand` is passed (group view), this is still the
+  // global "was anything imported at all" flag, since a group total
+  // legitimately draws on every tracked entity's data together.
   hasImportedData: boolean;
   lastImportedAt: string | null;
 
@@ -101,6 +111,15 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
     scoped = scoped.filter((o) => o.brand === brand);
   }
 
+  // Captured before the date-range filter below narrows `scoped` further —
+  // this must reflect "has this entity EVER had an opportunity imported,"
+  // not "does it have one in this particular period." A brand with real
+  // imported history but nothing in the current date range still counts
+  // as having data (the correct answer is a genuine 0 for this period),
+  // while a brand absent from every imported row, in any period, has no
+  // coverage at all.
+  const hasImportedData = brand ? scoped.length > 0 : all.length > 0;
+
   let undated = 0;
   if (startDate && endDate) {
     const start = new Date(startDate);
@@ -122,7 +141,7 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
   const unclassifiedOpps = scoped.filter((o) => o.commercialStatus === 'unclassified');
 
   return {
-    hasImportedData: all.length > 0,
+    hasImportedData,
     lastImportedAt: lastImport?.importedAt ?? null,
     opportunities: scoped.length,
     wonDeals: wonOpps.length,
