@@ -2,15 +2,12 @@ import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
-import { BrandBadge } from '@/components/common/BrandBadge';
 import { AddActivityModal } from '@/components/calendar/AddActivityModal';
 import { CalendarMonthView } from '@/components/calendar/CalendarMonthView';
 import { CalendarWeekView } from '@/components/calendar/CalendarWeekView';
 import { CalendarListView } from '@/components/calendar/CalendarListView';
 import type { CalendarActivityItem } from '@/components/calendar/types';
 import { getMarketingEvents, type MarketingEvent } from '@/utils/marketingEvents';
-import { getCampaignProgressInfo } from '@/utils/campaignProgress';
-import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMonthName, formatDateShort } from '@/utils/dateUtils';
 
 type ViewMode = 'month' | 'week' | 'list';
@@ -190,12 +187,10 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, campaigns, selectedEntity, campaignFilter]);
 
-  const activeCampaignsInRange = useMemo(
-    () => entityCampaigns.filter((c) => c.status === 'active' && c.startDate <= range.end && c.endDate >= range.start).slice(0, 6),
-    [entityCampaigns, range]
-  );
-
   // Same "sends this month" summary the old screen had, now entity-aware.
+  // Cost is only included when a genuine, non-zero cost exists across the
+  // month's sends — most seeded sends have no real cost recorded, and a
+  // flat "£0.00" read as a real (and wrong) figure rather than "unknown".
   const sendsSummary = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
@@ -205,7 +200,7 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
     if (sends.length === 0) return null;
     const recipients = sends.reduce((sum, t) => sum + (t.recipients || 0), 0);
     const cost = sends.reduce((sum, t) => sum + (t.cost || 0), 0);
-    return { count: sends.length, recipients, cost };
+    return { count: sends.length, recipients, cost: cost > 0 ? cost : null };
   }, [tasks, matchesSelectedEntity, currentDate]);
 
   const goPrev = () => {
@@ -267,102 +262,90 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
           </button>
         </div>
 
-        {/* Overdue/upcoming planning strip — independent of whichever
-            month/week is currently displayed, so overdue work is never
-            silently out of view (see the Content & Calendar audit).
-            Native tasks only; campaign milestones have no overdue concept
-            in the data model. Clicking a count jumps to List view scoped
-            to exactly that set. */}
-        <div className="v2-cal-summary-strip">
-          {overdueUpcomingCounts.overdue > 0 ? (
-            <button
-              className="v2-cal-summary-link"
-              data-severity="red"
-              onClick={() => {
-                setViewMode('list');
-                setListFocus('overdue');
-              }}
-            >
-              {overdueUpcomingCounts.overdue} overdue
-            </button>
-          ) : (
-            <span className="v2-cal-summary-static">0 overdue</span>
-          )}
-          <span className="v2-cal-summary-dot">·</span>
-          {overdueUpcomingCounts.upcoming > 0 ? (
-            <button
-              className="v2-cal-summary-link"
-              onClick={() => {
-                setViewMode('list');
-                setListFocus('upcoming');
-              }}
-            >
-              {overdueUpcomingCounts.upcoming} upcoming
-            </button>
-          ) : (
-            <span className="v2-cal-summary-static">0 upcoming</span>
-          )}
-        </div>
-
+        {/* Consolidated planning toolbar — nav, overdue/upcoming (kept
+            independent of whichever month/week is displayed, so overdue
+            work is never silently out of view — see the Content &
+            Calendar audit), campaign filter, and view switcher all in one
+            compact row. The separate campaign badge row was removed: the
+            dropdown here now does that filtering job, so the badges were
+            pure duplication. */}
         <div className="v2-cal-toolbar">
-          <div className="v2-cal-nav">
-            <button className="v2-cal-nav-btn" onClick={goPrev} title="Previous">
-              <ChevronLeft size={16} />
-            </button>
-            <span className="v2-cal-nav-label">{navLabel}</span>
-            <button className="v2-cal-nav-btn" onClick={goNext} title="Next">
-              <ChevronRight size={16} />
-            </button>
-            <button className="btn btn-secondary text-sm" onClick={goToday} style={{ marginLeft: 4 }}>
-              Today
-            </button>
+          <div className="v2-cal-toolbar-group">
+            <div className="v2-cal-nav">
+              <button className="v2-cal-nav-btn" onClick={goPrev} title="Previous">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="v2-cal-nav-label">{navLabel}</span>
+              <button className="v2-cal-nav-btn" onClick={goNext} title="Next">
+                <ChevronRight size={16} />
+              </button>
+              <button className="btn btn-secondary text-sm" onClick={goToday} style={{ marginLeft: 4 }}>
+                Today
+              </button>
+            </div>
+
+            <div className="v2-cal-summary-strip">
+              {overdueUpcomingCounts.overdue > 0 ? (
+                <button
+                  className="v2-cal-summary-link"
+                  data-severity="red"
+                  onClick={() => {
+                    setViewMode('list');
+                    setListFocus('overdue');
+                  }}
+                >
+                  {overdueUpcomingCounts.overdue} overdue
+                </button>
+              ) : (
+                <span className="v2-cal-summary-static">0 overdue</span>
+              )}
+              <span className="v2-cal-summary-dot">·</span>
+              {overdueUpcomingCounts.upcoming > 0 ? (
+                <button
+                  className="v2-cal-summary-link"
+                  onClick={() => {
+                    setViewMode('list');
+                    setListFocus('upcoming');
+                  }}
+                >
+                  {overdueUpcomingCounts.upcoming} upcoming
+                </button>
+              ) : (
+                <span className="v2-cal-summary-static">0 upcoming</span>
+              )}
+            </div>
           </div>
 
-          <select
-            value={campaignFilter}
-            onChange={(e) => setCampaignFilter(e.target.value)}
-            className="input text-sm"
-            style={{ maxWidth: 220 }}
-          >
-            <option value="">All Campaigns</option>
-            {entityCampaigns.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <div className="v2-cal-toolbar-group">
+            <select
+              value={campaignFilter}
+              onChange={(e) => setCampaignFilter(e.target.value)}
+              className="input text-sm"
+              style={{ maxWidth: 200 }}
+            >
+              <option value="">All Campaigns</option>
+              {entityCampaigns.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
 
-          <div className="v2-cal-view-tabs">
-            {(['month', 'week', 'list'] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                className="v2-cal-view-tab"
-                data-active={viewMode === mode}
-                onClick={() => {
-                  setListFocus(null);
-                  setViewMode(mode);
-                }}
-              >
-                {mode === 'month' ? 'Month' : mode === 'week' ? 'Week' : 'List'}
-              </button>
-            ))}
+            <div className="v2-cal-view-tabs">
+              {(['month', 'week', 'list'] as ViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  className="v2-cal-view-tab"
+                  data-active={viewMode === mode}
+                  onClick={() => {
+                    setListFocus(null);
+                    setViewMode(mode);
+                  }}
+                >
+                  {mode === 'month' ? 'Month' : mode === 'week' ? 'Week' : 'List'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-
-        {activeCampaignsInRange.length > 0 && (
-          <div className="flex gap-2 flex-wrap mb-4">
-            {activeCampaignsInRange.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => selectCampaign(c.id)}
-                className="badge"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid var(--v2-border)', color: 'var(--color-text-primary)', cursor: 'pointer', fontSize: '12px', padding: '4px 10px' }}
-                title={getCampaignProgressInfo(c.status, c.startDate, c.endDate).label}
-              >
-                <BrandBadge brand={c.brand} />
-                {c.name}
-              </button>
-            ))}
-          </div>
-        )}
 
         <div className="card" style={{ padding: viewMode === 'list' ? '1.5rem' : '1rem' }}>
           {viewMode === 'month' && <CalendarMonthView currentDate={currentDate} items={items} onDayClick={(d) => { setAddModalDate(d); setShowAddModal(true); }} />}
@@ -372,7 +355,8 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
 
         {sendsSummary && (
           <p className="text-xs text-text-secondary mt-4">
-            {sendsSummary.count} email send{sendsSummary.count === 1 ? '' : 's'} completed this month · {sendsSummary.recipients.toLocaleString()} recipients · £{sendsSummary.cost.toFixed(2)}
+            {sendsSummary.count} email send{sendsSummary.count === 1 ? '' : 's'} completed this month · {sendsSummary.recipients.toLocaleString()} recipients
+            {sendsSummary.cost !== null && <> · £{sendsSummary.cost.toFixed(2)}</>}
           </p>
         )}
       </div>

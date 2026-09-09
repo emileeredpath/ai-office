@@ -164,3 +164,23 @@ export function getMarketingEvents({
 
   return events.sort((a, b) => a.date.getTime() - b.date.getTime());
 }
+
+// A concise display label for tight spaces (Month view's day chips) —
+// derived only from the event's own already-known campaignName field, never
+// rewritten or inferred. Many real task/send titles already follow a
+// "<Campaign Name> — <thing>" convention (see seed data); when a title
+// starts with exactly its own campaign's real name plus that separator,
+// showing just the remainder is strictly a mechanical trim, not a summary.
+// Anything that doesn't match this exact pattern is returned unchanged —
+// never truncated or guessed at. The full original title stays available
+// via the caller's title/tooltip attribute regardless.
+export function getConciseEventLabel(item: Pick<MarketingEvent, 'title' | 'campaignName'>): string {
+  if (item.campaignName) {
+    const prefix = `${item.campaignName} — `;
+    if (item.title.startsWith(prefix)) {
+      const rest = item.title.slice(prefix.length).trim();
+      if (rest.length > 0) return rest;
+    }
+  }
+  return item.title;
+}

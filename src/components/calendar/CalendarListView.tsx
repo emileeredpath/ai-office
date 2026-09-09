@@ -36,8 +36,29 @@ export function CalendarListView({ items, emptyLabel }: CalendarListViewProps) {
           </div>
           <div className="v2-cal-list-items">
             {group.items.map((item) => {
-              const Icon = EVENT_KIND_ICON[item.kind];
               const color = item.colour || EVENT_KIND_COLOR[item.kind];
+              // Completed history gets a compact single-row treatment —
+              // no card, no icon box, no strikethrough — so a month of
+              // finished email sends doesn't dominate the page over what's
+              // actually upcoming or overdue. Recipient counts (subtitle)
+              // stay visible, just inline rather than on their own line.
+              if (item.completed) {
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => item.onClick?.()}
+                    className="v2-cal-list-item-compact"
+                    data-clickable={!!item.onClick}
+                  >
+                    <span className="v2-cal-list-item-compact-dot" style={{ backgroundColor: color }} />
+                    <span className="v2-cal-list-item-compact-text">
+                      {item.title}
+                      {item.subtitle && <span className="v2-cal-list-item-compact-subtitle"> · {item.subtitle}</span>}
+                    </span>
+                  </button>
+                );
+              }
+              const Icon = EVENT_KIND_ICON[item.kind];
               return (
                 <button
                   key={item.id}
@@ -52,12 +73,7 @@ export function CalendarListView({ items, emptyLabel }: CalendarListViewProps) {
                     <div className="text-xs font-semibold" style={{ color, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                       {EVENT_KIND_LABEL[item.kind]}
                     </div>
-                    <div
-                      className="text-sm font-medium text-text-primary"
-                      style={{ textDecoration: item.completed ? 'line-through' : undefined, opacity: item.completed ? 0.65 : 1 }}
-                    >
-                      {item.title}
-                    </div>
+                    <div className="text-sm font-medium text-text-primary">{item.title}</div>
                     {(item.subtitle || item.campaignName) && (
                       <div className="text-xs text-text-secondary">{item.subtitle || item.campaignName}</div>
                     )}

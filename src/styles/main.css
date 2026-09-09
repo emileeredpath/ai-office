@@ -1736,7 +1736,6 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 14px;
 }
 
 .v2-cal-summary-link {
@@ -1774,8 +1773,15 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 12px 24px;
   margin-bottom: 20px;
+}
+
+.v2-cal-toolbar-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .v2-cal-nav {
@@ -1888,7 +1894,7 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
 }
 
 .v2-cal-week-grid .v2-cal-day {
-  min-height: 320px;
+  min-height: 64px;
 }
 
 .v2-cal-item {
@@ -1929,9 +1935,12 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
   flex: 1;
 }
 
-.v2-cal-item[data-completed='true'] .v2-cal-item-title {
-  text-decoration: line-through;
-  opacity: 0.65;
+.v2-cal-item[data-completed='true'] {
+  opacity: 0.55;
+}
+
+.v2-cal-item[data-completed='true'] .v2-cal-item-dot {
+  background-color: var(--color-text-secondary) !important;
 }
 
 .v2-cal-day-more {
@@ -2003,6 +2012,47 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
 .v2-cal-list-item[data-clickable='true']:hover {
   border-color: var(--v2-purple);
   background: var(--v2-purple-soft);
+}
+
+.v2-cal-list-item-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border: none;
+  background: none;
+  text-align: left;
+  width: 100%;
+  cursor: default;
+  color: var(--color-text-secondary);
+}
+
+.v2-cal-list-item-compact[data-clickable='true'] {
+  cursor: pointer;
+}
+
+.v2-cal-list-item-compact[data-clickable='true']:hover {
+  color: var(--color-text-primary);
+}
+
+.v2-cal-list-item-compact-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.v2-cal-list-item-compact-text {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-cal-list-item-compact-subtitle {
+  color: var(--color-text-secondary);
+  opacity: 0.85;
 }
 
 .v2-cal-list-item-icon {

@@ -38,9 +38,7 @@ export function CalendarWeekView({ weekStart, items, onDayClick }: CalendarWeekV
             onClick={() => onDayClick?.(day)}
             style={{ cursor: onDayClick ? 'pointer' : undefined }}
           >
-            {dayItems.length === 0 ? (
-              <div className="text-xs text-text-secondary" style={{ opacity: 0.6, marginTop: 8 }}>No activity</div>
-            ) : (
+            {dayItems.length > 0 &&
               dayItems.map((item) => {
                 const Icon = EVENT_KIND_ICON[item.kind];
                 const color = item.colour || EVENT_KIND_COLOR[item.kind];
@@ -72,8 +70,7 @@ export function CalendarWeekView({ weekStart, items, onDayClick }: CalendarWeekV
                     </span>
                   </button>
                 );
-              })
-            )}
+              })}
           </div>
         );
       })}

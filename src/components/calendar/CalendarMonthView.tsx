@@ -1,5 +1,6 @@
 import type { CalendarActivityItem } from '@/components/calendar/types';
 import { EVENT_KIND_COLOR } from '@/utils/marketingEventStyle';
+import { getConciseEventLabel } from '@/utils/marketingEvents';
 import { isSameDay, isToday } from '@/utils/dateUtils';
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -56,7 +57,7 @@ export function CalendarMonthView({ currentDate, items, onDayClick }: CalendarMo
               >
                 <span className="v2-cal-item-dot" style={{ backgroundColor: item.colour || EVENT_KIND_COLOR[item.kind] }} />
                 <span className="v2-cal-item-title" style={{ color: item.colour || EVENT_KIND_COLOR[item.kind] }}>
-                  {item.title}
+                  {getConciseEventLabel(item)}
                 </span>
               </button>
             ))}
