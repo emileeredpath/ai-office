@@ -26,12 +26,19 @@ interface KpiCardProps {
   // one that simply isn't wired up yet. Defaults to "Not connected" so
   // every existing call site is unaffected.
   notConnectedLabel?: string;
+  // Opt-in: renders `subtitle` without truncation, wrapping onto multiple
+  // lines (a literal '\n' in the string becomes a real line break) instead
+  // of ellipsis-and-hover. For a subtitle whose full content is important
+  // to read at a glance (e.g. Performance's Fixed/Media spend breakdown)
+  // rather than a one-line caveat that's fine to truncate. Defaults to
+  // false so every existing call site keeps its current truncated layout.
+  subtitleWrap?: boolean;
 }
 
 // Shared V2 KPI tile. Renders an honest "Not connected" state instead of a
 // fabricated £0/0 when the underlying data source doesn't exist yet
 // (see NOT_CONNECTED_METRICS in Overview — Acumatica-sourced metrics).
-export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', status = 'available', onClick, size = 'default', comparison, notConnectedLabel = 'Not connected' }: KpiCardProps) {
+export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', status = 'available', onClick, size = 'default', comparison, notConnectedLabel = 'Not connected', subtitleWrap = false }: KpiCardProps) {
   const isNotConnected = status === 'not-connected';
   const valueClass = size === 'compact' ? 'text-xl font-bold text-text-primary truncate' : 'text-3xl font-bold text-text-primary truncate';
 
@@ -52,7 +59,15 @@ export function KpiCard({ title, value, subtitle, accent = 'var(--v2-purple)', s
           <div className={valueClass} style={{ fontVariantNumeric: 'tabular-nums' }}>
             {value}
           </div>
-          {subtitle && <div className="text-xs text-text-secondary mt-2 truncate" title={subtitle}>{subtitle}</div>}
+          {subtitle && (
+            <div
+              className={subtitleWrap ? 'text-xs text-text-secondary mt-2' : 'text-xs text-text-secondary mt-2 truncate'}
+              style={subtitleWrap ? { whiteSpace: 'pre-line' } : undefined}
+              title={subtitle}
+            >
+              {subtitle}
+            </div>
+          )}
           {comparison && <ComparisonBadge comparison={comparison} />}
         </>
       )}

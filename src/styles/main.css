@@ -2131,3 +2131,16 @@ button.v2-leads-breakdown-row:hover .v2-leads-breakdown-label {
 .v2-commercial-panel .v2-kpi-card {
   background-color: var(--color-bg);
 }
+
+/* Coverage & Data Quality — same compact dot/status treatment as
+   DataFreshnessBar everywhere else, just with a little more breathing
+   room for readability. Scoped to this wrapper only, so every other
+   screen's freshness bar is unaffected. */
+.v2-perf-coverage .v2-freshness-bar {
+  gap: 18px 24px;
+  row-gap: 14px;
+}
+
+.v2-perf-coverage .v2-freshness-item {
+  line-height: 1.6;
+}

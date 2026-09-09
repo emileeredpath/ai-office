@@ -12,7 +12,6 @@ import {
   filterCampaignsByPeriod,
   filterCampaignsByDateRange,
   sumLeads,
-  sumEnquiries,
   MARKETING_LEADS_CAVEAT,
 } from '@/utils/campaignMetrics';
 import { sumKnownCampaignSpend } from '@/utils/campaignCosts';
@@ -156,7 +155,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     [periodCampaigns, campaignCosts, googleAdsPerformance]
   );
   const marketingSpend = marketingSpendInfo.total;
-  const enquiriesTotal = useMemo(() => sumEnquiries(periodCampaigns), [periodCampaigns]);
   const websiteUsers = useMemo(
     () => getWebsiteUsers(ga4Traffic, isGroupView, selectedEntity),
     [ga4Traffic, isGroupView, selectedEntity]
@@ -231,10 +229,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     );
   }, [ga4EnquiriesInfo, previousGa4Enquiries, previousRange, isGroupView, selectedEntity]);
 
-  const enquiriesComparison = useMemo(
-    () => compareToPrevious(enquiriesTotal, previousRange ? sumEnquiries(previousPeriodCampaigns) : null),
-    [enquiriesTotal, previousPeriodCampaigns, previousRange]
-  );
   const leadsComparison = useMemo(
     () => compareToPrevious(marketingLeads, previousRange ? sumLeads(previousPeriodCampaigns) : null),
     [marketingLeads, previousPeriodCampaigns, previousRange]
@@ -365,8 +359,16 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     scConfigured
       ? { label: 'Search Console', status: scHasErrors ? 'error' : 'live', detail: scHasErrors ? 'Sync error' : 'Live' }
       : { label: 'Search Console', status: 'not-connected', detail: 'Not connected' },
+    // "Connected" here means the Infinity integration itself is live —
+    // distinct from whether THIS entity has any real call data to show.
+    // Infinity's real data today is scoped to one hardcoded campaign (see
+    // src/utils/wave1.ts), so a connected integration can still show
+    // "Not connected" on an out-of-scope entity's Channel Performance
+    // tile below — that's a genuine data-availability gap, not a
+    // contradiction, and the "Wave 1 campaign only" suffix here makes
+    // that explicit rather than leaving the two readings unreconciled.
     infinityConfigured
-      ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
+      ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected — Wave 1 campaign only' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
     campaignMonitorStatus,
     googleAdsPerformance?.configured === true
@@ -398,8 +400,11 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
+  // Two short lines, never truncated (KpiCard's subtitleWrap) — the
+  // breakdown itself must always be readable without hovering; the legacy
+  // classification note only appears as a second line when it applies.
   const spendBreakdownSubtitle = `Fixed costs £${Math.round(marketingSpendInfo.fixedCosts).toLocaleString()} · Media £${Math.round(marketingSpendInfo.mediaSpend).toLocaleString()}${
-    marketingSpendInfo.hasLegacyFallback ? ' — includes legacy costs needing classification' : ''
+    marketingSpendInfo.hasLegacyFallback ? '\nIncludes legacy costs requiring classification' : ''
   }`;
 
   return (
@@ -424,6 +429,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               title="Marketing Spend"
               value={`£${Math.round(marketingSpend).toLocaleString()}`}
               subtitle={spendBreakdownSubtitle}
+              subtitleWrap
               onClick={() => onNavigate?.('campaigns')}
               comparison={spendComparison}
             />
@@ -442,35 +448,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               subtitle={websiteUsers.subtitle}
               comparison={websiteUsers.status === 'available' ? websiteUsersComparison : undefined}
             />
-          </div>
-        </section>
-
-        {/* B. Marketing Response — the fuller response picture, at lower
-            visual weight than the headline row above (compact cards, no
-            repeated comparison badges) so Website Users/GA4 Enquiries/
-            Marketing Leads aren't shown twice at equal prominence. GA4
-            Enquiries (verified website events) and manually-logged
-            Enquiries (a campaign result) are kept as two distinct cards,
-            never merged. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Marketing Response</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard
-              title="Website Users"
-              value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
-              status={websiteUsers.status}
-              subtitle={websiteUsers.subtitle}
-              size="compact"
-            />
-            <KpiCard
-              title="GA4 Enquiries"
-              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
-              status={ga4EnquiriesInfo.status}
-              subtitle="Verified website enquiry events"
-              size="compact"
-            />
-            <KpiCard title="Enquiries" value={enquiriesTotal} subtitle="Manually logged campaign result" comparison={enquiriesComparison} size="compact" />
-            <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" size="compact" />
           </div>
         </section>
 
@@ -604,7 +581,19 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             {callsSnapshot ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered — see Call Tracking`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (
-              <KpiCard title="Calls" status="not-connected" subtitle="Awaiting Infinity integration" onClick={() => onNavigate?.('infinity')} size="compact" />
+              // Infinity being globally "Connected" (Coverage & Data
+              // Quality below) doesn't mean this entity has real call
+              // data — Infinity's real data is scoped to one Wave 1
+              // campaign. Distinguish that from the integration itself
+              // genuinely not being set up, so the two states never read
+              // as contradictory.
+              <KpiCard
+                title="Calls"
+                status="not-connected"
+                subtitle={infinityConfigured ? 'No calls scoped to this entity — Wave 1 campaign only' : 'Awaiting Infinity integration'}
+                onClick={() => onNavigate?.('infinity')}
+                size="compact"
+              />
             )}
             {socialTraffic.status === 'available' ? (
               <KpiCard
@@ -623,7 +612,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         {/* G. Coverage / Data Quality — one compact strip for the whole
             page's source state, replacing the previously scattered
             per-section messaging. */}
-        <section className="v2-perf-section" style={{ marginBottom: 8 }}>
+        <section className="v2-perf-section v2-perf-coverage" style={{ marginBottom: 8 }}>
           <h2 className="v2-section-title">Coverage &amp; Data Quality</h2>
           <DataFreshnessBar entries={freshnessEntries} />
         </section>

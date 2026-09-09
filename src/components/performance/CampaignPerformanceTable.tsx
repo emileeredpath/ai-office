@@ -18,11 +18,17 @@ interface CampaignPerformanceTableProps {
 // A lighter, performance-focused campaign table — deliberately not a
 // reproduction of the Campaigns page's management table. Only the fields
 // that answer "which campaigns are driving this entity's performance":
-// real enquiries/leads/value-generated, plus genuine GA4/Infinity figures
-// where they actually exist (today, only the Wave 1 campaign). Spend is
-// the same canonical Known Campaign Spend (Fixed Costs + connected Media
-// Spend) shown on the Campaigns list and Campaign Detail — never raw
+// real enquiries/leads, plus genuine GA4/Infinity figures where they
+// actually exist (today, only the Wave 1 campaign). Spend is the same
+// canonical Known Campaign Spend (Fixed Costs + connected Media Spend)
+// shown on the Campaigns list and Campaign Detail — never raw
 // campaign.spend — so this table can never disagree with those screens.
+// "Logged Value" is campaign.valueGenerated — a manually-typed figure
+// from Edit Campaign, the same category as Marketing Leads/Enquiries.
+// There is no deterministic Acumatica-to-campaign attribution anywhere
+// in this app, so this column is never backed by (or implied to be) real
+// Acumatica revenue — see Overall Commercial Performance on Performance
+// for the genuine, campaign-independent Acumatica figures.
 export function CampaignPerformanceTable({ campaigns, wave1Performance, campaignCosts, googleAdsPerformance, showEntityColumn, onSelectCampaign }: CampaignPerformanceTableProps) {
   const withSpend = useMemo(
     () => campaigns.map((c) => ({ campaign: c, spendInfo: getCampaignKnownSpend(c, campaignCosts, googleAdsPerformance) })),
@@ -47,7 +53,7 @@ export function CampaignPerformanceTable({ campaigns, wave1Performance, campaign
             <th style={{ textAlign: 'right' }}>Enquiries</th>
             <th style={{ textAlign: 'right' }}>Marketing Leads</th>
             <th style={{ textAlign: 'right' }} title="Fixed costs + connected media spend">Spend</th>
-            <th style={{ textAlign: 'right' }}>Value Generated</th>
+            <th style={{ textAlign: 'right' }} title="Manually logged campaign value — not CRM-linked, not Acumatica revenue">Logged Value</th>
             <th style={{ textAlign: 'right' }}>GA4 / Calls</th>
           </tr>
         </thead>
