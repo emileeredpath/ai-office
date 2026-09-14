@@ -56,6 +56,9 @@ export function CommercialByEntityTable({ rows }: { rows: EntityCommercialRow[] 
           ))}
         </tbody>
       </table>
+      <p className="text-xs text-text-secondary mt-2">
+        Period filtering uses Opportunity Created On. Won Deals and Won Revenue therefore describe currently Won opportunities created in the selected period; they do not mean the deal was won, or the revenue was won, during that period.
+      </p>
     </div>
   );
 }
