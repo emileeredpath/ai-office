@@ -74,7 +74,7 @@ export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] 
                 {row.ga4Enquiries != null ? row.ga4Enquiries.toLocaleString() : <span className="v2-not-connected-text">Not available</span>}
               </td>
               <td style={{ textAlign: 'right' }}>{row.leads}</td>
-              <td style={{ textAlign: 'right' }} title={row.hasLegacySpendFallback ? 'Includes a campaign relying on legacy cost classification' : 'Fixed costs + connected media spend'}>
+              <td style={{ textAlign: 'right' }} title={row.hasLegacySpendFallback ? 'Includes a campaign relying on legacy cost classification' : 'Campaign-lifetime fixed costs + connected media spend'}>
                 £{Math.round(row.spend).toLocaleString()}
                 {row.hasLegacySpendFallback && (
                   <div className="text-xs" style={{ color: 'var(--v2-orange)', whiteSpace: 'nowrap' }}>
@@ -96,7 +96,7 @@ export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] 
         </tbody>
       </table>
       <p className="text-xs text-text-secondary mt-2">
-        Opportunities, Open Pipeline and Won Revenue are overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked.
+        Opportunities, Open Pipeline and Won Revenue are overall commercial performance from imported Acumatica opportunity data. Period filtering uses Opportunity Created On; Won Revenue is therefore revenue on currently Won opportunities created in the selected period, not revenue won during that period. Not attributed to Marketing unless explicitly linked.
       </p>
     </div>
   );
