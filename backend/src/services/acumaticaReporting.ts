@@ -91,8 +91,12 @@ function parseExportDate(raw: string | null): Date | null {
 }
 
 // Shared entity/period scoping — the ONE place that decides which real
-// imported opportunities are "in scope" for a given brand/date-range
-// selection, so getAcumaticaSummary and getAcumaticaBreakdowns (below) can
+// imported opportunities are "in scope" for a given brand/date-range.
+// Date ranges are based on Opportunity Created On because the export has no
+// trustworthy Won Date. Consequently period-scoped Won Deals/Won Revenue mean
+// "currently Won opportunities created in this period", never "won during
+// this period". UI consumers must label that distinction explicitly.
+// This selection is shared so getAcumaticaSummary and getAcumaticaBreakdowns (below) can
 // never disagree about what they're both summarising. Mirrors
 // getAcumaticaSummary's original inline logic exactly — no behaviour
 // change, just factored out so a second consumer doesn't re-derive it.

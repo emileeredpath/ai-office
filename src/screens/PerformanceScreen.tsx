@@ -13,9 +13,11 @@ import {
   filterCampaignsByDateRange,
   sumLeads,
   MARKETING_LEADS_CAVEAT,
+  campaignMatchesSelectedEntity,
+  filterCampaignsBySelectedEntity,
 } from '@/utils/campaignMetrics';
 import { sumKnownCampaignSpend } from '@/utils/campaignCosts';
-import { getCallsSnapshot } from '@/utils/channelSnapshot';
+import { resolveCallDateRange, getCallPerformance } from '@/utils/callPerformance';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
@@ -23,6 +25,7 @@ import { resolveEmailDateRange, getEmailPerformance } from '@/utils/emailPerform
 import { resolveSearchConsoleDateRange, getSearchConsoleSummary } from '@/utils/searchConsole';
 import { getPreviousPeriodRange, compareToPrevious } from '@/utils/periodComparison';
 import { fetchGa4Traffic, fetchGa4Enquiries, type Ga4TrafficResponse, type Ga4EnquiriesResponse } from '@/services/ga4Api';
+import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
 import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
 import type { BrandAcumaticaInfo } from '@/components/performance/PerformanceByBrandTable';
 
@@ -73,6 +76,7 @@ function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined): Bra
 export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const campaigns = useAppStore((s) => s.campaigns);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
+  const infinityCalls = useAppStore((s) => s.infinityCalls);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
@@ -82,6 +86,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const campaignCosts = useAppStore((s) => s.campaignCosts);
   const syncWave1Performance = useAppStore((s) => s.syncWave1Performance);
   const syncWave1Calls = useAppStore((s) => s.syncWave1Calls);
+  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const syncGa4Traffic = useAppStore((s) => s.syncGa4Traffic);
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
   const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
@@ -122,6 +127,23 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     syncGoogleAdsPerformance(googleAdsRange.startDate, googleAdsRange.endDate);
   }, [googleAdsRange.startDate, googleAdsRange.endDate, syncGoogleAdsPerformance]);
 
+  // Known Campaign Spend is campaign-lifetime. Fetch all-time media spend
+  // separately so the selected reporting period chooses campaigns, not a
+  // different spend value for the same campaign. Period-scoped Google Ads
+  // above remains the source for PPC performance.
+  const [knownSpendGoogleAds, setKnownSpendGoogleAds] = useState<GoogleAdsResponse | null>(null);
+  useEffect(() => {
+    const range = resolveGoogleAdsDateRange('all-time');
+    fetchGoogleAdsPerformance(range.startDate, range.endDate)
+      .then(setKnownSpendGoogleAds)
+      .catch(() => setKnownSpendGoogleAds(null));
+  }, []);
+
+  const callRange = useMemo(() => resolveCallDateRange(period), [period]);
+  useEffect(() => {
+    syncInfinityCalls(callRange.startDate, callRange.endDate);
+  }, [callRange.startDate, callRange.endDate, syncInfinityCalls]);
+
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
     syncEmailPerformance(emailRange.startDate, emailRange.endDate);
@@ -133,7 +155,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   }, [scRange.startDate, scRange.endDate, syncSearchConsolePerformance]);
 
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
+    () => filterCampaignsBySelectedEntity(campaigns, matchesSelectedEntity),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -151,8 +173,8 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // campaign still relies on its un-migrated campaign.spend value (no
   // structured campaign_costs row yet) rather than silently absorbing it.
   const marketingSpendInfo = useMemo(
-    () => sumKnownCampaignSpend(periodCampaigns, campaignCosts, googleAdsPerformance),
-    [periodCampaigns, campaignCosts, googleAdsPerformance]
+    () => sumKnownCampaignSpend(periodCampaigns, campaignCosts, knownSpendGoogleAds),
+    [periodCampaigns, campaignCosts, knownSpendGoogleAds]
   );
   const marketingSpend = marketingSpendInfo.total;
   const websiteUsers = useMemo(
@@ -233,14 +255,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     () => compareToPrevious(marketingLeads, previousRange ? sumLeads(previousPeriodCampaigns) : null),
     [marketingLeads, previousPeriodCampaigns, previousRange]
   );
-  const spendComparison = useMemo(
-    () =>
-      compareToPrevious(
-        marketingSpend,
-        previousRange ? sumKnownCampaignSpend(previousPeriodCampaigns, campaignCosts, googleAdsPerformance).total : null
-      ),
-    [marketingSpend, previousPeriodCampaigns, previousRange, campaignCosts, googleAdsPerformance]
-  );
 
   // ---- E. Overall Commercial Performance — Acumatica, not marketing-
   // attributed --------------------------------------------------------------
@@ -297,12 +311,12 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     return ENTITY_OPTIONS.filter((o) => o.value !== 'all').map((o) => {
       const brand = o.value as Brand;
       const brandCampaigns = filterCampaignsByPeriod(
-        campaigns.filter((c) => c.brand === brand),
+        campaigns.filter((c) => campaignMatchesSelectedEntity(c, (candidate) => candidate === brand)),
         periodStart
       );
       const brandWebsiteUsers = getWebsiteUsersForBrand(ga4Traffic, brand);
       const brandGa4Enquiries = getEnquiries(ga4Enquiries, false, brand);
-      const brandSpend = sumKnownCampaignSpend(brandCampaigns, campaignCosts, googleAdsPerformance);
+      const brandSpend = sumKnownCampaignSpend(brandCampaigns, campaignCosts, knownSpendGoogleAds);
       return {
         brand,
         label: o.label,
@@ -314,7 +328,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         acumatica: toBrandAcumaticaInfo(brandAcumaticaSummaries[brand]),
       };
     });
-  }, [campaigns, periodStart, ga4Traffic, ga4Enquiries, campaignCosts, googleAdsPerformance, brandAcumaticaSummaries]);
+  }, [campaigns, periodStart, ga4Traffic, ga4Enquiries, campaignCosts, knownSpendGoogleAds, brandAcumaticaSummaries]);
 
   // ---- F. Channel Performance — identical logic to Overview ---------------
   const emailPerf = useMemo(
@@ -322,8 +336,8 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     [emailPerformance, isGroupView, selectedEntity]
   );
   const callsSnapshot = useMemo(
-    () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
-    [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
+    () => getCallPerformance(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
   );
 
   // ---- G. Coverage / Data Quality ------------------------------------------
@@ -335,7 +349,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // for the whole page — no other section repeats this state messaging.
   const ga4Configured = ga4Traffic?.configured === true;
   const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
-  const infinityConfigured = wave1Performance?.infinityConfigured === true;
+  const infinityConfigured = infinityCalls?.configured === true;
   const scConfigured = searchConsolePerformance?.configured === true;
   const scHasErrors = (searchConsolePerformance?.errors?.length ?? 0) > 0;
 
@@ -368,7 +382,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     // contradiction, and the "Wave 1 campaign only" suffix here makes
     // that explicit rather than leaving the two readings unreconciled.
     infinityConfigured
-      ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected — Wave 1 campaign only' }
+      ? { label: 'Infinity (Calls)', status: (infinityCalls?.errors?.length ?? 0) > 0 ? 'error' : 'live', detail: (infinityCalls?.errors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
     campaignMonitorStatus,
     googleAdsPerformance?.configured === true
@@ -431,7 +445,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               subtitle={spendBreakdownSubtitle}
               subtitleWrap
               onClick={() => onNavigate?.('campaigns')}
-              comparison={spendComparison}
             />
             <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" comparison={leadsComparison} />
             <KpiCard
@@ -472,7 +485,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               campaigns={periodCampaigns}
               wave1Performance={wave1Performance}
               campaignCosts={campaignCosts}
-              googleAdsPerformance={googleAdsPerformance}
+              googleAdsPerformance={knownSpendGoogleAds}
               showEntityColumn={isGroupView}
               onSelectCampaign={(id) => selectCampaign(id, 'performance')}
             />
@@ -521,7 +534,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
-                      ? 'Manual Acumatica export'
+                      ? periodStart
+                        ? 'Won opportunities created in selected period — not revenue won during the period'
+                        : 'Latest Acumatica export — no reliable Won Date'
                       : 'No Acumatica export imported yet'
                 }
               />
@@ -578,7 +593,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             ) : (
               <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
             )}
-            {callsSnapshot ? (
+            {callsSnapshot.status === 'available' ? (
               <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered — see Call Tracking`} onClick={() => onNavigate?.('infinity')} size="compact" />
             ) : (
               // Infinity being globally "Connected" (Coverage & Data
@@ -590,7 +605,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               <KpiCard
                 title="Calls"
                 status="not-connected"
-                subtitle={infinityConfigured ? 'No calls scoped to this entity — Wave 1 campaign only' : 'Awaiting Infinity integration'}
+                subtitle={callsSnapshot.subtitle}
                 onClick={() => onNavigate?.('infinity')}
                 size="compact"
               />

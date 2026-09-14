@@ -11,7 +11,8 @@ import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMarketingEvents } from '@/utils/marketingEvents';
-import { filterCampaignsByPeriod, sumSpend } from '@/utils/campaignMetrics';
+import { filterCampaignsByPeriod, filterCampaignsBySelectedEntity } from '@/utils/campaignMetrics';
+import { getCampaignKnownSpend, sumKnownCampaignSpend } from '@/utils/campaignCosts';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
@@ -55,6 +56,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
+  const campaignCosts = useAppStore((s) => s.campaignCosts);
   const emailPerformance = useAppStore((s) => s.emailPerformance);
   const infinityCalls = useAppStore((s) => s.infinityCalls);
   const searchConsolePerformance = useAppStore((s) => s.searchConsolePerformance);
@@ -63,6 +65,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const syncGa4SocialTraffic = useAppStore((s) => s.syncGa4SocialTraffic);
   const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
   const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
+  const syncCampaignCosts = useAppStore((s) => s.syncCampaignCosts);
   const syncEmailPerformance = useAppStore((s) => s.syncEmailPerformance);
   const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const syncSearchConsolePerformance = useAppStore((s) => s.syncSearchConsolePerformance);
@@ -74,7 +77,8 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   useEffect(() => {
     syncFundingRecordsFromApi();
-  }, [syncFundingRecordsFromApi]);
+    syncCampaignCosts();
+  }, [syncFundingRecordsFromApi, syncCampaignCosts]);
 
   // ---- Live source fetches, all period-aware via the shared resolve*
   // utilities every other screen already uses — see REPORTING_PERIOD.md
@@ -94,6 +98,18 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   useEffect(() => {
     syncGoogleAdsPerformance(googleAdsRange.startDate, googleAdsRange.endDate);
   }, [googleAdsRange.startDate, googleAdsRange.endDate, syncGoogleAdsPerformance]);
+
+  // Known Campaign Spend is a campaign-lifetime figure. Keep a separate
+  // all-time Google Ads response for it so the same campaign has the same
+  // spend on Overview, Campaigns, Campaign Detail and Performance. The
+  // period-scoped store response above remains the source for PPC KPIs.
+  const [knownSpendGoogleAds, setKnownSpendGoogleAds] = useState<GoogleAdsResponse | null>(null);
+  useEffect(() => {
+    const range = resolveGoogleAdsDateRange('all-time');
+    fetchGoogleAdsPerformance(range.startDate, range.endDate)
+      .then(setKnownSpendGoogleAds)
+      .catch(() => setKnownSpendGoogleAds(null));
+  }, []);
 
   const emailRange = useMemo(() => resolveEmailDateRange(period), [period]);
   useEffect(() => {
@@ -127,7 +143,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   // ---- Entity-scoped base data -------------------------------------------
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
+    () => filterCampaignsBySelectedEntity(campaigns, matchesSelectedEntity),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const entityTasks = useMemo(
@@ -143,7 +159,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     () => filterCampaignsByPeriod(entityCampaigns, periodStart),
     [entityCampaigns, periodStart]
   );
-  const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
+  const marketingSpendInfo = useMemo(
+    () => sumKnownCampaignSpend(periodCampaigns, campaignCosts, knownSpendGoogleAds),
+    [periodCampaigns, campaignCosts, knownSpendGoogleAds]
+  );
 
   // ---- Marketing Performance KPIs ----------------------------------------
   const ga4EnquiriesInfo = useMemo(
@@ -346,6 +365,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         const progress = getCampaignProgressInfo(c.status, c.startDate, c.endDate);
         const emailResponse = getEmailPerformanceForCampaign(emailPerformance, c.id);
         const adsResponse = getGoogleAdsForCampaign(googleAdsPerformance, c);
+        const spendInfo = getCampaignKnownSpend(c, campaignCosts, knownSpendGoogleAds);
         let response: { label: string; onClick?: () => void } | null = null;
         if (emailResponse.status === 'available' && emailResponse.sends.length > 0) {
           const clicks = emailResponse.sends.reduce((sum, s) => sum + (s.clicks ?? 0), 0);
@@ -362,10 +382,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         if (progress.statusInconsistent) nextAction = 'Review & close campaign';
         else if (linkedOverdueTasks.length > 0) nextAction = `${linkedOverdueTasks.length} overdue task${linkedOverdueTasks.length === 1 ? '' : 's'}`;
 
-        return { campaign: c, progress, response, nextAction };
+        return { campaign: c, progress, response, nextAction, spendInfo };
       })
       .sort((a, b) => (a.progress.statusInconsistent === b.progress.statusInconsistent ? 0 : a.progress.statusInconsistent ? -1 : 1));
-  }, [entityCampaigns, entityTasks, emailPerformance, googleAdsPerformance, onNavigate]);
+  }, [entityCampaigns, entityTasks, emailPerformance, googleAdsPerformance, campaignCosts, knownSpendGoogleAds, onNavigate]);
 
   const today = new Date();
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -637,7 +657,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeCampaigns.map(({ campaign: c, progress, response, nextAction }) => (
+                  {activeCampaigns.map(({ campaign: c, progress, response, nextAction, spendInfo }) => (
                     <tr key={c.id} onClick={() => selectCampaign(c.id)} style={{ cursor: 'pointer' }}>
                       <td style={{ padding: '0.75rem 1rem' }}>
                         <div className="font-medium text-text-primary text-sm">{c.name}</div>
@@ -654,7 +674,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                         {response ? <span className="text-sm">{response.label}</span> : <span className="v2-not-connected-text">— / Not linked</span>}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                        <div className="text-sm">£{Math.round(c.spend || 0).toLocaleString()}<span className="text-xs text-text-secondary"> manual</span></div>
+                        <div className="text-sm" title={spendInfo.isLegacyFallback ? 'Includes legacy cost requiring classification' : 'Fixed costs + connected media spend'}>
+                          £{Math.round(spendInfo.knownCampaignSpend).toLocaleString()}
+                          {spendInfo.isLegacyFallback && <span className="text-xs text-text-secondary"> legacy cost</span>}
+                        </div>
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }}>
                         {nextAction ? <span className="text-sm" style={{ color: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}>{nextAction}</span> : <span className="v2-not-connected-text">—</span>}

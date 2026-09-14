@@ -135,7 +135,7 @@ const updateCampaignSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   budget: z.number().nullable().optional(),
-  actualSpend: z.number().optional().describe('Actual spend in £ — the field shown as "Actual spend (£)" on the campaign card. Overwritten automatically the next time a linked task\'s cost changes, so prefer setting task costs where possible.'),
+  actualSpend: z.number().optional().describe('Deprecated legacy campaign.spend field. MCP writes are rejected; use the authenticated Campaign Costs UI/API so spend remains classified.'),
   entities: z.array(z.enum(BRANDS)).optional(),
   colour: z.string().max(20).optional(),
   notes: z.string().max(10000).optional(),
@@ -609,6 +609,18 @@ function doUpdateCampaign(payload: unknown, source: ActionSource | undefined, re
     return { success: false, action: 'update_campaign', message: `No campaign found with id ${input.campaign_id}.` };
   }
 
+  // Structured Campaign Costs are the canonical spend model. Keep MCP
+  // least-privilege intact: do not expose campaign_costs through generic
+  // MCP access, and do not let this legacy field silently bypass cost
+  // classification by writing campaigns.spend.
+  if (input.actualSpend !== undefined) {
+    return {
+      success: false,
+      action: 'update_campaign',
+      message: 'actualSpend is no longer writable through MCP. Record classified spend through Campaign Costs in the authenticated dashboard/API.',
+    };
+  }
+
   if (!confirmed) {
     return {
       success: false,
@@ -625,7 +637,6 @@ function doUpdateCampaign(payload: unknown, source: ActionSource | undefined, re
   if (input.startDate !== undefined) updates.startDate = input.startDate;
   if (input.endDate !== undefined) updates.endDate = input.endDate;
   if (input.budget !== undefined) updates.budget = input.budget;
-  if (input.actualSpend !== undefined) updates.spend = input.actualSpend;
   if (input.entities !== undefined) updates.entities = input.entities;
   if (input.colour !== undefined) updates.colour = input.colour;
   if (input.notes !== undefined) updates.notes = input.notes;

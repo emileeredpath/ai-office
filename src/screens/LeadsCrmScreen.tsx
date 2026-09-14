@@ -9,7 +9,7 @@ import { DataFreshnessBar, type FreshnessEntry } from '@/components/common/DataF
 import { UnmatchedActivity } from '@/components/leads/UnmatchedActivity';
 import { AcumaticaBreakdownBars, AcumaticaBreakdownTable } from '@/components/leads/AcumaticaBreakdown';
 import { CommercialByEntityTable, type EntityCommercialRow } from '@/components/leads/CommercialByEntityTable';
-import { filterCampaignsByPeriod, sumLeads, sumEnquiries, MARKETING_LEADS_CAVEAT } from '@/utils/campaignMetrics';
+import { filterCampaignsByPeriod, filterCampaignsBySelectedEntity, sumLeads, sumEnquiries, MARKETING_LEADS_CAVEAT } from '@/utils/campaignMetrics';
 import { resolveEmailDateRange } from '@/utils/emailPerformance';
 import { resolveCallDateRange } from '@/utils/callPerformance';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
@@ -159,7 +159,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   // ---- A. Marketing Response ------------------------------------------
   const periodStart = useMemo(() => periodStartDate(period), [period]);
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
+    () => filterCampaignsBySelectedEntity(campaigns, matchesSelectedEntity),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const periodCampaigns = useMemo(
@@ -392,7 +392,9 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
-                      ? 'Manual Acumatica export'
+                      ? periodStart
+                        ? 'Won opportunities created in selected period — not revenue won during the period'
+                        : 'Latest Acumatica export — no reliable Won Date'
                       : 'No Acumatica export imported yet'
                 }
               />

@@ -19,12 +19,11 @@
 // Anything that cannot be established either way is Unmatched. There is no
 // third "probably this one" state — see DATA_INTEGRITY.md.
 //
-// What this file does NOT cover yet (see the Campaign Attribution phase
-// report for why): GA4 session/enquiry attribution needs new backend query
-// support (an exact sessionCampaignName match against a campaign's own
-// Tracking Link utmCampaign values) that hasn't shipped yet. Until that
-// lands, GA4 campaign-level figures stay "Not connected" on Campaign
-// Detail rather than guessing from date/volume alone.
+// GA4 campaign attribution is now supported separately through explicit
+// campaign.ga4CampaignNames[] exact matches against sessionCampaignName.
+// This file continues to own Google Ads and Infinity matching; it does not
+// invent per-enquiry identity or CRM attribution where no deterministic key
+// exists.
 import type { Campaign, Brand } from '@/types/index';
 import type { GoogleAdsResponse, GoogleAdsCampaignRow, GoogleAdsBrandPerformance } from '@/services/googleAdsApi';
 import type { InfinityCallsResponse } from '@/services/infinityCallsApi';
