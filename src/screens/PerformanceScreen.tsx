@@ -201,8 +201,10 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // ---- Previous-period comparisons ---------------------------------------
   // See src/utils/periodComparison.ts and REPORTING_PERIOD.md/
   // KPI_DEFINITIONS.md for exactly which KPIs can honestly support this and
-  // why (Website Users, GA4 Enquiries, Marketing Leads, Marketing Spend —
-  // the same real, bounded-window sources already used above). "All time"
+  // why (Website Users, GA4 Enquiries and Marketing Leads — the real,
+  // bounded-window sources used below). Known Campaign Spend is deliberately
+  // excluded: it is a campaign-lifetime figure, so comparing it as if it were
+  // spend incurred in two reporting periods would be misleading. "All time"
   // has no meaningful previous period (previousRange is null), so every
   // comparison below is null in that case — an honest "not available" via
   // KpiCard's comparison prop, never a fabricated 0%.
@@ -373,14 +375,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     scConfigured
       ? { label: 'Search Console', status: scHasErrors ? 'error' : 'live', detail: scHasErrors ? 'Sync error' : 'Live' }
       : { label: 'Search Console', status: 'not-connected', detail: 'Not connected' },
-    // "Connected" here means the Infinity integration itself is live —
-    // distinct from whether THIS entity has any real call data to show.
-    // Infinity's real data today is scoped to one hardcoded campaign (see
-    // src/utils/wave1.ts), so a connected integration can still show
-    // "Not connected" on an out-of-scope entity's Channel Performance
-    // tile below — that's a genuine data-availability gap, not a
-    // contradiction, and the "Wave 1 campaign only" suffix here makes
-    // that explicit rather than leaving the two readings unreconciled.
+    // Page-level Infinity coverage and Calls now use the modern,
+    // entity-aware Infinity integration. Wave 1 remains only for the
+    // explicitly labelled campaign-specific GA4/Calls column below.
     infinityConfigured
       ? { label: 'Infinity (Calls)', status: (infinityCalls?.errors?.length ?? 0) > 0 ? 'error' : 'live', detail: (infinityCalls?.errors?.length ?? 0) > 0 ? 'Sync error' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
@@ -417,7 +414,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // Two short lines, never truncated (KpiCard's subtitleWrap) — the
   // breakdown itself must always be readable without hovering; the legacy
   // classification note only appears as a second line when it applies.
-  const spendBreakdownSubtitle = `Fixed costs £${Math.round(marketingSpendInfo.fixedCosts).toLocaleString()} · Media £${Math.round(marketingSpendInfo.mediaSpend).toLocaleString()}${
+  const spendBreakdownSubtitle = `Campaign lifetime · Fixed costs £${Math.round(marketingSpendInfo.fixedCosts).toLocaleString()} · Media £${Math.round(marketingSpendInfo.mediaSpend).toLocaleString()}${
     marketingSpendInfo.hasLegacyFallback ? '\nIncludes legacy costs requiring classification' : ''
   }`;
 
@@ -440,7 +437,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
           <h2 className="v2-section-title">Marketing Performance</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
-              title="Marketing Spend"
+              title="Known Campaign Spend"
               value={`£${Math.round(marketingSpend).toLocaleString()}`}
               subtitle={spendBreakdownSubtitle}
               subtitleWrap

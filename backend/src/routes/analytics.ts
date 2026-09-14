@@ -261,8 +261,8 @@ router.get('/acumatica', (req: Request, res: Response) => {
 // Class, Product Focus, Sales-reported Source, Entity) — same manual
 // Acumatica data and the same startDate/endDate/brand scoping contract as
 // /acumatica above, via the shared scopeOpportunities() helper. Reporting
-// support only; Leads & CRM does not yet render this (see the Leads & CRM
-// Data + Privacy Foundation phase report).
+// support consumed by Leads & CRM's Pipeline & Opportunity Analysis.
+// Stage remains display-only and never changes Status-based classification.
 router.get('/acumatica-breakdown', (req: Request, res: Response) => {
   const rawStart = req.query.startDate as string | undefined;
   const rawEnd = req.query.endDate as string | undefined;
