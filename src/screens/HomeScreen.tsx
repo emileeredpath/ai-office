@@ -1,3 +1,6 @@
+import { getCampaignKnownSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
+import { fetchCampaignCostsFromApi } from '@/services/campaignCostsApi';
+import type { CampaignCost } from '@/types/index';
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
@@ -12,7 +15,7 @@ import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMarketingEvents } from '@/utils/marketingEvents';
-import { filterCampaignsByPeriod, sumSpend } from '@/utils/campaignMetrics';
+import { filterCampaignsByPeriod } from '@/utils/campaignMetrics';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
@@ -144,7 +147,21 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     () => filterCampaignsByPeriod(entityCampaigns, periodStart),
     [entityCampaigns, periodStart]
   );
-  const marketingSpend = useMemo(() => sumSpend(periodCampaigns), [periodCampaigns]);
+  // Campaign rows use lifetime costs and the existing all-time media range.
+  // Keep these reads separate from the period-scoped Google Ads headline.
+  const [homeCampaignCosts, setHomeCampaignCosts] = useState<CampaignCost[] | null>(null);
+  const [campaignSpendAds, setCampaignSpendAds] = useState<GoogleAdsResponse | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCampaignCostsFromApi()
+      .then((costs) => { if (!cancelled) setHomeCampaignCosts(costs); })
+      .catch(() => { if (!cancelled) setHomeCampaignCosts(null); });
+    const range = resolveGoogleAdsDateRange('all-time');
+    fetchGoogleAdsPerformance(range.startDate, range.endDate)
+      .then((data) => { if (!cancelled) setCampaignSpendAds(data); })
+      .catch(() => { if (!cancelled) setCampaignSpendAds(null); });
+    return () => { cancelled = true; };
+  }, []);
 
   // ---- Marketing Performance KPIs ----------------------------------------
   const ga4EnquiriesInfo = useMemo(
@@ -363,10 +380,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         if (progress.statusInconsistent) nextAction = 'Review & close campaign';
         else if (linkedOverdueTasks.length > 0) nextAction = `${linkedOverdueTasks.length} overdue task${linkedOverdueTasks.length === 1 ? '' : 's'}`;
 
-        return { campaign: c, progress, response, nextAction };
+        return { campaign: c, progress, response, nextAction, spendInfo: homeCampaignCosts === null ? null : getCampaignKnownSpend(c, homeCampaignCosts, campaignSpendAds) };
       })
       .sort((a, b) => (a.progress.statusInconsistent === b.progress.statusInconsistent ? 0 : a.progress.statusInconsistent ? -1 : 1));
-  }, [entityCampaigns, entityTasks, emailPerformance, googleAdsPerformance, onNavigate]);
+  }, [entityCampaigns, entityTasks, emailPerformance, googleAdsPerformance, homeCampaignCosts, campaignSpendAds, onNavigate]);
 
   const today = new Date();
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -633,12 +650,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                     <th style={{ padding: '0.75rem 1rem' }}>Campaign</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Response (this period)</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Spend</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Known Campaign Spend</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Next Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {activeCampaigns.map(({ campaign: c, progress, response, nextAction }) => (
+                  {activeCampaigns.map(({ campaign: c, progress, response, nextAction, spendInfo }) => (
                     <tr key={c.id} onClick={() => selectCampaign(c.id)} style={{ cursor: 'pointer' }}>
                       <td style={{ padding: '0.75rem 1rem' }}>
                         <div className="font-medium text-text-primary text-sm">{c.name}</div>
@@ -655,7 +672,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                         {response ? <span className="text-sm">{response.label}</span> : <span className="v2-not-connected-text">— / Not linked</span>}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                        <div className="text-sm">£{Math.round(c.spend || 0).toLocaleString()}<span className="text-xs text-text-secondary"> manual</span></div>
+                        {spendInfo ? (
+                          <>
+                            <div className="text-sm">£{Math.round(spendInfo.knownCampaignSpend).toLocaleString()}</div>
+                            <div className="text-xs text-text-secondary">Lifetime fixed costs + available mapped media</div>
+                            {spendInfo.isLegacyFallback && <div className="text-xs text-text-secondary">{LEGACY_COST_LABEL}</div>}
+                            {spendInfo.mediaSpendStatus !== 'available' && <div className="text-xs text-text-secondary">Media: {spendInfo.mediaSpendStatus === 'unmapped' ? 'Unmapped' : 'Not connected'}</div>}
+                          </>
+                        ) : <span className="v2-not-connected-text">Costs unavailable</span>}
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }}>
                         {nextAction ? <span className="text-sm" style={{ color: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}>{nextAction}</span> : <span className="v2-not-connected-text">—</span>}
