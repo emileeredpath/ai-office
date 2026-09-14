@@ -1,4 +1,5 @@
 import { Brand, Campaign, FundingRecord, Task } from '@/types/index';
+import { campaignMatchesSelectedEntity } from '@/utils/campaignMetrics';
 
 // Genuine dated marketing activity, computed once and shared by Overview's
 // "Coming Up" and the Content & Calendar page — no invented data, just a
@@ -88,14 +89,10 @@ export function getMarketingEvents({
   }
 
   for (const c of campaigns) {
-    // A campaign's real entity list is entities[] when set, falling back to
-    // its single brand only when entities[] is empty — same convention
-    // CampaignDetailScreen already uses. Checking c.brand alone here missed
-    // multi-entity campaigns (e.g. Q3 Education: brand 'mtech', entities
-    // spanning Brentwood/Radio Links/Capcom/IRCL) whenever any entity other
-    // than the primary brand was selected.
-    const campaignEntities = c.entities && c.entities.length > 0 ? c.entities : [c.brand];
-    if (!campaignEntities.some((entity) => matchesSelectedEntity(entity))) continue;
+    // Campaign membership uses the same central entities[]-first rule as
+    // Overview, Performance, Leads & CRM and Campaigns. This keeps calendar
+    // milestones/markers consistent with every campaign aggregate/filter.
+    if (!campaignMatchesSelectedEntity(c, matchesSelectedEntity)) continue;
 
     for (const s of c.schedule || []) {
       if (!s.date) continue;
