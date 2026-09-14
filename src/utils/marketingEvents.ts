@@ -1,3 +1,4 @@
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { Brand, Campaign, FundingRecord, Task } from '@/types/index';
 
 // Genuine dated marketing activity, computed once and shared by Overview's
@@ -94,7 +95,7 @@ export function getMarketingEvents({
     // multi-entity campaigns (e.g. Q3 Education: brand 'mtech', entities
     // spanning Brentwood/Radio Links/Capcom/IRCL) whenever any entity other
     // than the primary brand was selected.
-    const campaignEntities = c.entities && c.entities.length > 0 ? c.entities : [c.brand];
+    const campaignEntities = getCampaignEntities(c);
     if (!campaignEntities.some((entity) => matchesSelectedEntity(entity))) continue;
 
     for (const s of c.schedule || []) {

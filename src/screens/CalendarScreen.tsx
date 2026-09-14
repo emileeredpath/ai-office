@@ -1,3 +1,4 @@
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -152,7 +153,7 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
   // whenever a non-primary entity was selected. Feeds both the campaign
   // filter dropdown and the "active campaigns" badge row below.
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => (c.entities && c.entities.length > 0 ? c.entities : [c.brand]).some((entity) => matchesSelectedEntity(entity))),
+    () => campaigns.filter((c) => getCampaignEntities(c).some(matchesSelectedEntity)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
 

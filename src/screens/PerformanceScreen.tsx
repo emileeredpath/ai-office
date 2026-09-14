@@ -1,3 +1,4 @@
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
@@ -133,7 +134,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   }, [scRange.startDate, scRange.endDate, syncSearchConsolePerformance]);
 
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
+    () => campaigns.filter((c) => getCampaignEntities(c).some(matchesSelectedEntity)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -297,7 +298,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     return ENTITY_OPTIONS.filter((o) => o.value !== 'all').map((o) => {
       const brand = o.value as Brand;
       const brandCampaigns = filterCampaignsByPeriod(
-        campaigns.filter((c) => c.brand === brand),
+        campaigns.filter((c) => getCampaignEntities(c).includes(brand)),
         periodStart
       );
       const brandWebsiteUsers = getWebsiteUsersForBrand(ga4Traffic, brand);

@@ -1,3 +1,4 @@
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -127,7 +128,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
 
   // ---- Entity-scoped base data -------------------------------------------
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
+    () => campaigns.filter((c) => getCampaignEntities(c).some(matchesSelectedEntity)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const entityTasks = useMemo(

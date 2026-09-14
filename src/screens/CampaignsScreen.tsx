@@ -1,3 +1,4 @@
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
@@ -81,15 +82,13 @@ export function CampaignsScreen() {
     return Array.from(vendors).sort();
   };
 
-  const campaignEntities = (c: Campaign): Brand[] => (c.entities && c.entities.length > 0 ? c.entities : [c.brand]);
-
   const periodStart = useMemo(() => periodStartDate(period), [period]);
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       // Respect the global entity selector (top bar) instead of a second,
       // possibly-conflicting brand filter on this page.
-      if (!isGroupView && !campaignEntities(c).includes(selectedEntity as Brand)) return false;
+      if (!isGroupView && !getCampaignEntities(c).includes(selectedEntity as Brand)) return false;
       if (filterStatus !== 'all' && c.status !== filterStatus) return false;
       if (filterIndustry !== 'all' && c.primaryIndustry !== filterIndustry && c.secondaryIndustry !== filterIndustry && c.industry !== filterIndustry) return false;
       if (filterVendor !== 'all' && c.vendor !== filterVendor) return false;

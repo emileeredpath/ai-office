@@ -1,3 +1,4 @@
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -159,7 +160,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   // ---- A. Marketing Response ------------------------------------------
   const periodStart = useMemo(() => periodStartDate(period), [period]);
   const entityCampaigns = useMemo(
-    () => campaigns.filter((c) => matchesSelectedEntity(c.brand)),
+    () => campaigns.filter((c) => getCampaignEntities(c).some(matchesSelectedEntity)),
     [campaigns, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const periodCampaigns = useMemo(
