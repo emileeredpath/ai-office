@@ -1,4 +1,28 @@
-import { Campaign } from '@/types/index';
+import { Campaign, Brand } from '@/types/index';
+
+// Campaign entity membership is defined once here for every screen that
+// filters Campaign records. `entities[]` is authoritative when populated;
+// the campaign's primary `brand` is the backward-compatible fallback only
+// when no entity list exists. This keeps multi-entity campaigns visible in
+// exactly the same selections on Overview, Performance, Leads & CRM,
+// Campaigns, and Content & Calendar.
+export function getCampaignEntities(campaign: Pick<Campaign, 'brand' | 'entities'>): Brand[] {
+  return campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
+}
+
+export function campaignMatchesSelectedEntity(
+  campaign: Pick<Campaign, 'brand' | 'entities'>,
+  matchesSelectedEntity: (brand: Brand | null | undefined) => boolean
+): boolean {
+  return getCampaignEntities(campaign).some((brand) => matchesSelectedEntity(brand));
+}
+
+export function filterCampaignsBySelectedEntity(
+  campaigns: Campaign[],
+  matchesSelectedEntity: (brand: Brand | null | undefined) => boolean
+): Campaign[] {
+  return campaigns.filter((campaign) => campaignMatchesSelectedEntity(campaign, matchesSelectedEntity));
+}
 
 // Shared campaign aggregation used by Overview and Performance so the two
 // pages can never disagree on what "this period, this entity" totals to.
@@ -31,6 +55,10 @@ export function sumLeads(campaigns: Campaign[]): number {
 // sites should use these constants rather than adding a fourth variant.
 export const MARKETING_LEADS_CAVEAT = 'Manually logged, not yet CRM-linked';
 
+// Legacy-only helper. New/updated spend surfaces must use
+// src/utils/campaignCosts.ts's Known Campaign Spend calculation instead.
+// Retained only for callers that intentionally need the raw historic
+// campaigns.spend field while remaining legacy records are classified.
 export function sumSpend(campaigns: Campaign[]): number {
   return campaigns.reduce((sum, c) => sum + (c.spend || 0), 0);
 }
