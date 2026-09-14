@@ -389,11 +389,12 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
                 value={acumaticaHasData ? `£${Math.round(acumaticaSummary!.wonRevenue).toLocaleString()}` : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
                 notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                subtitleWrap
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
-                      ? 'Manual Acumatica export'
+                      ? (period === 'all-time' ? 'Current Status = Won — latest imported data' : 'Current Status = Won; Created On within the selected period')
                       : 'No Acumatica export imported yet'
                 }
               />
@@ -412,7 +413,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               />
             </div>
             <p className="v2-perf-section-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
-              Overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked.
+              Overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked. When a period is selected, Won Revenue sums Total for opportunities created within that period whose current Status is Won. It does not measure revenue that became Won during the period.
             </p>
           </div>
 

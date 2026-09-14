@@ -34,3 +34,11 @@ Explicitly excluded from comparison, with reasons:
 The isolated local seed database inspected for this change has zero structured rows and four campaigns with positive legacy spend. This does not establish hosted preview or production coverage; neither live database was inspected. Reliable period attribution cannot be established, so the numerical calculation is deliberately unchanged.
 
 Campaign Detail and the Campaigns table continue using lifetime fixed costs plus mapped media returned by the existing all-time query. Overview's active campaign rows use the same scope. Performance retains its existing selected campaign set, lifetime fixed costs and reporting-period mapped media, explicitly labelled as mixed scope. Per-entity campaign spend can overlap for multi-entity campaigns; entity rows must not be added together to reconstruct the group total.
+
+## Phase 1 Acumatica Won Revenue semantics
+
+The persisted/imported date fields are `created_on` / `createdOn` and `estimated_close_date` / `estimatedCloseDate`, plus import/audit timestamps. No canonical Won Date or Closed Date is stored. The importer accepts the header `close date` as an alias for **estimated** close date; that alias is not evidence of an actual won date. No live export coverage was claimed or inferred.
+
+Performance and Leads & CRM retain the existing definition: when start and end dates are supplied, sum `Total` for opportunities whose `Created On` is in the inclusive selected range and whose current imported `Status` is Won. This is not revenue that became Won during that period. With All time selected, there is no Created On filter. Overview continues to use the latest full import without period filtering.
+
+All numerical calculations, Status classification, Open + New pipeline, Stage handling, entity availability and Sales-reported Source remain unchanged.

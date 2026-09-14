@@ -56,6 +56,9 @@ export function CommercialByEntityTable({ rows }: { rows: EntityCommercialRow[] 
           ))}
         </tbody>
       </table>
+      <p className="text-xs text-text-secondary mt-2">
+        Period filters use Created On. Won Revenue sums Total for currently Won opportunities created in that period, not revenue won during it.
+      </p>
     </div>
   );
 }

@@ -96,7 +96,7 @@ export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] 
         </tbody>
       </table>
       <p className="text-xs text-text-secondary mt-2">
-        Opportunities, Open Pipeline and Won Revenue are overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked.
+        Opportunities, Open Pipeline and Won Revenue are overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked. Period filters use Created On; Won Revenue is Total for currently Won opportunities created in that period, not revenue won during it.
       </p>
     </div>
   );
