@@ -55,7 +55,7 @@ export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] 
             <th style={{ textAlign: 'right' }}>Website Users</th>
             <th style={{ textAlign: 'right' }}>GA4 Enquiries</th>
             <th style={{ textAlign: 'right' }}>Marketing Leads</th>
-            <th style={{ textAlign: 'right' }}>Marketing Spend</th>
+            <th style={{ textAlign: 'right' }}>Known Campaign Spend</th>
             <th style={{ textAlign: 'right' }}>Opportunities</th>
             <th style={{ textAlign: 'right' }}>Open Pipeline</th>
             <th style={{ textAlign: 'right' }}>Won Revenue</th>

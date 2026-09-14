@@ -17,11 +17,20 @@ This document records, per data source, whether the global reporting-period sele
 
 ## Implication for previous-period comparisons
 
-Only sources with a genuine, bounded `[start, end]` window and no severe silent-gap risk can honestly support a previous-period comparison today: **Website Users (GA4), GA4 Enquiries, plain Enquiries, Marketing Leads, Marketing Spend, Google Ads spend/clicks/conversions**. See `KPI_DEFINITIONS.md` for exactly which KPIs these back, and `src/utils/periodComparison.ts` for the shared comparison utility built from this audit.
+Only sources with a genuine, bounded `[start, end]` window and no severe silent-gap risk can honestly support a previous-period comparison today: **Website Users (GA4), GA4 Enquiries, plain Enquiries, Marketing Leads, Google Ads spend/clicks/conversions**. See `KPI_DEFINITIONS.md` for exactly which KPIs these back, and `src/utils/periodComparison.ts` for the shared comparison utility built from this audit.
 
 Explicitly excluded from comparison, with reasons:
+- **Known Campaign Spend** — Performance retains lifetime fixed costs for the selected campaign set plus available mapped media for the selected API period. Its totals are unchanged, but this mixed scope is not spend incurred during that period and must not be compared as such.
 - **Funding** — not period-scoped at all (see above).
 - **Qualified Leads** — no underlying data exists yet.
 - **Opportunities / Open Pipeline / Won Deals / Won Revenue** — CONFIRMED (Dashboard Completion Phase 2, Overview redesign): the Acumatica manual export has `Created On` and `Estimated Close Date` but no trustworthy Won Date. Filtering by `Created On` (the only date `getAcumaticaSummary` can filter by) would silently misrepresent "revenue already marked Won among opportunities created in this period" as "revenue won during this period" — a different, dishonest claim. These figures are therefore never period-scoped or period-compared on Overview: they always reflect the latest full manual import, labelled "Latest Acumatica export" with its import date shown. Leads & CRM makes a different, narrower choice (filtering by `Created On` for its own KPI cards) — that is a pre-existing, separately-reviewed decision on that screen, not touched here.
 - **ROI** — technically computable, but built entirely from one uncaveated manual figure (`valueGenerated`) with no real commercial data behind it; comparing two unverifiable numbers period-over-period would look precise while being no more reliable than the single-period figure already is.
 - **Infinity calls, for a period/entity combination near or above 1000 raw calls** — the pagination cap above means a comparison could silently compare a truncated period against a complete one. Not disabled outright (current volumes are well under 1000), but flagged for anyone extending this to a busier account.
+
+## Phase 1 campaign cost date audit
+
+`campaign_costs.cost_date` is NOT NULL, with no database default. The REST API requires a non-empty string but does not establish a genuine transaction date. `restoreEducationStructuredCost()` sets the restored £1,791 cost date to `REAL_EDUCATION_CORE.endDate`; this is a campaign boundary, not independently verified cost-date evidence. Legacy `campaign.spend` has no cost date. No dates have been migrated or manufactured in this clean-up.
+
+The isolated local seed database inspected for this change has zero structured rows and four campaigns with positive legacy spend. This does not establish hosted preview or production coverage; neither live database was inspected. Reliable period attribution cannot be established, so the numerical calculation is deliberately unchanged.
+
+Campaign Detail and the Campaigns table continue using lifetime fixed costs plus mapped media returned by the existing all-time query. Overview's active campaign rows use the same scope. Performance retains its existing selected campaign set, lifetime fixed costs and reporting-period mapped media, explicitly labelled as mixed scope. Per-entity campaign spend can overlap for multi-entity campaigns; entity rows must not be added together to reconstruct the group total.

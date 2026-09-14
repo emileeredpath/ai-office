@@ -234,15 +234,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     () => compareToPrevious(marketingLeads, previousRange ? sumLeads(previousPeriodCampaigns) : null),
     [marketingLeads, previousPeriodCampaigns, previousRange]
   );
-  const spendComparison = useMemo(
-    () =>
-      compareToPrevious(
-        marketingSpend,
-        previousRange ? sumKnownCampaignSpend(previousPeriodCampaigns, campaignCosts, googleAdsPerformance).total : null
-      ),
-    [marketingSpend, previousPeriodCampaigns, previousRange, campaignCosts, googleAdsPerformance]
-  );
-
   // ---- E. Overall Commercial Performance — Acumatica, not marketing-
   // attributed --------------------------------------------------------------
   // Reuses the exact same fetchAcumaticaSummary() API and period/brand
@@ -404,7 +395,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // Two short lines, never truncated (KpiCard's subtitleWrap) — the
   // breakdown itself must always be readable without hovering; the legacy
   // classification note only appears as a second line when it applies.
-  const spendBreakdownSubtitle = `Fixed costs £${Math.round(marketingSpendInfo.fixedCosts).toLocaleString()} · Media £${Math.round(marketingSpendInfo.mediaSpend).toLocaleString()}${
+  const spendBreakdownSubtitle = `Lifetime fixed costs £${Math.round(marketingSpendInfo.fixedCosts).toLocaleString()} · Available mapped media £${Math.round(marketingSpendInfo.mediaSpend).toLocaleString()}${
     marketingSpendInfo.hasLegacyFallback ? '\nIncludes legacy costs requiring classification' : ''
   }`;
 
@@ -425,14 +416,17 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             top-line response/change-vs-previous-period summary. */}
         <section className="v2-perf-section">
           <h2 className="v2-section-title">Marketing Performance</h2>
+          <p className="v2-perf-section-subtitle">
+            Spend across this page combines lifetime fixed costs for the selected campaigns with available mapped media in the reporting period.
+            This is not spend incurred within the period. Unmapped or unavailable media is excluded; period spend comparisons are unavailable.
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
-              title="Marketing Spend"
+              title="Known Campaign Spend"
               value={`£${Math.round(marketingSpend).toLocaleString()}`}
               subtitle={spendBreakdownSubtitle}
               subtitleWrap
               onClick={() => onNavigate?.('campaigns')}
-              comparison={spendComparison}
             />
             <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" comparison={leadsComparison} />
             <KpiCard

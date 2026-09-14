@@ -52,7 +52,7 @@ export function CampaignPerformanceTable({ campaigns, wave1Performance, campaign
             {showEntityColumn && <th>Entity</th>}
             <th style={{ textAlign: 'right' }}>Enquiries</th>
             <th style={{ textAlign: 'right' }}>Marketing Leads</th>
-            <th style={{ textAlign: 'right' }} title="Fixed costs + connected media spend">Spend</th>
+            <th style={{ textAlign: 'right' }} title="Lifetime fixed costs + available mapped media in the reporting period">Known Spend</th>
             <th style={{ textAlign: 'right' }} title="Manually logged campaign value — not CRM-linked, not Acumatica revenue">Logged Value</th>
             <th style={{ textAlign: 'right' }}>GA4 / Calls</th>
           </tr>
