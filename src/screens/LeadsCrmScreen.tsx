@@ -22,6 +22,7 @@ import {
   SPEND_WITHOUT_CAMPAIGN_GAP,
 } from '@/utils/attributionHealth';
 import { getUnmatchedGoogleAdsCampaigns, getUnmatchedGa4Campaigns } from '@/utils/campaignAttribution';
+import { filterUnmatchedGoogleAdsByEntity, prioritiseUnmatchedGoogleAds } from '@/utils/unmatchedGoogleAds';
 import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
 import { fetchGa4CampaignNamesInUse } from '@/services/ga4Api';
 import { fetchAcumaticaSummary, fetchAcumaticaBreakdowns, type AcumaticaSummary, type AcumaticaBreakdowns } from '@/services/acumaticaApi';
@@ -90,8 +91,15 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   // this period whose ID isn't mapped to any AI Office campaign. See
   // getUnmatchedGoogleAdsCampaigns's doc comment.
   const unmatchedGoogleAdsCampaigns = useMemo(
-    () => getUnmatchedGoogleAdsCampaigns(googleAdsPerformance, campaigns),
-    [googleAdsPerformance, campaigns]
+    () => filterUnmatchedGoogleAdsByEntity(
+      getUnmatchedGoogleAdsCampaigns(googleAdsPerformance, campaigns),
+      matchesSelectedEntity
+    ),
+    [googleAdsPerformance, campaigns, matchesSelectedEntity]
+  );
+  const unmatchedGoogleAdsPriority = useMemo(
+    () => prioritiseUnmatchedGoogleAds(unmatchedGoogleAdsCampaigns),
+    [unmatchedGoogleAdsCampaigns]
   );
   const googleAdsGap = useMemo(() => {
     if (!googleAdsPerformance || !googleAdsPerformance.configured) {
@@ -100,9 +108,11 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
     return {
       status: 'available' as const,
       count: unmatchedGoogleAdsCampaigns.length,
-      subtitle: unmatchedGoogleAdsCampaigns.length > 0 ? 'Real Google Ads campaigns with no AI Office campaign mapped' : 'Every Google Ads campaign this period is mapped',
+      subtitle: unmatchedGoogleAdsCampaigns.length > 0
+        ? `${unmatchedGoogleAdsPriority.withSpend.length} with spend in this period · ${unmatchedGoogleAdsPriority.zeroSpend.length} zero-spend history`
+        : 'Every Google Ads campaign this period is mapped',
     };
-  }, [googleAdsPerformance, unmatchedGoogleAdsCampaigns]);
+  }, [googleAdsPerformance, unmatchedGoogleAdsCampaigns, unmatchedGoogleAdsPriority]);
 
   // Manual Google Ads -> AI Office campaign mapping — additive only:
   // appends this real Google Ads campaign ID to the chosen campaign's own

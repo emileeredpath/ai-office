@@ -5,6 +5,9 @@ import type { AttributionGap } from '@/utils/attributionHealth';
 import type { UnmatchedGoogleAdsCampaign } from '@/utils/campaignAttribution';
 import type { Campaign } from '@/types/index';
 import { BRAND_LABEL } from '@/utils/brandColors';
+import { prioritiseUnmatchedGoogleAds, searchUnmatchedGoogleAds } from '@/utils/unmatchedGoogleAds';
+
+const INITIAL_UNMATCHED_ROWS = 20;
 
 // Genuine, computed Unmatched Activity — distinct from the CRM-shaped
 // Attribution Health tiles above it (those are Acumatica-pending stubs;
@@ -106,6 +109,15 @@ export function UnmatchedActivity({
   const spendTile = gapValue(spendGap);
 
   const canMapGoogleAds = isEditor && campaigns && onMapGoogleAdsCampaign;
+  const [adsSearch, setAdsSearch] = useState('');
+  const [showZeroSpend, setShowZeroSpend] = useState(false);
+  const [visibleAdsRows, setVisibleAdsRows] = useState(INITIAL_UNMATCHED_ROWS);
+  const prioritisedAds = prioritiseUnmatchedGoogleAds(unmatchedGoogleAdsCampaigns ?? []);
+  const adsRows = searchUnmatchedGoogleAds(
+    showZeroSpend ? [...prioritisedAds.withSpend, ...prioritisedAds.zeroSpend] : prioritisedAds.withSpend,
+    adsSearch
+  );
+  const displayedAdsRows = adsRows.slice(0, visibleAdsRows);
 
   return (
     <div>
@@ -114,7 +126,7 @@ export function UnmatchedActivity({
         <KpiCard title="Unclassified calls" value={callsTile.value} status={callsTile.status} subtitle={unclassifiedCalls.subtitle} size="compact" />
         <KpiCard title="Unmapped Ads campaigns" value={adsTile.value} status={adsTile.status} subtitle={googleAdsGap.subtitle} size="compact" />
         <KpiCard title="GA4 campaigns unlinked" value={ga4Tile.value} status={ga4Tile.status} subtitle={ga4EnquiryGap.subtitle} size="compact" />
-        <KpiCard title="Spend, no campaign" value={spendTile.value} status={spendTile.status} subtitle={spendGap.subtitle} size="compact" />
+        <KpiCard title="Unattached logged spend" value={spendTile.value} status={spendTile.status} subtitle={spendGap.subtitle} size="compact" />
         <KpiCard title="No activity" value={campaignsWithNoActivity.length} status="available" subtitle="No linked sends/calls and every logged figure is zero" size="compact" />
       </div>
 
@@ -123,33 +135,81 @@ export function UnmatchedActivity({
           <div className="px-4 pt-4">
             <h4 className="text-sm font-semibold text-text-primary">Unmapped Google Ads campaigns</h4>
             <p className="text-xs text-text-secondary mb-2">
-              Real Google Ads campaigns with no AI Office campaign mapped this period.
+              Prioritised by spend for the selected entity and reporting period.
               {canMapGoogleAds ? ' Map one below — this stores the real Google Ads campaign ID and never overwrites an existing mapping.' : ''}
             </p>
-          </div>
-          <table className="table w-full text-sm">
-            <thead>
-              <tr>
-                <th>Google Ads Campaign</th>
-                <th>Entity</th>
-                <th style={{ textAlign: 'right' }}>Spend</th>
-                {canMapGoogleAds && <th>Map to campaign</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {unmatchedGoogleAdsCampaigns.map((row) =>
-                canMapGoogleAds ? (
-                  <GoogleAdsMappingRow key={row.campaignId} row={row} campaigns={campaigns!} onMap={onMapGoogleAdsCampaign!} />
-                ) : (
-                  <tr key={row.campaignId}>
-                    <td className="text-text-primary">{row.campaignName}</td>
-                    <td className="text-text-secondary">{BRAND_LABEL[row.brand] ?? row.brand}</td>
-                    <td style={{ textAlign: 'right' }}>£{row.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</td>
-                  </tr>
-                )
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <input
+                className="input text-sm"
+                style={{ maxWidth: 360 }}
+                type="search"
+                aria-label="Search unmapped Google Ads campaigns"
+                placeholder="Search campaign names"
+                value={adsSearch}
+                onChange={(event) => {
+                  setAdsSearch(event.target.value);
+                  setVisibleAdsRows(INITIAL_UNMATCHED_ROWS);
+                }}
+              />
+              {prioritisedAds.zeroSpend.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary text-sm"
+                  onClick={() => {
+                    setShowZeroSpend((current) => !current);
+                    setVisibleAdsRows(INITIAL_UNMATCHED_ROWS);
+                  }}
+                >
+                  {showZeroSpend ? 'Hide' : 'Show'} zero-spend history ({prioritisedAds.zeroSpend.length})
+                </button>
               )}
-            </tbody>
-          </table>
+              <span className="text-xs text-text-secondary">
+                {prioritisedAds.withSpend.length} with spend · {prioritisedAds.zeroSpend.length} zero-spend
+              </span>
+            </div>
+          </div>
+          {displayedAdsRows.length > 0 ? (
+            <>
+              <table className="table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>Google Ads Campaign</th>
+                    <th>Entity</th>
+                    <th style={{ textAlign: 'right' }}>Spend</th>
+                    {canMapGoogleAds && <th>Map to campaign</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedAdsRows.map((row) =>
+                    canMapGoogleAds ? (
+                      <GoogleAdsMappingRow key={row.campaignId} row={row} campaigns={campaigns!} onMap={onMapGoogleAdsCampaign!} />
+                    ) : (
+                      <tr key={row.campaignId}>
+                        <td className="text-text-primary">{row.campaignName}</td>
+                        <td className="text-text-secondary">{BRAND_LABEL[row.brand] ?? row.brand}</td>
+                        <td style={{ textAlign: 'right' }}>£{row.spend.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+              {visibleAdsRows < adsRows.length && (
+                <div className="px-4 py-3" style={{ borderTop: '1px solid var(--v2-border)' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-sm"
+                    onClick={() => setVisibleAdsRows((current) => current + INITIAL_UNMATCHED_ROWS)}
+                  >
+                    Show more ({adsRows.length - visibleAdsRows} remaining)
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-text-secondary px-4 pb-4">
+              {adsSearch ? 'No campaign names match this search.' : 'No unmatched campaigns have spend in this period.'}
+            </p>
+          )}
         </div>
       )}
 

@@ -97,5 +97,5 @@ export function getCampaignsWithNoActivity(campaigns: Campaign[], tasks: Task[])
 export const SPEND_WITHOUT_CAMPAIGN_GAP: AttributionGap = {
   status: 'not-applicable',
   count: 0,
-  subtitle: 'Structurally impossible — spend is always logged directly against a campaign',
+  subtitle: 'Legacy spend is campaign-bound; unmapped media is separate',
 };
