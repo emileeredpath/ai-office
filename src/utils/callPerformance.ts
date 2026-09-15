@@ -90,6 +90,12 @@ function getRelevantCalls(
     return { status: 'not-connected', calls: [], subtitle: 'Awaiting Infinity integration' };
   }
 
+  // A failed read returns an empty array too; it is not a successful zero.
+  // Non-empty partial results remain usable with the source error surfaced.
+  if (data.errors.length > 0 && data.calls.length === 0) {
+    return { status: 'not-connected', calls: [], subtitle: 'Infinity call data unavailable — sync failed' };
+  }
+
   if (!isGroupView) {
     const brand = selectedEntity as Brand;
     if (!data.mappedBrands.includes(brand)) {

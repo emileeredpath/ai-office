@@ -16,7 +16,7 @@ import {
   MARKETING_LEADS_CAVEAT,
 } from '@/utils/campaignMetrics';
 import { sumKnownCampaignSpend } from '@/utils/campaignCosts';
-import { getCallsSnapshot } from '@/utils/channelSnapshot';
+import { resolveCallDateRange, getCallPerformance } from '@/utils/callPerformance';
 import { resolveGa4DateRange, getWebsiteUsers, getWebsiteUsersForBrand, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
@@ -74,6 +74,8 @@ function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined): Bra
 export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const campaigns = useAppStore((s) => s.campaigns);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
+  const infinityCalls = useAppStore((s) => s.infinityCalls);
+  const syncInfinityCalls = useAppStore((s) => s.syncInfinityCalls);
   const ga4Traffic = useAppStore((s) => s.ga4Traffic);
   const ga4SocialTraffic = useAppStore((s) => s.ga4SocialTraffic);
   const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
@@ -127,6 +129,11 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   useEffect(() => {
     syncEmailPerformance(emailRange.startDate, emailRange.endDate);
   }, [emailRange.startDate, emailRange.endDate, syncEmailPerformance]);
+
+  const callRange = useMemo(() => resolveCallDateRange(period), [period]);
+  useEffect(() => {
+    syncInfinityCalls(callRange.startDate, callRange.endDate);
+  }, [callRange.startDate, callRange.endDate, syncInfinityCalls]);
 
   const scRange = useMemo(() => resolveSearchConsoleDateRange(period), [period]);
   useEffect(() => {
@@ -313,9 +320,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
     [emailPerformance, isGroupView, selectedEntity]
   );
-  const callsSnapshot = useMemo(
-    () => getCallsSnapshot(campaigns, wave1Performance, matchesSelectedEntity),
-    [campaigns, wave1Performance, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
+  const callPerformance = useMemo(
+    () => getCallPerformance(infinityCalls, isGroupView, selectedEntity),
+    [infinityCalls, isGroupView, selectedEntity]
   );
 
   // ---- G. Coverage / Data Quality ------------------------------------------
@@ -327,7 +334,8 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // for the whole page — no other section repeats this state messaging.
   const ga4Configured = ga4Traffic?.configured === true;
   const ga4HasErrors = (ga4Traffic?.errors?.length ?? 0) > 0;
-  const infinityConfigured = wave1Performance?.infinityConfigured === true;
+  const infinityConfigured = infinityCalls?.configured === true;
+  const infinityHasErrors = (infinityCalls?.errors?.length ?? 0) > 0;
   const scConfigured = searchConsolePerformance?.configured === true;
   const scHasErrors = (searchConsolePerformance?.errors?.length ?? 0) > 0;
 
@@ -351,16 +359,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     scConfigured
       ? { label: 'Search Console', status: scHasErrors ? 'error' : 'live', detail: scHasErrors ? 'Sync error' : 'Live' }
       : { label: 'Search Console', status: 'not-connected', detail: 'Not connected' },
-    // "Connected" here means the Infinity integration itself is live —
-    // distinct from whether THIS entity has any real call data to show.
-    // Infinity's real data today is scoped to one hardcoded campaign (see
-    // src/utils/wave1.ts), so a connected integration can still show
-    // "Not connected" on an out-of-scope entity's Channel Performance
-    // tile below — that's a genuine data-availability gap, not a
-    // contradiction, and the "Wave 1 campaign only" suffix here makes
-    // that explicit rather than leaving the two readings unreconciled.
+    // Integration freshness is independent of an entity's confirmed mapping.
     infinityConfigured
-      ? { label: 'Infinity (Calls)', status: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'error' : 'live', detail: (wave1Performance?.infinityErrors?.length ?? 0) > 0 ? 'Sync error' : 'Connected — Wave 1 campaign only' }
+      ? { label: 'Infinity (Calls)', status: infinityHasErrors ? 'error' : 'live', detail: infinityHasErrors ? 'Sync error — results may be incomplete' : 'Connected' }
       : { label: 'Infinity (Calls)', status: 'not-connected', detail: 'Not connected' },
     campaignMonitorStatus,
     googleAdsPerformance?.configured === true
@@ -574,23 +575,14 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             ) : (
               <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
             )}
-            {callsSnapshot ? (
-              <KpiCard title="Calls" value={callsSnapshot.totalCalls} subtitle={`${callsSnapshot.answeredCalls} answered — see Call Tracking`} onClick={() => onNavigate?.('infinity')} size="compact" />
-            ) : (
-              // Infinity being globally "Connected" (Coverage & Data
-              // Quality below) doesn't mean this entity has real call
-              // data — Infinity's real data is scoped to one Wave 1
-              // campaign. Distinguish that from the integration itself
-              // genuinely not being set up, so the two states never read
-              // as contradictory.
-              <KpiCard
-                title="Calls"
-                status="not-connected"
-                subtitle={infinityConfigured ? 'No calls scoped to this entity — Wave 1 campaign only' : 'Awaiting Infinity integration'}
-                onClick={() => onNavigate?.('infinity')}
-                size="compact"
-              />
-            )}
+            <KpiCard
+              title="Calls"
+              value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
+              status={callPerformance.status}
+              subtitle={callPerformance.subtitle}
+              onClick={() => onNavigate?.('infinity')}
+              size="compact"
+            />
             {socialTraffic.status === 'available' ? (
               <KpiCard
                 title="Social"
