@@ -2,16 +2,15 @@ import { Brand } from '@/types/index';
 import { BrandBadge } from '@/components/common/BrandBadge';
 
 // Per-brand Acumatica commercial figures for MTech Group view — same
-// three-state honesty as Performance's Performance by Entity table:
+// coverage states as Performance's Performance by Entity table:
 // 'not-available' is a brand structurally outside Acumatica (IRCL),
-// 'not-connected' means this brand has no imported opportunities of its
-// own (never inferred from another brand's import), 'available' only
-// once real imported data exists for THIS brand. Never a fabricated
-// £0/0.
+// 'no-entity-data' means an import exists but this brand has no imported
+// opportunities, and 'not-connected' means no usable import exists.
+// Never a fabricated £0/0.
 export interface EntityCommercialRow {
   brand: Brand;
   label: string;
-  status: 'available' | 'not-connected' | 'not-available';
+  status: 'available' | 'no-entity-data' | 'not-connected' | 'not-available';
   opportunities?: number;
   openPipelineValue?: number;
   wonDeals?: number;
@@ -22,7 +21,8 @@ export interface EntityCommercialRow {
 
 function cell(row: EntityCommercialRow, value: number | undefined, format: (n: number) => string) {
   if (row.status !== 'available' || value === undefined) {
-    return <span className="v2-not-connected-text">{row.status === 'not-available' ? 'Not available' : 'Not connected'}</span>;
+    const label = row.status === 'not-available' ? 'Not available' : row.status === 'no-entity-data' ? 'No entity data' : 'Not connected';
+    return <span className="v2-not-connected-text">{label}</span>;
   }
   return format(value);
 }

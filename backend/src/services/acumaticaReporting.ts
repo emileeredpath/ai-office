@@ -19,6 +19,11 @@ import {
 import type { Brand } from '../types.js';
 
 export interface AcumaticaSummary {
+  // Global source coverage, kept separate from hasImportedData below.
+  // This lets callers distinguish "no Acumatica data exists" from
+  // "Acumatica data exists, but this entity has no imported rows" without
+  // presenting either case as a genuine numeric zero.
+  hasAnyImportedData: boolean;
   // Per-entity Availability (2026-09-09) — when `brand` is passed, this is
   // whether ANY opportunity has ever been imported for THAT brand
   // specifically (checked against the full imported dataset, before the
@@ -98,6 +103,7 @@ function parseExportDate(raw: string | null): Date | null {
 // change, just factored out so a second consumer doesn't re-derive it.
 interface AcumaticaScope {
   scoped: AcumaticaOpportunityRecord[];
+  hasAnyImportedData: boolean;
   hasImportedData: boolean;
   undated: number;
   lastImportedAt: string | null;
@@ -109,11 +115,13 @@ function scopeOpportunities(startDate?: string, endDate?: string, brand?: Brand)
   const all = getAllOpportunities();
   const lastImport = getLastImportLog();
   const lastImportedAt = lastImport?.importedAt ?? null;
+  const hasAnyImportedData = all.length > 0;
 
   if (brand && !isBrandTrackedInAcumatica(brand)) {
     return {
       scoped: [],
-      hasImportedData: all.length > 0,
+      hasAnyImportedData,
+      hasImportedData: hasAnyImportedData,
       undated: 0,
       lastImportedAt,
       notAvailableForBrand: true,
@@ -149,7 +157,7 @@ function scopeOpportunities(startDate?: string, endDate?: string, brand?: Brand)
     });
   }
 
-  return { scoped, hasImportedData, undated, lastImportedAt, notAvailableForBrand: false, notAvailableReason: null };
+  return { scoped, hasAnyImportedData, hasImportedData, undated, lastImportedAt, notAvailableForBrand: false, notAvailableReason: null };
 }
 
 export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?: Brand): AcumaticaSummary {
@@ -157,6 +165,7 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
 
   if (scope.notAvailableForBrand) {
     return {
+      hasAnyImportedData: scope.hasAnyImportedData,
       hasImportedData: scope.hasImportedData,
       lastImportedAt: scope.lastImportedAt,
       opportunities: 0,
@@ -185,6 +194,7 @@ export function getAcumaticaSummary(startDate?: string, endDate?: string, brand?
   const unclassifiedOpps = scoped.filter((o) => o.commercialStatus === 'unclassified');
 
   return {
+    hasAnyImportedData: scope.hasAnyImportedData,
     hasImportedData,
     lastImportedAt,
     opportunities: scoped.length,

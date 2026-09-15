@@ -27,6 +27,7 @@ import { resolveGoogleAdsDateRange } from '@/utils/googleAdsPerformance';
 import { fetchGa4CampaignNamesInUse } from '@/services/ga4Api';
 import { fetchAcumaticaSummary, fetchAcumaticaBreakdowns, type AcumaticaSummary, type AcumaticaBreakdowns } from '@/services/acumaticaApi';
 import { BRAND_LABEL } from '@/utils/brandColors';
+import { getAcumaticaMissingDataHeadline, getAcumaticaMissingDataLabel } from '@/utils/acumaticaAvailability';
 import type { Brand } from '@/types/index';
 
 const GA4_BRANDS: Brand[] = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl', 'idaro'];
@@ -243,7 +244,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
       const brand = o.value as Brand;
       const summary = brandAcumaticaSummaries[brand];
       if (!summary) {
-        return { brand, label: o.label, status: 'not-connected', subtitle: 'No Acumatica export imported yet' };
+        return { brand, label: o.label, status: 'not-connected', subtitle: getAcumaticaMissingDataLabel(summary, o.label) };
       }
       if (summary.notAvailableForBrand) {
         return {
@@ -254,7 +255,12 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
         };
       }
       if (!summary.hasImportedData) {
-        return { brand, label: o.label, status: 'not-connected', subtitle: 'No Acumatica export imported yet' };
+        return {
+          brand,
+          label: o.label,
+          status: summary.hasAnyImportedData ? 'no-entity-data' : 'not-connected',
+          subtitle: getAcumaticaMissingDataLabel(summary, o.label),
+        };
       }
       return {
         brand,
@@ -285,6 +291,13 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   );
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
+  const acumaticaMissingLabel = getAcumaticaMissingDataLabel(acumaticaSummary, isGroupView ? undefined : entityLabel);
+  const acumaticaMissingHeadline = getAcumaticaMissingDataHeadline(acumaticaSummary);
+  const acumaticaBreakdownEmptyLabel = acumaticaNotAvailable
+    ? acumaticaNotAvailableSubtitle
+    : acumaticaHasData
+      ? 'No opportunities in this period.'
+      : acumaticaMissingLabel;
 
   const cmConfigured = emailPerformance?.configured === true;
   const infinityConfigured = infinityCalls?.configured === true;
@@ -305,7 +318,9 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               ? `Manual export — last imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')}`
               : 'Manual export',
           }
-        : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
+        : acumaticaSummary?.hasAnyImportedData
+          ? { label: 'Acumatica', status: 'stale', detail: acumaticaMissingLabel }
+          : { label: 'Acumatica', status: 'not-connected', detail: acumaticaMissingLabel },
   ];
 
   return (
@@ -359,66 +374,66 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
                 title="Opportunities"
                 value={acumaticaHasData ? acumaticaSummary!.opportunities : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? 'Manual Acumatica export — see Settings for last import'
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
               <KpiCard
                 title="Open Pipeline"
                 value={acumaticaHasData ? `£${Math.round(acumaticaSummary!.openPipelineValue).toLocaleString()}` : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? `${acumaticaSummary!.openPipelineCount} opportunities — Status = Open + New`
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
               <KpiCard
                 title="Won Deals"
                 value={acumaticaHasData ? acumaticaSummary!.wonDeals : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? 'Status = Won'
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
               <KpiCard
                 title="Won Revenue"
                 value={acumaticaHasData ? `£${Math.round(acumaticaSummary!.wonRevenue).toLocaleString()}` : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitleWrap
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? (period === 'all-time' ? 'Current Status = Won — latest imported data' : 'Current Status = Won; Created On within the selected period')
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
               <KpiCard
                 title="Lost"
                 value={acumaticaHasData ? acumaticaSummary!.lostDeals : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? 'Status = Lost'
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
             </div>
@@ -445,14 +460,14 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               <h3 className="text-sm font-semibold text-text-primary mb-3">Pipeline by Stage</h3>
               <AcumaticaBreakdownBars
                 entries={acumaticaBreakdowns?.byStage ?? []}
-                emptyLabel={acumaticaNotAvailable ? acumaticaNotAvailableSubtitle : 'No opportunities in this period.'}
+                emptyLabel={acumaticaBreakdownEmptyLabel}
               />
             </div>
             <div className="card">
               <h3 className="text-sm font-semibold text-text-primary mb-3">Opportunity Class</h3>
               <AcumaticaBreakdownBars
                 entries={acumaticaBreakdowns?.byOpportunityClass ?? []}
-                emptyLabel={acumaticaNotAvailable ? acumaticaNotAvailableSubtitle : 'No opportunities in this period.'}
+                emptyLabel={acumaticaBreakdownEmptyLabel}
                 color="#2E9ECC"
               />
             </div>
@@ -460,7 +475,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               <h3 className="text-sm font-semibold text-text-primary mb-3">Product Focus</h3>
               <AcumaticaBreakdownBars
                 entries={acumaticaBreakdowns?.byProductFocus ?? []}
-                emptyLabel={acumaticaNotAvailable ? acumaticaNotAvailableSubtitle : 'No opportunities in this period.'}
+                emptyLabel={acumaticaBreakdownEmptyLabel}
                 color="var(--v2-green)"
               />
             </div>
@@ -477,7 +492,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               <AcumaticaBreakdownTable
                 columnLabel="Sales-reported Source"
                 entries={acumaticaBreakdowns?.bySalesReportedSource ?? []}
-                emptyLabel={acumaticaNotAvailable ? acumaticaNotAvailableSubtitle : 'No opportunities in this period.'}
+                emptyLabel={acumaticaBreakdownEmptyLabel}
               />
             </div>
             <div className="card">
@@ -485,7 +500,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               <AcumaticaBreakdownTable
                 columnLabel="Status"
                 entries={acumaticaBreakdowns?.byCommercialStatus ?? []}
-                emptyLabel={acumaticaNotAvailable ? acumaticaNotAvailableSubtitle : 'No opportunities in this period.'}
+                emptyLabel={acumaticaBreakdownEmptyLabel}
                 labelFor={(key) => STATUS_LABEL[key] ?? key}
               />
             </div>
@@ -494,7 +509,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               <AcumaticaBreakdownTable
                 columnLabel="Entity"
                 entries={acumaticaBreakdowns?.byEntity ?? []}
-                emptyLabel={acumaticaNotAvailable ? acumaticaNotAvailableSubtitle : 'No opportunities in this period.'}
+                emptyLabel={acumaticaBreakdownEmptyLabel}
                 labelFor={(key) => BRAND_LABEL[key as Brand] ?? key}
               />
             </div>

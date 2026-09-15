@@ -26,6 +26,7 @@ import { getPreviousPeriodRange, compareToPrevious } from '@/utils/periodCompari
 import { fetchGa4Traffic, fetchGa4Enquiries, type Ga4TrafficResponse, type Ga4EnquiriesResponse } from '@/services/ga4Api';
 import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
 import type { BrandAcumaticaInfo } from '@/components/performance/PerformanceByBrandTable';
+import { getAcumaticaMissingDataHeadline, getAcumaticaMissingDataLabel } from '@/utils/acumaticaAvailability';
 
 interface PerformanceScreenProps {
   onNavigate?: (screen: string) => void;
@@ -38,9 +39,9 @@ interface PerformanceScreenProps {
 // Per-Entity Availability phase — never inferred from another brand's
 // import), 'available' only once real imported data exists for THIS
 // brand. Never presents a missing brand as a genuine £0/0.
-function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined): BrandAcumaticaInfo {
+function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined, entityLabel: string): BrandAcumaticaInfo {
   if (!summary) {
-    return { status: 'not-connected', subtitle: 'No Acumatica export imported yet' };
+    return { status: 'not-connected', subtitle: getAcumaticaMissingDataLabel(summary, entityLabel) };
   }
   if (summary.notAvailableForBrand) {
     return {
@@ -49,7 +50,10 @@ function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined): Bra
     };
   }
   if (!summary.hasImportedData) {
-    return { status: 'not-connected', subtitle: 'No Acumatica export imported yet' };
+    return {
+      status: summary.hasAnyImportedData ? 'no-entity-data' : 'not-connected',
+      subtitle: getAcumaticaMissingDataLabel(summary, entityLabel),
+    };
   }
   return {
     status: 'available',
@@ -267,6 +271,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     ? `Not available — ${acumaticaSummary.notAvailableReason}`
     : 'Not available';
   const acumaticaHasData = acumaticaSummary?.hasImportedData === true && !acumaticaNotAvailable;
+  const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
+  const acumaticaMissingLabel = getAcumaticaMissingDataLabel(acumaticaSummary, isGroupView ? undefined : entityLabel);
+  const acumaticaMissingHeadline = getAcumaticaMissingDataHeadline(acumaticaSummary);
 
   // Per-brand Acumatica figures for Performance by Entity (group view
   // only) — same API, one call per real brand for the current period.
@@ -311,7 +318,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         leads: sumLeads(brandCampaigns),
         spend: brandSpend.total,
         hasLegacySpendFallback: brandSpend.hasLegacyFallback,
-        acumatica: toBrandAcumaticaInfo(brandAcumaticaSummaries[brand]),
+        acumatica: toBrandAcumaticaInfo(brandAcumaticaSummaries[brand], o.label),
       };
     });
   }, [campaigns, periodStart, ga4Traffic, ga4Enquiries, campaignCosts, googleAdsPerformance, brandAcumaticaSummaries]);
@@ -382,7 +389,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               ? `Manual export — last imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')}`
               : 'Manual export',
           }
-        : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
+        : acumaticaSummary?.hasAnyImportedData
+          ? { label: 'Acumatica', status: 'stale', detail: acumaticaMissingLabel }
+          : { label: 'Acumatica', status: 'not-connected', detail: acumaticaMissingLabel },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
     // The retained Wave 1 campaign-table display is limited to one
     // hardcoded campaign (see src/utils/wave1.ts) — never general
@@ -391,8 +400,6 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
     // Campaign Performance table.
     { label: 'Campaign Attribution (GA4/Calls)', status: 'stale', detail: 'Limited — Wave 1 campaign only' },
   ];
-
-  const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
   // Two short lines, never truncated (KpiCard's subtitleWrap) — the
   // breakdown itself must always be readable without hovering; the legacy
@@ -487,40 +494,40 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
                 title="Opportunities"
                 value={acumaticaHasData ? acumaticaSummary!.opportunities : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? 'Manual Acumatica export — see Settings for last import'
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
               <KpiCard
                 title="Open Pipeline"
                 value={acumaticaHasData ? `£${Math.round(acumaticaSummary!.openPipelineValue).toLocaleString()}` : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? `${acumaticaSummary!.openPipelineCount} opportunities — Status = Open + New`
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
               <KpiCard
                 title="Won Revenue"
                 value={acumaticaHasData ? `£${Math.round(acumaticaSummary!.wonRevenue).toLocaleString()}` : undefined}
                 status={acumaticaHasData ? 'available' : 'not-connected'}
-                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+                notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
                 subtitleWrap
                 subtitle={
                   acumaticaNotAvailable
                     ? acumaticaNotAvailableSubtitle
                     : acumaticaHasData
                       ? (period === 'all-time' ? 'Current Status = Won — latest imported data' : 'Current Status = Won; Created On within the selected period')
-                      : 'No Acumatica export imported yet'
+                      : acumaticaMissingLabel
                 }
               />
             </div>

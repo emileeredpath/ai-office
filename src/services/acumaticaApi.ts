@@ -62,6 +62,10 @@ export async function fetchAcumaticaStatus(): Promise<AcumaticaStatusResponse> {
 }
 
 export interface AcumaticaSummary {
+  // True when any entity has imported Acumatica opportunities. Kept
+  // separate from hasImportedData, which is scoped to the requested
+  // entity, so missing entity coverage never becomes a fabricated zero.
+  hasAnyImportedData: boolean;
   hasImportedData: boolean;
   lastImportedAt: string | null;
   opportunities: number;

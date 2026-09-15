@@ -4,12 +4,11 @@ import { BrandBadge } from '@/components/common/BrandBadge';
 // Per-brand Acumatica commercial figures — same shape/states as
 // src/services/acumaticaApi.ts's AcumaticaSummary, reduced to what this
 // table shows. 'not-available' is a brand structurally outside Acumatica
-// (IRCL); 'not-connected' means this brand has no imported opportunities
-// of its own (see the Acumatica Per-Entity Availability phase — never
-// inferred from another brand's import); either way this must never
-// render as a real £0/0 opportunities.
+// (IRCL); 'no-entity-data' means the import exists but this brand has no
+// imported opportunities of its own; 'not-connected' means no usable
+// import exists. None of these states renders as a real £0/0.
 export interface BrandAcumaticaInfo {
-  status: 'available' | 'not-connected' | 'not-available';
+  status: 'available' | 'no-entity-data' | 'not-connected' | 'not-available';
   opportunities?: number;
   openPipelineValue?: number;
   openPipelineCount?: number;
@@ -46,6 +45,9 @@ export interface BrandPerformanceRow {
 // and both remain visible per-campaign in the Campaign Performance table
 // below for anyone drilling in further.
 export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] }) {
+  const unavailableText = (status: BrandAcumaticaInfo['status']) =>
+    status === 'not-available' ? 'Not available' : status === 'no-entity-data' ? 'No entity data' : 'Not connected';
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <table className="table" style={{ width: '100%', minWidth: 820 }}>
@@ -83,13 +85,13 @@ export function PerformanceByBrandTable({ rows }: { rows: BrandPerformanceRow[] 
                 )}
               </td>
               <td style={{ textAlign: 'right' }} title={row.acumatica.subtitle}>
-                {row.acumatica.status === 'available' ? row.acumatica.opportunities : <span className="v2-not-connected-text">{row.acumatica.status === 'not-available' ? 'Not available' : 'Not connected'}</span>}
+                {row.acumatica.status === 'available' ? row.acumatica.opportunities : <span className="v2-not-connected-text">{unavailableText(row.acumatica.status)}</span>}
               </td>
               <td style={{ textAlign: 'right' }} title={row.acumatica.subtitle}>
-                {row.acumatica.status === 'available' ? `£${Math.round(row.acumatica.openPipelineValue!).toLocaleString()}` : <span className="v2-not-connected-text">{row.acumatica.status === 'not-available' ? 'Not available' : 'Not connected'}</span>}
+                {row.acumatica.status === 'available' ? `£${Math.round(row.acumatica.openPipelineValue!).toLocaleString()}` : <span className="v2-not-connected-text">{unavailableText(row.acumatica.status)}</span>}
               </td>
               <td style={{ textAlign: 'right' }} title={row.acumatica.subtitle}>
-                {row.acumatica.status === 'available' ? `£${Math.round(row.acumatica.wonRevenue!).toLocaleString()}` : <span className="v2-not-connected-text">{row.acumatica.status === 'not-available' ? 'Not available' : 'Not connected'}</span>}
+                {row.acumatica.status === 'available' ? `£${Math.round(row.acumatica.wonRevenue!).toLocaleString()}` : <span className="v2-not-connected-text">{unavailableText(row.acumatica.status)}</span>}
               </td>
             </tr>
           ))}

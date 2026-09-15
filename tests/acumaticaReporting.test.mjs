@@ -27,9 +27,14 @@ test('Won Revenue uses Created On and current Status, never Stage or estimated c
 });
 
 test('missing coverage, real period zero and IRCL availability remain distinct', () => {
-  assert.equal(getAcumaticaSummary('2027-01-01', '2027-01-31', 'radio-links').hasImportedData, true);
-  assert.equal(getAcumaticaSummary('2027-01-01', '2027-01-31', 'radio-links').wonRevenue, 0);
-  assert.equal(getAcumaticaSummary(undefined, undefined, 'capcom').hasImportedData, false);
+  const genuinePeriodZero = getAcumaticaSummary('2027-01-01', '2027-01-31', 'radio-links');
+  assert.equal(genuinePeriodZero.hasAnyImportedData, true);
+  assert.equal(genuinePeriodZero.hasImportedData, true);
+  assert.equal(genuinePeriodZero.wonRevenue, 0);
+
+  const missingEntityCoverage = getAcumaticaSummary(undefined, undefined, 'capcom');
+  assert.equal(missingEntityCoverage.hasAnyImportedData, true);
+  assert.equal(missingEntityCoverage.hasImportedData, false);
   assert.equal(getAcumaticaSummary(undefined, undefined, 'ircl').notAvailableForBrand, true);
 });
 

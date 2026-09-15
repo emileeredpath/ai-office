@@ -1,6 +1,6 @@
 import { getCampaignKnownSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
 import { fetchCampaignCostsFromApi } from '@/services/campaignCostsApi';
-import type { CampaignCost } from '@/types/index';
+import type { Brand, CampaignCost } from '@/types/index';
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
@@ -27,6 +27,8 @@ import { getCurrentPeriodRange, getPreviousPeriodRange, compareToPrevious } from
 import { fetchGa4Enquiries, type Ga4EnquiriesResponse } from '@/services/ga4Api';
 import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
 import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
+import { getAcumaticaMissingDataHeadline, getAcumaticaMissingDataLabel } from '@/utils/acumaticaAvailability';
+import { BRAND_LABEL } from '@/utils/brandColors';
 
 interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
@@ -128,6 +130,9 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     fetchAcumaticaSummary(undefined, undefined, brand).then(setAcumaticaSummary).catch(() => setAcumaticaSummary(null));
   }, [isGroupView, selectedEntity]);
   const acumaticaNotAvailable = acumaticaSummary?.notAvailableForBrand === true;
+  const acumaticaEntityLabel = isGroupView || selectedEntity === 'all' ? undefined : BRAND_LABEL[selectedEntity as Brand];
+  const acumaticaMissingLabel = getAcumaticaMissingDataLabel(acumaticaSummary, acumaticaEntityLabel);
+  const acumaticaMissingHeadline = getAcumaticaMissingDataHeadline(acumaticaSummary);
 
   // ---- Entity-scoped base data -------------------------------------------
   const entityCampaigns = useMemo(
@@ -540,13 +545,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               title="Opportunities"
               value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined}
               status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
-              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
               subtitle={
                 acumaticaNotAvailable
                   ? `Not available — ${acumaticaSummary?.notAvailableReason}`
                   : acumaticaSummary?.hasImportedData
                     ? 'Latest Acumatica export'
-                    : 'No Acumatica export imported yet'
+                    : acumaticaMissingLabel
               }
               onClick={() => onNavigate?.('leads')}
             />
@@ -554,13 +559,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               title="Won Revenue"
               value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
               status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
-              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : 'Not connected'}
+              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
               subtitle={
                 acumaticaNotAvailable
                   ? `Not available — ${acumaticaSummary?.notAvailableReason}`
                   : acumaticaSummary?.hasImportedData
                     ? 'Latest Acumatica export — no reliable Won Date to scope by period'
-                    : 'No Acumatica export imported yet'
+                    : acumaticaMissingLabel
               }
               onClick={() => onNavigate?.('leads')}
             />
@@ -614,7 +619,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-text-secondary">No Acumatica export imported yet</p>
+                  <p className="text-sm text-text-secondary">{acumaticaMissingLabel}</p>
                 )}
               </div>
             </div>
