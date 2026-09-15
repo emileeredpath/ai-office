@@ -128,6 +128,8 @@ const searchWorkspaceSchema = z.object({
 
 const CAMPAIGN_STATUSES = ['planning', 'active', 'on-hold', 'completed'] as const;
 
+// Reject stale spend fields before any campaign mutation, including calls
+// made directly to the action service rather than through the MCP schema.
 const updateCampaignSchema = z.object({
   campaign_id: z.string().min(1, 'campaign_id is required'),
   name: z.string().trim().min(1).max(300).optional(),
@@ -135,11 +137,10 @@ const updateCampaignSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   budget: z.number().nullable().optional(),
-  actualSpend: z.number().optional().describe('Actual spend in £ — the field shown as "Actual spend (£)" on the campaign card. Overwritten automatically the next time a linked task\'s cost changes, so prefer setting task costs where possible.'),
   entities: z.array(z.enum(BRANDS)).optional(),
   colour: z.string().max(20).optional(),
   notes: z.string().max(10000).optional(),
-});
+}).strict();
 
 // Per-link shape used by both the single-create and bulk-import tools —
 // snake_case params to match the rest of the ai_office_* MCP surface
@@ -625,7 +626,6 @@ function doUpdateCampaign(payload: unknown, source: ActionSource | undefined, re
   if (input.startDate !== undefined) updates.startDate = input.startDate;
   if (input.endDate !== undefined) updates.endDate = input.endDate;
   if (input.budget !== undefined) updates.budget = input.budget;
-  if (input.actualSpend !== undefined) updates.spend = input.actualSpend;
   if (input.entities !== undefined) updates.entities = input.entities;
   if (input.colour !== undefined) updates.colour = input.colour;
   if (input.notes !== undefined) updates.notes = input.notes;
