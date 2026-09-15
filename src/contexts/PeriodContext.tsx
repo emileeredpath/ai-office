@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-// Global reporting-period selector — Phase 1A. This is a real, working date
-// filter (used client-side against real deadline/date fields already in the
-// store) but it is not a promise that every screen's data is period-aware
-// yet; only the Overview consumes it in Phase 1A.
+// Shared reporting-period selection, used by screens and their source date
+// resolvers. It does not imply uniform scope: see REPORTING_PERIOD.md for
+// lifetime campaign costs, Created On commercial reporting and source limits.
 export type Period = 'this-month' | 'this-quarter' | 'this-year' | 'all-time';
 
 export const PERIOD_OPTIONS: { value: Period; label: string }[] = [

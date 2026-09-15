@@ -18,11 +18,11 @@ interface CampaignPerformanceTableProps {
 // A lighter, performance-focused campaign table — deliberately not a
 // reproduction of the Campaigns page's management table. Only the fields
 // that answer "which campaigns are driving this entity's performance":
-// real enquiries/leads, plus genuine GA4/Infinity figures where they
-// actually exist (today, only the Wave 1 campaign). Spend is the same
-// canonical Known Campaign Spend (Fixed Costs + connected Media Spend)
-// shown on the Campaigns list and Campaign Detail — never raw
-// campaign.spend — so this table can never disagree with those screens.
+// manually logged enquiries/leads and the retained Wave 1 GA4/Calls
+// display. This legacy call assignment is not evidence of deterministic
+// campaign attribution. Spend reuses canonical Known Campaign Spend with
+// lifetime fixed costs and the caller's media window; it can differ from
+// Campaign Detail's all-time media result. See REPORTING_PERIOD.md.
 // "Logged Value" is campaign.valueGenerated — a manually-typed figure
 // from Edit Campaign, the same category as Marketing Leads/Enquiries.
 // There is no deterministic Acumatica-to-campaign attribution anywhere

@@ -381,8 +381,8 @@ export async function fetchInfinityCalls(startDate?: string, endDate?: string): 
 }
 
 // ---------------------------------------------------------------------
-// Legacy shape, preserved for existing callers (wave1Sync.ts, the /wave1/
-// calls route, and the Home/Performance "Calls" channel snapshot) — a
+// Legacy shape, preserved for wave1Sync.ts, the /wave1/calls route and the
+// shared campaign table on Performance/Reports — a
 // combined, entity-unaware total across every call fetchInfinityCalls
 // returns for a default month-to-date window. Never scoped to Wave 1 or
 // any other specific campaign, because Infinity has no identifier for one.

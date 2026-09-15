@@ -15,8 +15,9 @@ import { nanoid } from 'nanoid';
 
 // The MCP tools are thin wrappers around the exact same executeAction() used
 // by POST /api/actions — same validation, same duplicate detection, same
-// confirmation gate, same audit log. Nothing here talks to the database
-// directly.
+// confirmation gate and audit log on those action-service paths. Some
+// bespoke tools below call repositories directly; review their own guards.
+// update_campaign rejects legacy spend at both schema and service layers.
 //
 // Security Hardening Phase 1 update: /mcp now requires its own dedicated
 // Bearer credential (MCP_API_KEY, see middleware/mcpAuth.ts) and is rate

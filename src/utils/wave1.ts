@@ -1,11 +1,9 @@
 import { Campaign } from '@/types/index';
 
-// Wave 1 backend integration only reports metrics for this campaign today —
-// every other campaign shows "Not connected" until GA4/Infinity queries are
-// scoped per-campaign (see Wave 1 Data Integration brief, Phase 3). Shared
-// between the Performance page's Campaign Performance table and the
-// Campaign Detail Performance tab so the same campaign is treated
-// consistently in both places.
+// Legacy Wave 1 display selector for CampaignPerformanceTable (Performance
+// and Reports). It is not the canonical attribution rule: Campaign Detail
+// already uses explicit GA4 names, Google Ads IDs and Infinity landing paths.
+// The retained Wave 1 name match must not be broadened into attribution.
 export function isWave1Campaign(campaign: Pick<Campaign, 'name'>): boolean {
   return campaign.name.trim().toLowerCase() === 'q3 education campaign';
 }

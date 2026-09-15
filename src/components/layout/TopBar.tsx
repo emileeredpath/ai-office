@@ -1,9 +1,8 @@
 import { EntitySelector } from '@/components/common/EntitySelector';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Persistent global top bar — entity selector shows on every screen (shell
-// requirement); it currently filters the Overview only, other screens keep
-// their own independent brand filters until they're redesigned.
+// Persistent top bar with the shared entity selector and current user's
+// role. Screen consumers determine their own supported data scope.
 export function TopBar() {
   const { isEditor } = useAuth();
   const userName = isEditor ? 'Emilee' : 'John';

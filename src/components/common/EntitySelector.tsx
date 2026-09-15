@@ -1,8 +1,8 @@
 import { ENTITY_OPTIONS, useEntity } from '@/contexts/EntityContext';
 
-// Persistent global entity selector — Phase 1A. Filters the Overview by the
-// existing `brand` column; other screens keep their own independent brand
-// filters unchanged for now (they are not redesigned in Phase 1A).
+// Persistent entity selection shared by screens. Each consumer applies its
+// canonical record/campaign/source membership rules; this component only
+// changes the selection.
 export function EntitySelector() {
   const { selectedEntity, setSelectedEntity } = useEntity();
 

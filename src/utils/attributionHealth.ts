@@ -19,13 +19,10 @@ export interface AttributionGap {
   subtitle: string;
 }
 
-// Campaign Monitor sends whose dashboardCampaignId is null — i.e. the
-// existing (heuristic, name/word-fragment) linker in
-// backend/src/services/campaignMonitor.ts's buildCampaignMap could not
-// confidently match this send to an AI Office campaign. That linker is
-// NOT strengthened here — this only surfaces its real, already-computed
-// result honestly instead of letting an unmatched send silently vanish
-// from every campaign-scoped view.
+// Campaign Monitor sends with no dashboardCampaignId after the existing
+// exact-name linker and explicit manual mapping rules. Manual mappings
+// are preserved by sync. This reports the existing result without adding
+// heuristic/name-fragment matching or changing mapping precedence.
 export function getUnmappedEmailSends(
   data: EmailPerformanceResponse | null,
   matchesSelectedEntity: (brand: Brand | null | undefined) => boolean
@@ -93,9 +90,9 @@ export function getCampaignsWithNoActivity(campaigns: Campaign[], tasks: Task[])
 //    Attribution phase). Per-individual-enquiry-record campaign linking
 //    (as opposed to a campaign-level session/enquiry total) still doesn't
 //    exist and isn't claimed here.
-//  - Marketing spend without a campaign: structurally impossible in the
-//    current data model — `spend` only ever exists as a field directly on
-//    a Campaign row, so it cannot exist unattached to one.
+//  - SPEND_WITHOUT_CAMPAIGN_GAP below retains its legacy logged-spend
+//    scope. It is not a completeness check for Campaign Costs or unmapped
+//    media; real unmatched Google Ads activity is reported separately.
 
 export const SPEND_WITHOUT_CAMPAIGN_GAP: AttributionGap = {
   status: 'not-applicable',

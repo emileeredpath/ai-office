@@ -1,10 +1,11 @@
 // Canonical Campaign Costs calculations (Structured Campaign Costs phase,
 // extended by the Legacy Campaign Cost Reconciliation phase). This is the
 // ONE place Fixed Costs / Media Spend / Known Campaign Spend are computed —
-// every screen that shows one of these figures (Campaign Overview, Campaign
-// Performance, the Campaigns list) must call through here rather than
-// re-deriving its own sum, so the three numbers can never drift or disagree
-// between screens.
+// canonical consumers call through here rather than re-deriving sums.
+// Equality also requires the same campaign set and media date range:
+// lifetime campaign views and mixed-scope Performance can differ honestly.
+// These functions sum supplied rows; they do not validate date provenance
+// or distinguish a failed cost fetch from a successfully empty dataset.
 import type { Campaign, CampaignCost } from '@/types/index';
 import type { CampaignGoogleAdsAttribution } from '@/utils/campaignAttribution';
 import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';

@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Brand } from '@/types/index';
 
-// Global entity selector — Phase 1A. Filters by the existing `brand` column
-// already present on campaigns/tasks/funding records; no schema change.
+// Global entity selector. Record callers use the brand predicate; canonical
+// campaign consumers apply it to getCampaignEntities() membership.
 // 'all' represents "MTech Group" — the combined, unfiltered view across every
 // brand (including any brand not in ENTITY_OPTIONS below).
 export type EntitySelection = 'all' | Brand;

@@ -70,7 +70,8 @@ function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined): Bra
 // a fabricated number or chart. Spend, GA4 Enquiries, and Acumatica figures
 // deliberately reuse the exact same canonical utilities as Campaign
 // Detail/Campaigns (src/utils/campaignCosts.ts) and Leads & CRM
-// (src/services/acumaticaApi.ts) so no two screens can ever disagree.
+// (src/services/acumaticaApi.ts). Different date windows can legitimately
+// produce different totals; the scope is disclosed beside the figures.
 export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   const campaigns = useAppStore((s) => s.campaigns);
   const wave1Performance = useAppStore((s) => s.wave1Performance);
@@ -187,8 +188,8 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   // ---- Previous-period comparisons ---------------------------------------
   // See src/utils/periodComparison.ts and REPORTING_PERIOD.md/
   // KPI_DEFINITIONS.md for exactly which KPIs can honestly support this and
-  // why (Website Users, GA4 Enquiries, Marketing Leads, Marketing Spend —
-  // the same real, bounded-window sources already used above). "All time"
+  // why (Website Users, GA4 Enquiries and campaign-cohort Marketing Leads).
+  // Known Campaign Spend has mixed scope and no period comparison. "All time"
   // has no meaningful previous period (previousRange is null), so every
   // comparison below is null in that case — an honest "not available" via
   // KpiCard's comparison prop, never a fabricated 0%.
@@ -383,7 +384,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
           }
         : { label: 'Acumatica', status: 'not-connected', detail: 'Not connected — no manual export imported yet' },
     { label: 'Hootsuite', status: 'not-connected', detail: 'Not connected' },
-    // Wave 1 campaign-level GA4/Calls attribution is scoped to one
+    // The retained Wave 1 campaign-table display is limited to one
     // hardcoded campaign (see src/utils/wave1.ts) — never general
     // per-campaign attribution. Surfaced here so the limitation is
     // visible in one place rather than only as a per-row caveat on the

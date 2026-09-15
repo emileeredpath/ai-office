@@ -2,10 +2,9 @@ import { Campaign, Brand } from '@/types/index';
 import { isWave1Campaign } from '@/utils/wave1';
 import type { Wave1PerformanceData } from '@/store/useAppStore';
 
-// Shared channel-snapshot logic used by both Overview's "Channel Snapshot"
-// and Performance's "Channel Summary" — pure extraction of the logic that
-// previously lived inline in HomeScreen, so the two pages read the exact
-// same real figures and can never disagree.
+// Legacy Wave 1 snapshot helper, retained for compatibility but no longer
+// consumed by Overview or Performance. General calls use callPerformance.ts
+// with infinityCalls, the selected reporting period and confirmed entities.
 //
 // Email figures used to live here too (getEmailSnapshot), but the Campaign
 // Monitor V2 audit found it summed every email-send task regardless of
@@ -22,10 +21,10 @@ export interface CallsSnapshot {
   avgDuration: string;
 }
 
-// Infinity's real data today is scoped to one hardcoded campaign (see
-// isWave1Campaign) — only surface it if that campaign actually belongs to
-// the currently-selected entity, otherwise it would silently show another
-// entity's figure under the wrong selection.
+// Legacy display gating by the Wave 1 campaign's primary brand. This is
+// not deterministic call-to-campaign attribution: the legacy backend
+// snapshot aggregates default-window calls before assigning the campaign.
+// Do not use this helper for general period/entity reporting.
 export function getCallsSnapshot(
   campaigns: Campaign[],
   wave1Performance: Wave1PerformanceData | null,

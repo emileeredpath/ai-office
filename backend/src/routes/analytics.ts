@@ -9,7 +9,7 @@ import { getSearchConsolePerformance } from '../services/searchConsole.js';
 import { getAcumaticaSummary, getAcumaticaBreakdowns } from '../services/acumaticaReporting.js';
 import type { Brand } from '../types.js';
 
-// Wave 1 analytics routes — GA4 and Infinity integration
+// Analytics routes for current source reporting and retained Wave 1 reads.
 const router = Router();
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

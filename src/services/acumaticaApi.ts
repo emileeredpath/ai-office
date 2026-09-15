@@ -106,8 +106,8 @@ export async function fetchAcumaticaSummary(startDate?: string, endDate?: string
 // phase) — Commercial Status, Stage, Opportunity Class, Product Focus,
 // Sales-reported Source, and Entity, each as real opportunity count +
 // total value for the same period/entity scope as fetchAcumaticaSummary
-// above. Reporting/typing support only — not yet rendered anywhere; see
-// that phase's report for why (no Leads & CRM redesign this phase).
+// above. LeadsCrmScreen renders these through AcumaticaBreakdownBars and
+// AcumaticaBreakdownTable. Stage grouping does not classify commercial status.
 // `key` for bySalesReportedSource is already "Unspecified" for a blank
 // value (never a bare "Source" label — display code presenting these
 // rows must still label the field "Sales-reported source"). `key` for

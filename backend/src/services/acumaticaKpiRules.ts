@@ -179,11 +179,9 @@ export function formatSalesReportedSource(rawHeardAboutUs: string | null): strin
 //   acumaticaImport.ts's parseNumber) — never converted into a meaningful
 //   commercial value — while a genuine "£0" parses to the real number 0.
 //   Revenue/pipeline sums only ever add real numeric totals.
-// - Entity/brand: derived ONLY from a genuine Entity/Branch/Business Unit/
-//   Company column (see acumaticaImport.ts's deriveBrand) — never from the
-//   Opportunity ID. The real export's "RL-"/"MC-" ID prefixes are
-//   deliberately not parsed; their business meaning isn't yet confirmed.
-//   No matching entity column value leaves brand null/unclassified.
+// - Entity/brand: a recognised explicit Entity/Branch/Business Unit/Company
+//   value takes precedence. Otherwise deriveBrand uses the confirmed exact
+//   RL/BC/CC/MC prefix map above. If neither matches, brand stays null.
 export function formatUnspecified(raw: string | null): string {
   return raw ?? UNSPECIFIED;
 }
