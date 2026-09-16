@@ -3,12 +3,13 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { KpiCard } from '@/components/common/KpiCard';
-import { fetchGa4Traffic, type Ga4TrafficResponse } from '@/services/ga4Api';
+import { fetchGa4Traffic, fetchGa4WebsiteJourney, type Ga4TrafficResponse, type Ga4WebsiteJourneyResponse } from '@/services/ga4Api';
 import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/googleAdsApi';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
 import { resolveSearchConsoleDateRange } from '@/utils/searchConsole';
 import { useAppStore } from '@/store/useAppStore';
+import { PpcSignals, WebsiteSignals } from '@/components/improvement/ImprovementSignals';
 import {
   fetchWebsiteImprovements, fetchWebsiteSites, createWebsiteImprovement, updateWebsiteImprovement,
   type WebsiteSite, type WebsiteImprovement,
@@ -64,15 +65,19 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
   const [sites, setSites] = useState<WebsiteSite[]>([]);
   const [rows, setRows] = useState<WebsiteImprovement[]>([]);
   const [ga4, setGa4] = useState<Ga4TrafficResponse | null>(null);
+  const [journey, setJourney] = useState<Ga4WebsiteJourneyResponse | null>(null);
+  const [journeyLoading, setJourneyLoading] = useState(true);
   const [googleAds, setGoogleAds] = useState<GoogleAdsResponse | null>(null);
   const [adsLoading, setAdsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [ga4Loading, setGa4Loading] = useState(true);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState(false);
   const [selectedSite, setSelectedSite] = useState('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
+  const [showAllLog, setShowAllLog] = useState(false);
   const [windowSessions, setWindowSessions] = useState<{ before: number | null; after: number | null; state: string }>({ before: null, after: null, state: '' });
   const range = useMemo(() => resolveGa4DateRange(period), [period]);
   const searchRange = useMemo(() => resolveSearchConsoleDateRange(period), [period]);
@@ -82,9 +87,11 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError(false);
     Promise.all([fetchWebsiteSites(), fetchWebsiteImprovements(mode)])
       .then(([nextSites, nextRows]) => { if (active) { setSites(nextSites); setRows(nextRows); } })
-      .catch(() => { if (active) setError('Could not load the improvement log.'); })
+      .catch(() => { if (active) setLoadError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [mode]);
@@ -102,10 +109,6 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
 
   useEffect(() => {
     let active = true;
-    if (mode === 'ppc') {
-      setWindowSessions({ before: null, after: null, state: 'Comparable paid landing-page sessions and verified paid leads are not connected.' });
-      return;
-    }
     setGa4Loading(true);
     setGa4(null);
     fetchGa4Traffic(range.startDate, range.endDate)
@@ -115,10 +118,30 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
     return () => { active = false; };
   }, [range.startDate, range.endDate]);
 
+  useEffect(() => {
+    if (mode !== 'website') return;
+    let active = true;
+    setJourneyLoading(true);
+    setJourney(null);
+    fetchGa4WebsiteJourney(range.startDate, range.endDate)
+      .then((data) => { if (active) setJourney(data); })
+      .catch(() => { if (active) setJourney(null); })
+      .finally(() => { if (active) setJourneyLoading(false); });
+    return () => { active = false; };
+  }, [mode, range.startDate, range.endDate]);
+
   const visibleRows = rows.filter((row) => selectedSite === 'all' || row.site_id === selectedSite);
+  const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+  const rankedRows = [...visibleRows].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority] || a.id.localeCompare(b.id));
+  const suggestedRows = rankedRows.filter((row) => row.status === 'Suggested');
+  const activeRows = visibleRows.filter((row) => !['Suggested', 'Reverted'].includes(row.status));
   const selected = selectedId ? rows.find((row) => row.id === selectedId) : null;
   useEffect(() => {
     let active = true;
+    if (mode === 'ppc') {
+      setWindowSessions({ before: null, after: null, state: 'Comparable paid landing-page sessions and verified paid leads are not connected.' });
+      return;
+    }
     if (!selected?.baseline_start || !selected.baseline_end || !selected.measurement_start || !selected.measurement_end) {
       setWindowSessions({ before: null, after: null, state: 'Set both complete date windows to compare GA4 sessions.' });
       return;
@@ -145,6 +168,7 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
   const measuredSites = sites.filter((site) => site.brand && ga4?.brands.some((item) => item.brand === site.brand));
   const allMeasured = sites.length > 0 && measuredSites.length === sites.length && (ga4?.errors.length ?? 0) === 0;
   const sessions = measuredSites.reduce((sum, site) => sum + (ga4?.brands.find((row) => row.brand === site.brand)?.sessions ?? 0), 0);
+  const maxSiteSessions = Math.max(0, ...(ga4?.brands.map((row) => row.sessions) ?? []));
   const adsSummary = getGoogleAdsSummary(googleAds, true, 'mtech');
 
   const selectRow = (row: WebsiteImprovement) => { setSelectedId(row.id); setDraft(fromRow(row)); setError(''); };
@@ -176,21 +200,25 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
       <p className="text-text-secondary">{mode === 'ppc' ? 'Track paid search changes, landing-page work and what to improve next.' : 'Track what we change, what improves and where the next lead opportunity is.'}</p>
     </div><PeriodSelector /></div>
 
+    {mode === 'website'
+      ? <WebsiteSignals journey={journey} loading={journeyLoading} sites={sites} selectedSite="all" />
+      : <PpcSignals googleAds={googleAds} loading={adsLoading} />}
+
     {mode === 'website' ? <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-      <KpiCard title="Website Leads" status="not-connected" notConnectedLabel="Not available" subtitle="A verified website-origin lead source is needed." accent="var(--v2-orange)" />
-      <KpiCard title="Website Conversion Rate" status="not-connected" notConnectedLabel="Not available" subtitle="Website Leads ÷ eligible sessions. Lead source and eligibility are not yet confirmed." accent="var(--v2-blue)" />
-      <KpiCard title="Conversion Rate Change" status="not-connected" notConnectedLabel="Not available" subtitle="Requires current and previous equivalent conversion rates." accent="var(--v2-purple)" />
       <KpiCard title="GA4 Website Sessions" value={ga4Loading ? 'Loading…' : allMeasured ? sessions.toLocaleString('en-GB') : undefined} status={ga4Loading || allMeasured ? 'available' : 'not-connected'} notConnectedLabel="Incomplete" subtitle={allMeasured ? `${range.startDate} to ${range.endDate}` : `${measuredSites.length} of ${sites.length} sites returned data; no group total shown`} accent="var(--v2-green)" />
+      <KpiCard title="Sites reporting" value={journeyLoading || loading ? 'Loading…' : journey?.configured && sites.length ? `${journey.brands.filter((brand) => brand.entryPages !== null && sites.some((site) => site.brand === brand.brand)).length} / ${sites.length}` : undefined} status={journeyLoading || loading || Boolean(journey?.configured && sites.length) ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="GA4 entry-page reports" accent="var(--v2-blue)" />
+      <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="From the audit backlog" accent="var(--v2-orange)" />
+      <KpiCard title="Changes progressed" value={loading ? 'Loading…' : activeRows.length} status={loading || !loadError ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Beyond Suggested status" accent="var(--v2-purple)" />
     </div> : <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       <KpiCard title="Google Ads Clicks" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.clicks!.toLocaleString('en-GB') : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--v2-blue)" />
       <KpiCard title="Google Ads Spend" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? `£${adsSummary.spend!.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--v2-orange)" />
       <KpiCard title="Google Ads Conversions" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.conversions : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle="Google Ads' own conversion metric; not verified leads" accent="var(--v2-purple)" />
-      <KpiCard title="PPC Lead Conversion Rate" status="not-connected" notConnectedLabel="Not available" subtitle="Needs paid landing-page sessions and verified paid leads." accent="var(--v2-green)" />
+      <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Paid landing-page and PPC work" accent="var(--v2-green)" />
     </div>}
 
-    <div className="card p-5 border-l-4" style={{ borderColor: 'var(--v2-orange)' }}>
-      <h2 className="font-bold text-text-primary mb-1">Measurement status</h2>
-      <p className="text-sm text-text-secondary">{mode === 'website' ? 'GA4 sessions describe visits. Existing verified GA4 enquiry actions are not CRM leads, so they are not used as Website Leads or a lead conversion rate. Best improving site, site needing attention and before/after lead impact remain unranked until comparable lead data exists. A recorded change is not proof that it caused a result.' : 'Google Ads clicks and conversions describe the ad account, not individual landing-page journeys or verified CRM leads. PPC lead conversion and before/after impact remain unavailable until exact landing pages, paid sessions and leads can be matched. A recorded change is not proof that it caused a result.'}</p>
+    <details className="card p-4" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+      <summary className="font-semibold text-text-primary cursor-pointer">{mode === 'website' ? 'Website leads and conversion rate: Not available' : 'Paid leads and landing-page conversion rate: Not available'} <span className="font-normal text-text-secondary">· Why?</span></summary>
+      <p className="text-sm text-text-secondary mt-3">{mode === 'website' ? 'GA4 visits and verified enquiry actions are available as separate measures, but enquiries are not confirmed CRM leads. A lead conversion rate or drop-off calculation needs a reliable website-origin lead count for the same eligible sessions and dates.' : 'Google Ads clicks and its own conversions do not identify verified CRM leads on individual landing pages. Paid conversion needs matched paid sessions and leads for the same page and dates.'}</p>
       <div className="flex flex-wrap gap-2 mt-3 text-xs">
         <span className="rounded px-2 py-1 bg-slate-100">GA4: {ga4Loading ? 'Checking' : ga4?.configured && measuredSites.length ? ga4.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>
         {mode === 'website' && <span className="rounded px-2 py-1 bg-slate-100">Search Console: {searchConsole?.configured ? searchConsole.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>}
@@ -198,26 +226,40 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
         <span className="rounded px-2 py-1 bg-slate-100">Infinity: Not assessed for {mode === 'ppc' ? 'paid leads' : 'website leads'}</span>
         <span className="rounded px-2 py-1 bg-slate-100">CRM {mode === 'ppc' ? 'paid' : 'website'} attribution: Not verified</span>
       </div>
-    </div>
+    </details>
 
-    {mode === 'website' ? <section className="card p-5"><h2 className="v2-section-title">Website performance</h2>
-      <p className="text-xs text-text-secondary mb-3">GA4 sessions for the selected period. Lead metrics remain unavailable rather than showing a false zero.</p>
-      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">Website</th><th>Sessions</th><th>Website leads</th><th>Lead conversion rate</th><th>Improvement status</th></tr></thead><tbody>
-        {sites.map((site) => { const entry = ga4?.brands.find((row) => row.brand === site.brand); const count = rows.filter((row) => row.site_id === site.id && row.status !== 'Suggested').length; return <tr key={site.id} className="border-b last:border-0">
-          <td className="py-3"><a className="font-medium text-text-primary underline" href={site.url} target="_blank" rel="noopener noreferrer">{site.name} ↗</a></td>
-          <td className="tabular-nums">{ga4Loading ? 'Loading…' : entry ? entry.sessions.toLocaleString('en-GB') : 'Not connected'}</td>
-          <td>Not available</td><td>Not available</td><td>{count ? `${count} in progress or measured` : 'Suggested backlog only'}</td>
-        </tr>; })}
-      </tbody></table></div>
-    </section> : <section className="card p-5"><h2 className="v2-section-title">Paid performance by entity</h2>
-      <p className="text-xs text-text-secondary mb-3">Google Ads account totals for the selected period. These figures are not assigned to individual website pages.</p>
-      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">Entity</th><th>Clicks</th><th>Spend</th><th>Google Ads conversions</th><th>Paid leads</th></tr></thead><tbody>
-        {sites.map((site) => { const entry = googleAds?.brands.find((row) => row.brand === site.brand); return <tr key={site.id} className="border-b last:border-0"><td className="py-3 font-medium">{site.name}</td><td>{adsLoading ? 'Loading…' : entry ? entry.clicks.toLocaleString('en-GB') : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? `£${entry.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? entry.conversions.toLocaleString('en-GB') : 'Not connected'}</td><td>Not available</td></tr>; })}
+    {mode === 'website' ? <section className="card p-5"><h2 className="v2-section-title mb-1">Websites at a glance</h2>
+      <p className="text-xs text-text-secondary mb-4">GA4 website sessions for the selected period. A missing site report stays unavailable.</p>
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {sites.map((site) => { const entry = ga4?.brands.find((row) => row.brand === site.brand); const count = rows.filter((row) => row.site_id === site.id && !['Suggested', 'Reverted'].includes(row.status)).length; return <div key={site.id} className="rounded-lg bg-slate-50 p-3 min-w-0">
+          <a className="font-semibold text-sm text-text-primary hover:underline" href={site.url} target="_blank" rel="noopener noreferrer">{site.name} ↗</a>
+          <div className="flex justify-between items-end mt-2"><strong className="text-2xl tabular-nums text-text-primary">{ga4Loading ? '…' : entry ? entry.sessions.toLocaleString('en-GB') : '—'}</strong><span className="text-xs text-text-secondary">{entry ? 'sessions' : ga4Loading ? 'loading' : 'not connected'}</span></div>
+          {entry && <div className="h-1.5 bg-slate-200 rounded-full mt-2"><div className="h-full rounded-full bg-blue-500" style={{ width: `${maxSiteSessions > 0 ? entry.sessions / maxSiteSessions * 100 : 0}%` }} /></div>}
+          <p className="text-xs text-text-secondary mt-2">{count ? `${count} changes progressed` : 'No changes progressed yet'}</p>
+        </div>; })}
+      </div>
+    </section> : <section className="card p-5"><h2 className="v2-section-title mb-1">Paid performance by entity</h2>
+      <p className="text-xs text-text-secondary mb-3">Google Ads account totals; these are not assigned to individual landing pages.</p>
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">Entity</th><th>Clicks</th><th>Spend</th><th>Ads conversions</th></tr></thead><tbody>
+        {sites.map((site) => { const entry = googleAds?.brands.find((row) => row.brand === site.brand); return <tr key={site.id} className="border-b last:border-0"><td className="py-3 font-medium">{site.name}</td><td>{adsLoading ? 'Loading…' : entry ? entry.clicks.toLocaleString('en-GB') : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? `£${entry.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? entry.conversions.toLocaleString('en-GB') : 'Not connected'}</td></tr>; })}
       </tbody></table></div>
     </section>}
 
-    <section className="card p-5"><div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div><h2 className="v2-section-title mb-1">{mode === 'ppc' ? 'PPC improvement log' : 'Improvement log'}</h2><p className="text-xs text-text-secondary">{mode === 'ppc' ? 'Paid landing-page recommendations share the Website log so each change has one record. Add further paid improvements here.' : 'Audit recommendations start as Suggested. Select one to plan, record and review it.'}</p></div><div className="flex gap-2"><select className="input" aria-label="Filter website" value={selectedSite} onChange={(event) => setSelectedSite(event.target.value)}><option value="all">All websites</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>{isEditor && <button className="btn btn-primary" onClick={startNew}>Add improvement</button>}</div></div>
-      {loading ? <p className="text-sm text-text-secondary">Loading improvement log…</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">ID</th><th>Website</th><th>Improvement</th><th>Priority</th><th>Status</th><th>Implemented</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.id} className="border-b last:border-0"><td className="py-2"><button className="underline font-medium text-text-primary" onClick={() => selectRow(row)}>{row.id}</button></td><td>{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id}</td><td>{row.title}</td><td>{row.priority}</td><td>{row.status}</td><td>{row.implemented_on ?? '—'}</td></tr>)}</tbody></table></div>}
+    <section className="grid lg:grid-cols-2 gap-3">
+      <div className="card p-5" style={{ borderTop: '4px solid #F97316' }}>
+        <h2 className="v2-section-title mb-1">What to review next</h2><p className="text-xs text-text-secondary mb-3">Highest-priority suggestions from the audit. Priority is from the brief, not an automatic conversion score.</p>
+        {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : suggestedRows.length === 0 ? <p className="text-sm text-text-secondary">No suggested improvements for this selection.</p> : <div className="space-y-2">{suggestedRows.slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-orange-50 hover:bg-orange-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}>
+          <span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-orange-800 whitespace-nowrap">{row.priority}</span>
+        </button>)}</div>}
+      </div>
+      <div className="card p-5" style={{ borderTop: '4px solid #8B5CF6' }}>
+        <h2 className="v2-section-title mb-1">Changes being tracked</h2><p className="text-xs text-text-secondary mb-3">Work moved beyond Suggested. Open a record to check dates and results.</p>
+        {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : activeRows.length === 0 ? <div className="rounded-lg bg-violet-50 p-4"><strong className="text-sm text-text-primary">No changes recorded yet</strong><p className="text-xs text-text-secondary mt-1">When a recommendation is approved or implemented, it will appear here.</p></div> : <div className="space-y-2">{[...activeRows].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-violet-50 hover:bg-violet-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}><span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-violet-800 whitespace-nowrap">{row.status}</span></button>)}</div>}
+      </div>
+    </section>
+
+    <section className="card p-5"><div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div><h2 className="v2-section-title mb-1">{mode === 'ppc' ? 'PPC improvement log' : 'Improvement log'}</h2><p className="text-xs text-text-secondary">{mode === 'ppc' ? 'Paid landing-page recommendations share the Website log so each change has one record.' : 'Audit recommendations start as Suggested. Open a row to plan or measure a change.'}</p></div><div className="flex gap-2"><select className="input" aria-label="Filter website" value={selectedSite} onChange={(event) => { setSelectedSite(event.target.value); setShowAllLog(false); }}><option value="all">All websites</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>{isEditor && <button className="btn btn-primary" onClick={startNew}>Add improvement</button>}</div></div>
+      {loading ? <p className="text-sm text-text-secondary">Loading improvement log…</p> : loadError ? <p className="text-sm text-text-secondary">Could not load the improvement log.</p> : <><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">ID</th><th>Website</th><th>Improvement</th><th>Priority</th><th>Status</th><th>Implemented</th></tr></thead><tbody>{(showAllLog ? rankedRows : rankedRows.slice(0, 5)).map((row) => <tr key={row.id} className="border-b last:border-0"><td className="py-2"><button className="underline font-medium text-text-primary" onClick={() => selectRow(row)}>{row.id}</button></td><td>{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id}</td><td>{row.title}</td><td>{row.priority}</td><td>{row.status}</td><td>{row.implemented_on ?? '—'}</td></tr>)}</tbody></table></div>{rankedRows.length > 5 && <button className="btn btn-secondary mt-3" onClick={() => setShowAllLog((current) => !current)}>{showAllLog ? 'Show less' : `Show all ${rankedRows.length} improvements`}</button>}</>}
     </section>
 
     {selectedId && <section className="card p-5"><div className="flex justify-between gap-3"><h2 className="v2-section-title">{selected ? `${selected.id} · ${selected.title}` : 'New improvement'}</h2><button className="btn btn-secondary" onClick={() => setSelectedId(null)}>Close</button></div>

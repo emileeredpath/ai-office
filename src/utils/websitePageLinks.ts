@@ -1,8 +1,9 @@
 import type { Brand } from '@/types/index';
 
-// Current MTech website domains from src/data/mtechEmployees.ts. Keep
-// brands without a confirmed site unlinked rather than guessing a host.
+// Confirmed MTech website domains, including mtechglobal.co.uk from the
+// Website Improvement brief. Keep other brands unlinked rather than guessing.
 const WEBSITE_ORIGINS: Partial<Record<Brand, string>> = {
+  mtech: 'https://mtechglobal.co.uk',
   brentwood: 'https://www.brentwoodradios.co.uk',
   'radio-links': 'https://www.radio-links.co.uk',
   capcom: 'https://www.capcom.co.uk',
@@ -10,6 +11,7 @@ const WEBSITE_ORIGINS: Partial<Record<Brand, string>> = {
 };
 
 const ALLOWED_HOSTS = new Set([
+  'mtechglobal.co.uk', 'www.mtechglobal.co.uk',
   'brentwoodradios.co.uk', 'www.brentwoodradios.co.uk',
   'radio-links.co.uk', 'www.radio-links.co.uk',
   'capcom.co.uk', 'www.capcom.co.uk',

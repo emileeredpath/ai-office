@@ -6,6 +6,7 @@ const bundled = await build({ entryPoints: ['src/utils/websitePageLinks.ts'], bu
 const { getGa4PageUrl, getSearchConsolePageUrl } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 
 test('GA4 paths link to the confirmed entity website without changing metrics', () => {
+  assert.equal(getGa4PageUrl('mtech', '/services/'), 'https://mtechglobal.co.uk/services/');
   assert.equal(getGa4PageUrl('brentwood', '/contact-us/'), 'https://www.brentwoodradios.co.uk/contact-us/');
   assert.equal(getGa4PageUrl('capcom', '/products/radios'), 'https://www.capcom.co.uk/products/radios');
   assert.equal(getGa4PageUrl('ircl', '/services/'), 'https://ircl.ie/services/');
