@@ -122,7 +122,7 @@ export interface Ga4WebsiteJourneyResponse {
   errors: string[];
   brands: Array<{
     brand: Brand;
-    entryPages: Array<{ pagePath: string; sessions: number; users: number }> | null;
+    entryPages: Array<{ pagePath: string; sessions: number; users: number; engagedSessions: number; bounceRate: number }> | null;
     topPages: Array<{ pagePath: string; pageViews: number; users: number }> | null;
     enquiryPages: Array<{ pagePath: string; enquiries: number }> | null;
   }>;

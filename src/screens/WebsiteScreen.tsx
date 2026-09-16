@@ -16,7 +16,7 @@ import {
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { fetchGa4WebsiteJourney, type Ga4WebsiteJourneyResponse } from '@/services/ga4Api';
-import { getWebsiteJourneyPages, type WebsiteJourneyList } from '@/utils/websiteJourney';
+import { getWebsiteJourneyPages, getEntryPageEngagement, type WebsiteJourneyList } from '@/utils/websiteJourney';
 import { BRAND_LABEL } from '@/utils/brandColors';
 
 function JourneyPageList({ title, description, data, loading, isGroupView }: {
@@ -123,6 +123,7 @@ export function WebsiteScreen() {
   const entryPages = useMemo(() => getWebsiteJourneyPages(journey, isGroupView, selectedEntity, 'entryPages'), [journey, isGroupView, selectedEntity]);
   const viewedPages = useMemo(() => getWebsiteJourneyPages(journey, isGroupView, selectedEntity, 'topPages'), [journey, isGroupView, selectedEntity]);
   const enquiryPages = useMemo(() => getWebsiteJourneyPages(journey, isGroupView, selectedEntity, 'enquiryPages'), [journey, isGroupView, selectedEntity]);
+  const entryEngagement = useMemo(() => getEntryPageEngagement(journey, isGroupView, selectedEntity), [journey, isGroupView, selectedEntity]);
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
@@ -171,6 +172,32 @@ export function WebsiteScreen() {
             Page paths are shown without query strings to avoid exposing information in URLs. A phone or email click may happen on a page other than the contact page.
             Enquiry pages are only available for entities with confirmed event definitions; they do not include CRM leads.
           </p>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="v2-section-title">Where engagement weakens</h2>
+          <p className="text-sm text-text-secondary mb-4" style={{ marginTop: -8 }}>
+            GA4 bounce rate for the busiest entry pages. A bounce is a session that was not engaged: it did not last
+            longer than 10 seconds, record a key event or include at least two page views. This is a signal to review
+            the page, not proof that a person left there or failed to enquire.
+          </p>
+          <div className="card p-0" style={{ overflowX: 'auto' }}>
+            {journeyLoading ? <p className="p-5 text-sm text-text-secondary">Loading GA4 engagement…</p>
+              : entryEngagement.status !== 'available' ? <p className="p-5 text-sm text-text-secondary">{entryEngagement.subtitle}</p>
+              : entryEngagement.rows.length === 0 ? <p className="p-5 text-sm text-text-secondary">No entry page activity in this period.</p>
+              : <table className="table w-full text-sm" style={{ minWidth: 600 }}>
+                <thead><tr><th>Entry page</th><th style={{ textAlign: 'right' }}>Sessions</th><th style={{ textAlign: 'right' }}>Engaged sessions</th><th style={{ textAlign: 'right' }}>Bounce rate</th></tr></thead>
+                <tbody>{entryEngagement.rows.map((row) => (
+                  <tr key={`${row.brand}:${row.pagePath}`}>
+                    <td><span className="text-text-primary break-all">{row.pagePath}</span>{isGroupView && <span className="block text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}</td>
+                    <td style={{ textAlign: 'right' }}>{row.sessions.toLocaleString('en-GB')}</td>
+                    <td style={{ textAlign: 'right' }}>{row.engagedSessions.toLocaleString('en-GB')}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--v2-orange)' }}>{(row.bounceRate * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}</tbody>
+              </table>}
+          </div>
+          <p className="text-xs text-text-secondary mt-3">Sorted by entry sessions, so a high rate on a very small page is not presented as the biggest issue. {entryEngagement.status === 'available' ? entryEngagement.subtitle : ''}</p>
         </div>
 
         {/* Organic Search — Search Console */}

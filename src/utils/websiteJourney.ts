@@ -12,6 +12,29 @@ export interface WebsiteJourneyList {
   subtitle: string;
 }
 
+export interface EntryPageEngagement {
+  status: 'available' | 'not-connected';
+  rows: Array<{ brand: Brand; pagePath: string; sessions: number; engagedSessions: number; bounceRate: number }>;
+  subtitle: string;
+}
+
+export function getEntryPageEngagement(
+  data: Ga4WebsiteJourneyResponse | null,
+  isGroupView: boolean,
+  selectedEntity: EntitySelection,
+  limit = 10
+): EntryPageEngagement {
+  const source = getWebsiteJourneyPages(data, isGroupView, selectedEntity, 'entryPages', limit);
+  if (source.status !== 'available') return { status: source.status, rows: [], subtitle: source.subtitle };
+  const scope = isGroupView ? GROUP_AGGREGATE_BRANDS : [selectedEntity as Brand];
+  const rows = data!.brands
+    .filter((entry) => scope.includes(entry.brand))
+    .flatMap((entry) => (entry.entryPages ?? []).map((page) => ({ brand: entry.brand, ...page })))
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, limit);
+  return { status: 'available', rows, subtitle: source.subtitle };
+}
+
 export function getWebsiteJourneyPages(
   data: Ga4WebsiteJourneyResponse | null,
   isGroupView: boolean,

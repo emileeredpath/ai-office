@@ -62,6 +62,9 @@ export interface WebsiteEntryPageRow {
   pagePath: string;
   sessions: number;
   users: number;
+  engagedSessions: number;
+  // GA4 fraction from 0 to 1, not a page exit or enquiry conversion rate.
+  bounceRate: number;
 }
 
 export interface WebsiteViewedPageRow {
@@ -480,8 +483,17 @@ async function runWebsiteJourneyReport(
     const body = await res.text().catch(() => '');
     throw new Error(`GA4 website journey runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
   }
-  const json = (await res.json()) as { rows?: Ga4ReportRow[] };
-  return json.rows ?? [];
+  const json = (await res.json()) as { rows?: Ga4ReportRow[]; rowCount?: number };
+  const rows = json.rows ?? [];
+  if (json.rowCount != null && json.rowCount > rows.length) {
+    throw new Error(`GA4 website journey report was truncated for property ${propertyId}`);
+  }
+  if (rows.some((row) => row.dimensionValues.length < (eventNames ? 2 : 1) ||
+    row.metricValues.length < metrics.length ||
+    row.metricValues.some((metric) => metric.value == null || metric.value.trim() === '' || !Number.isFinite(Number(metric.value))))) {
+    throw new Error(`GA4 website journey report was incomplete for property ${propertyId}`);
+  }
+  return rows;
 }
 
 // Read-only aggregate page reporting for the Website screen. These are
@@ -525,11 +537,16 @@ export async function getWebsiteJourney(startDate?: string, endDate?: string): P
     let enquiryPages: WebsiteEnquiryPageRow[] | null = null;
 
     try {
-      const rows = await runWebsiteJourneyReport(propertyId, token, range.startDate, range.endDate, 'landingPage', ['sessions', 'activeUsers']);
+      const rows = await runWebsiteJourneyReport(propertyId, token, range.startDate, range.endDate, 'landingPage', ['sessions', 'activeUsers', 'engagedSessions', 'bounceRate']);
+      if (rows.some((row) => Number(row.metricValues[3].value) < 0 || Number(row.metricValues[3].value) > 1)) {
+        throw new Error(`GA4 bounce rate was out of range for property ${propertyId}`);
+      }
       entryPages = rows.map((row) => ({
         pagePath: row.dimensionValues[0]?.value ?? '(not set)',
-        sessions: Number(row.metricValues[0]?.value ?? 0),
-        users: Number(row.metricValues[1]?.value ?? 0),
+        sessions: Number(row.metricValues[0].value),
+        users: Number(row.metricValues[1].value),
+        engagedSessions: Number(row.metricValues[2].value),
+        bounceRate: Number(row.metricValues[3].value),
       }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
