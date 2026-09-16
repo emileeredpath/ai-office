@@ -10,6 +10,7 @@ import {
   type AcumaticaImportResult,
 } from '@/services/acumaticaApi';
 import { ApiError } from '@/services/apiConfig';
+import { createWebsiteSite, fetchWebsiteSites, type WebsiteSite } from '@/services/websiteImprovementsApi';
 
 const BRAND_SWATCHES = [
   { label: 'MTech Navy', hex: '#0D1B2A' },
@@ -20,6 +21,29 @@ const BRAND_SWATCHES = [
   { label: 'IRCL Green', hex: '#1D9E75' },
   { label: 'IDARO Pink', hex: '#DB2777' },
 ];
+
+function WebsiteSettings() {
+  const { isEditor } = useAuth();
+  const [sites, setSites] = useState<WebsiteSite[]>([]);
+  const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
+  const [message, setMessage] = useState('');
+  useEffect(() => { fetchWebsiteSites().then(setSites).catch(() => setMessage('Could not load saved websites.')); }, []);
+  const add = async () => {
+    setMessage('');
+    try {
+      const site = await createWebsiteSite(name.trim(), url.trim());
+      setSites((current) => [...current, site].sort((a, b) => a.name.localeCompare(b.name)));
+      setName(''); setUrl('');
+    } catch { setMessage('Could not add this website. Check the URL or whether it is already saved.'); }
+  };
+  return <div className="card mb-6"><h2 className="v2-section-title">Websites</h2>
+    <p className="text-xs text-text-secondary mb-3">Sites available in Website Improvement. A new site needs its own verified analytics connection before metrics can appear.</p>
+    <ul className="text-sm space-y-1 mb-4">{sites.map((site) => <li key={site.id}><a className="underline" href={site.url} target="_blank" rel="noopener noreferrer">{site.name} ↗</a></li>)}</ul>
+    {isEditor && <div className="grid gap-2"><input className="input" aria-label="Website name" placeholder="Website name" value={name} onChange={(e) => setName(e.target.value)} /><input className="input" aria-label="Website URL" placeholder="https://example.co.uk/" type="url" value={url} onChange={(e) => setUrl(e.target.value)} /><button className="btn btn-secondary w-fit" onClick={add} disabled={!name.trim() || !url.trim()}>Add website</button></div>}
+    {message && <p role="alert" className="text-sm text-red-600 mt-2">{message}</p>}
+  </div>;
+}
 
 function ConnectionSettings() {
   const apiConnected = useAppStore((s) => s.apiConnected);
@@ -246,6 +270,8 @@ export function SettingsScreen() {
         <ConnectionSettings />
 
         <AcumaticaSettings />
+
+        <WebsiteSettings />
 
         <div className="card mb-6">
           <h2 className="v2-section-title">Brand Colours</h2>

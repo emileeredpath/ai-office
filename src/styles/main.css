@@ -906,6 +906,23 @@ h3 {
   color: white;
 }
 
+.v2-nav-item[data-branch-active='true'] {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.v2-nav-children {
+  margin: 2px 0 5px 17px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.v2-nav-child {
+  font-size: 12px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
 .v2-nav-item[data-disabled='true'] {
   cursor: default;
   color: rgba(255, 255, 255, 0.32);
@@ -1659,6 +1676,11 @@ h3 {
 @media (max-width: 900px) {
   .v2-sidebar {
     width: 76px;
+  }
+
+  .v2-nav-children {
+    margin-left: 5px;
+    padding-left: 3px;
   }
 
   .v2-sidebar-brand-text,

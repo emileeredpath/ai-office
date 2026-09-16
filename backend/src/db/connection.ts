@@ -511,4 +511,44 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_campaign_costs_campaign_id ON campaign_costs(campaign_id);
 `);
 
+// Website Improvement is additive and independent of the existing analytics
+// and CRM tables. A missing measurement remains NULL, never a stored zero.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS website_sites (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
+    brand TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS website_improvements (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES website_sites(id),
+    channel TEXT NOT NULL DEFAULT 'website',
+    page_url TEXT,
+    page_type TEXT,
+    improvement_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    priority TEXT NOT NULL DEFAULT 'Medium',
+    status TEXT NOT NULL DEFAULT 'Suggested',
+    implemented_on TEXT,
+    implemented_by TEXT,
+    baseline_start TEXT,
+    baseline_end TEXT,
+    measurement_start TEXT,
+    measurement_end TEXT,
+    confidence TEXT,
+    competing_activity TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_website_improvements_site ON website_improvements(site_id);
+`);
+const websiteImprovementColumns = db.prepare('PRAGMA table_info(website_improvements)').all() as Array<{ name: string }>;
+if (!websiteImprovementColumns.some((column) => column.name === 'channel')) {
+  db.exec("ALTER TABLE website_improvements ADD COLUMN channel TEXT NOT NULL DEFAULT 'website'");
+}
+
 export default db;

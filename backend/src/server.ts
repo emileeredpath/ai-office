@@ -14,6 +14,7 @@ import auditLogRouter from './routes/auditLog.js';
 import campaignMonitorRouter from './routes/campaignMonitor.js';
 import acumaticaRouter from './routes/acumatica.js';
 import analyticsRouter from './routes/analytics.js';
+import websiteImprovementsRouter from './routes/websiteImprovements.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
 import authRouter from './routes/auth.js';
@@ -117,6 +118,7 @@ app.use('/api/audit-log', requireSession, auditLogRouter);
 app.use('/api/campaign-monitor', requireSession, campaignMonitorRouter);
 app.use('/api/acumatica', requireSession, acumaticaRouter);
 app.use('/api/analytics', requireSession, analyticsRouter);
+app.use('/api/website-improvements', requireSession, websiteImprovementsRouter);
 app.use('/api/actions', requireSession, actionsRouter);
 app.use('/api/marketingos', requireSession, marketingosRouter);
 

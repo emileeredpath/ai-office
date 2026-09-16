@@ -33,6 +33,7 @@ import { PpcScreen } from '@/screens/PpcScreen';
 import { InfinityTrackingScreen } from '@/screens/InfinityTrackingScreen';
 import { SocialScreen } from '@/screens/SocialScreen';
 import { WebsiteScreen } from '@/screens/WebsiteScreen';
+import { WebsiteImprovementScreen } from '@/screens/WebsiteImprovementScreen';
 import { EmailScreen } from '@/screens/EmailScreen';
 import { FundingScreen } from '@/screens/FundingScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
@@ -46,25 +47,25 @@ import '@/styles/main.css';
 // src/screens/MTechHQScreen.tsx's header comment and DATA_INTEGRITY.md.
 const MTechHQScreen = lazy(() => import('@/screens/MTechHQScreen'));
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'infinity' | 'social' | 'website' | 'email' | 'funding' | 'metrics' | 'settings' | 'mtech-hq';
+type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'ppc-improvement' | 'infinity' | 'social' | 'website' | 'website-improvement' | 'email' | 'funding' | 'metrics' | 'settings' | 'mtech-hq';
 
-// Sidebar labels reflect the long-term MTech Marketing Hub navigation from
-// the approved V2 mockup. Every label maps to an existing, unmodified
-// screen (id = the Screen it opens) except the one item still flagged
-// `comingSoon: true` — Uploads has no real screen to open yet, so it's
-// shown (per the shell's information architecture) but disabled rather
-// than faked. "Reports" opens ReportsScreen (route id kept as 'metrics'
-// to avoid touching unrelated navigation).
+// Sidebar labels map to real screens. Website and PPC each reveal an
+// Improvement subcategory when selected. Uploads remains disabled until it
+// has a real screen. Reports keeps its existing 'metrics' route id.
 const PRIMARY_NAV: NavItem[] = [
   { id: 'home' as Screen, icon: LayoutDashboard, label: 'Overview' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Content & Calendar' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Performance' },
   { id: 'leads' as Screen, icon: Users, label: 'Leads & CRM' },
-  { id: 'ppc' as Screen, icon: TrendingUp, label: 'PPC' },
+  { id: 'ppc' as Screen, icon: TrendingUp, label: 'PPC', children: [
+    { id: 'ppc-improvement' as Screen, icon: TrendingUp, label: 'PPC Improvement' },
+  ] },
   { id: 'infinity' as Screen, icon: Phone, label: 'Call Tracking' },
   { id: 'social' as Screen, icon: Share2, label: 'Social' },
-  { id: 'website' as Screen, icon: Globe, label: 'Website' },
+  { id: 'website' as Screen, icon: Globe, label: 'Website', children: [
+    { id: 'website-improvement' as Screen, icon: TrendingUp, label: 'Website Improvement' },
+  ] },
   { id: 'email' as Screen, icon: Mail, label: 'Email' },
   { id: 'funding' as Screen, icon: Landmark, label: 'Funding' },
   { id: 'metrics' as Screen, icon: FileBarChart, label: 'Reports' },
@@ -156,12 +157,16 @@ export default function App() {
         return <CalendarScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'ppc':
         return <PpcScreen />;
+      case 'ppc-improvement':
+        return <WebsiteImprovementScreen mode="ppc" />;
       case 'infinity':
         return <InfinityTrackingScreen />;
       case 'social':
         return <SocialScreen />;
       case 'website':
         return <WebsiteScreen />;
+      case 'website-improvement':
+        return <WebsiteImprovementScreen />;
       case 'email':
         return <EmailScreen />;
       case 'funding':
