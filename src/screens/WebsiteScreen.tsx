@@ -18,6 +18,25 @@ import { getEnquiries } from '@/utils/ga4Enquiries';
 import { fetchGa4WebsiteJourney, type Ga4WebsiteJourneyResponse } from '@/services/ga4Api';
 import { getWebsiteJourneyPages, getEntryPageEngagement, type WebsiteJourneyList } from '@/utils/websiteJourney';
 import { BRAND_LABEL } from '@/utils/brandColors';
+import { getGa4PageUrl, getSearchConsolePageUrl } from '@/utils/websitePageLinks';
+
+function Ga4PageLink({ brand, pagePath }: { brand: WebsiteJourneyList['rows'][number]['brand']; pagePath: string }) {
+  const href = getGa4PageUrl(brand, pagePath);
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-text-primary underline break-all" title={`Open ${pagePath} on the ${BRAND_LABEL[brand]} website`}>
+      {pagePath} <span aria-hidden="true">↗</span>
+    </a>
+  ) : <span className="text-text-primary break-all">{pagePath}</span>;
+}
+
+function SearchConsolePageLink({ page }: { page: string }) {
+  const href = getSearchConsolePageUrl(page);
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-text-primary underline" title="Open this website page">
+      {page} <span aria-hidden="true">↗</span>
+    </a>
+  ) : <span className="text-text-primary">{page}</span>;
+}
 
 function JourneyPageList({ title, description, data, loading, isGroupView }: {
   title: string;
@@ -40,7 +59,7 @@ function JourneyPageList({ title, description, data, loading, isGroupView }: {
             <li key={`${row.brand}:${row.pagePath}`} className="flex items-start gap-3 text-sm">
               <span className="text-text-secondary" style={{ minWidth: 18 }}>{index + 1}.</span>
               <span className="min-w-0 flex-1">
-                <span className="block text-text-primary break-all" title={row.pagePath}>{row.pagePath}</span>
+                <span className="block" title={row.pagePath}><Ga4PageLink brand={row.brand} pagePath={row.pagePath} /></span>
                 {isGroupView && <span className="text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}
               </span>
               <strong className="text-text-primary tabular-nums">{row.count.toLocaleString('en-GB')}</strong>
@@ -189,7 +208,7 @@ export function WebsiteScreen() {
                 <thead><tr><th>Entry page</th><th style={{ textAlign: 'right' }}>Sessions</th><th style={{ textAlign: 'right' }}>Engaged sessions</th><th style={{ textAlign: 'right' }}>Bounce rate</th></tr></thead>
                 <tbody>{entryEngagement.rows.map((row) => (
                   <tr key={`${row.brand}:${row.pagePath}`}>
-                    <td><span className="text-text-primary break-all">{row.pagePath}</span>{isGroupView && <span className="block text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}</td>
+                    <td><Ga4PageLink brand={row.brand} pagePath={row.pagePath} />{isGroupView && <span className="block text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}</td>
                     <td style={{ textAlign: 'right' }}>{row.sessions.toLocaleString('en-GB')}</td>
                     <td style={{ textAlign: 'right' }}>{row.engagedSessions.toLocaleString('en-GB')}</td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--v2-orange)' }}>{(row.bounceRate * 100).toFixed(1)}%</td>
@@ -309,7 +328,7 @@ export function WebsiteScreen() {
                             style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={row.page}
                           >
-                            {row.page}
+                            <SearchConsolePageLink page={row.page} />
                           </td>
                           <td style={{ textAlign: 'right' }}>{row.clicks.toLocaleString('en-GB')}</td>
                           <td style={{ textAlign: 'right' }}>{row.impressions.toLocaleString('en-GB')}</td>
@@ -362,7 +381,7 @@ export function WebsiteScreen() {
                             style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={row.page}
                           >
-                            {row.page}
+                            <SearchConsolePageLink page={row.page} />
                           </td>
                           <td style={{ textAlign: 'right' }}>{row.clicks.toLocaleString('en-GB')}</td>
                           <td style={{ textAlign: 'right' }}>{row.impressions.toLocaleString('en-GB')}</td>
