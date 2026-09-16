@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { getBrandTraffic, getSocialTraffic, getEnquiries, getEducationCampaignAttribution, getCampaignGa4Attribution, getGa4CampaignNamesInUse } from '../services/ga4.js';
+import { getBrandTraffic, getSocialTraffic, getEnquiries, getWebsiteJourney, getEducationCampaignAttribution, getCampaignGa4Attribution, getGa4CampaignNamesInUse } from '../services/ga4.js';
 import { syncWave1Ga4, syncWave1Infinity } from '../services/wave1Sync.js';
 import { getMetricsByCampaignAndDate } from '../db/wave1PerformanceRepository.js';
 import { getEmailPerformance, getCampaignMonitorCoverage } from '../services/emailPerformance.js';
@@ -58,6 +58,16 @@ router.get('/ga4-enquiries', async (req: Request, res: Response) => {
   const rawEnd = req.query.endDate as string | undefined;
   const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
   const result = await getEnquiries(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
+  res.json(result);
+});
+
+// Aggregate entry, viewed and verified-enquiry pages. Each signal remains
+// separate so this endpoint never fabricates an ordered visitor path.
+router.get('/ga4-website-journey', async (req: Request, res: Response) => {
+  const rawStart = req.query.startDate as string | undefined;
+  const rawEnd = req.query.endDate as string | undefined;
+  const validRange = rawStart && rawEnd && ISO_DATE_RE.test(rawStart) && ISO_DATE_RE.test(rawEnd);
+  const result = await getWebsiteJourney(validRange ? rawStart : undefined, validRange ? rawEnd : undefined);
   res.json(result);
 });
 

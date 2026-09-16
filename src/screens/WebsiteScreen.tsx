@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod } from '@/contexts/PeriodContext';
@@ -15,6 +15,43 @@ import {
 } from '@/utils/searchConsole';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
+import { fetchGa4WebsiteJourney, type Ga4WebsiteJourneyResponse } from '@/services/ga4Api';
+import { getWebsiteJourneyPages, type WebsiteJourneyList } from '@/utils/websiteJourney';
+import { BRAND_LABEL } from '@/utils/brandColors';
+
+function JourneyPageList({ title, description, data, loading, isGroupView }: {
+  title: string;
+  description: string;
+  data: WebsiteJourneyList;
+  loading: boolean;
+  isGroupView: boolean;
+}) {
+  return (
+    <div className="card p-5" style={{ borderTop: '4px solid var(--v2-blue)' }}>
+      <h3 className="font-bold text-text-primary mb-1">{title}</h3>
+      <p className="text-xs text-text-secondary mb-4">{description}</p>
+      {loading ? <p className="text-sm text-text-secondary">Loading GA4 pages…</p> : data.status !== 'available' ? (
+        <p className="text-sm text-text-secondary">{data.subtitle}</p>
+      ) : data.rows.length === 0 ? (
+        <p className="text-sm text-text-secondary">No matching activity in this period.</p>
+      ) : (
+        <ol className="space-y-3">
+          {data.rows.map((row, index) => (
+            <li key={`${row.brand}:${row.pagePath}`} className="flex items-start gap-3 text-sm">
+              <span className="text-text-secondary" style={{ minWidth: 18 }}>{index + 1}.</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-text-primary break-all" title={row.pagePath}>{row.pagePath}</span>
+                {isGroupView && <span className="text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}
+              </span>
+              <strong className="text-text-primary tabular-nums">{row.count.toLocaleString('en-GB')}</strong>
+            </li>
+          ))}
+        </ol>
+      )}
+      {data.status === 'available' && <p className="text-xs text-text-secondary mt-4">{data.subtitle}</p>}
+    </div>
+  );
+}
 
 // Website — Phase 1. Real Google Search Console organic search
 // performance (clicks, impressions, CTR, average position, top queries,
@@ -34,6 +71,9 @@ export function WebsiteScreen() {
   const syncSearchConsolePerformance = useAppStore((s) => s.syncSearchConsolePerformance);
   const ga4Enquiries = useAppStore((s) => s.ga4Enquiries);
   const syncGa4Enquiries = useAppStore((s) => s.syncGa4Enquiries);
+  const [journey, setJourney] = useState<Ga4WebsiteJourneyResponse | null>(null);
+  const [journeyLoading, setJourneyLoading] = useState(true);
+  const [journeyError, setJourneyError] = useState(false);
   const { isGroupView, selectedEntity } = useEntity();
   const { period } = usePeriod();
 
@@ -46,6 +86,18 @@ export function WebsiteScreen() {
   useEffect(() => {
     syncGa4Enquiries(ga4Range.startDate, ga4Range.endDate);
   }, [ga4Range.startDate, ga4Range.endDate, syncGa4Enquiries]);
+
+  useEffect(() => {
+    let active = true;
+    setJourney(null);
+    setJourneyLoading(true);
+    setJourneyError(false);
+    fetchGa4WebsiteJourney(ga4Range.startDate, ga4Range.endDate)
+      .then((data) => { if (active) setJourney(data); })
+      .catch(() => { if (active) setJourneyError(true); })
+      .finally(() => { if (active) setJourneyLoading(false); });
+    return () => { active = false; };
+  }, [ga4Range.startDate, ga4Range.endDate]);
 
   const summary = useMemo(
     () => getSearchConsoleSummary(searchConsolePerformance, isGroupView, selectedEntity),
@@ -68,6 +120,9 @@ export function WebsiteScreen() {
     () => getEnquiries(ga4Enquiries, isGroupView, selectedEntity),
     [ga4Enquiries, isGroupView, selectedEntity]
   );
+  const entryPages = useMemo(() => getWebsiteJourneyPages(journey, isGroupView, selectedEntity, 'entryPages'), [journey, isGroupView, selectedEntity]);
+  const viewedPages = useMemo(() => getWebsiteJourneyPages(journey, isGroupView, selectedEntity, 'topPages'), [journey, isGroupView, selectedEntity]);
+  const enquiryPages = useMemo(() => getWebsiteJourneyPages(journey, isGroupView, selectedEntity, 'enquiryPages'), [journey, isGroupView, selectedEntity]);
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
@@ -99,6 +154,24 @@ export function WebsiteScreen() {
         </div>
 
         <DataFreshnessBar entries={freshnessEntries} />
+
+        <div className="mb-8">
+          <h2 className="v2-section-title">Where people go</h2>
+          <p className="text-sm text-text-secondary mb-4" style={{ marginTop: -8 }}>
+            Real GA4 page activity for the selected period. These lists show where sessions start, which pages are viewed
+            and where verified enquiry actions happen. They are separate totals, not a step-by-step visitor path or a drop-off rate.
+          </p>
+          {journeyError && <p className="text-sm text-text-secondary mb-3">GA4 page reporting could not load. Please try again.</p>}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <JourneyPageList title="Entry pages" description="First page of a GA4 session · sessions" data={entryPages} loading={journeyLoading} isGroupView={isGroupView} />
+            <JourneyPageList title="Most viewed pages" description="Pages people looked at · page views" data={viewedPages} loading={journeyLoading} isGroupView={isGroupView} />
+            <JourneyPageList title="Enquiry pages" description="Page where a verified form, phone, email or live chat event fired · events" data={enquiryPages} loading={journeyLoading} isGroupView={isGroupView} />
+          </div>
+          <p className="text-xs text-text-secondary mt-3">
+            Page paths are shown without query strings to avoid exposing information in URLs. A phone or email click may happen on a page other than the contact page.
+            Enquiry pages are only available for entities with confirmed event definitions; they do not include CRM leads.
+          </p>
+        </div>
 
         {/* Organic Search — Search Console */}
         <div className="mb-8">

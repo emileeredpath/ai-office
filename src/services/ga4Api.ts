@@ -113,6 +113,30 @@ export async function fetchGa4Enquiries(startDate: string, endDate: string): Pro
   return response.json();
 }
 
+export interface Ga4WebsiteJourneyResponse {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  configuredBrands: Brand[];
+  enquiryConfiguredBrands: Brand[];
+  errors: string[];
+  brands: Array<{
+    brand: Brand;
+    entryPages: Array<{ pagePath: string; sessions: number; users: number }> | null;
+    topPages: Array<{ pagePath: string; pageViews: number; users: number }> | null;
+    enquiryPages: Array<{ pagePath: string; enquiries: number }> | null;
+  }>;
+}
+
+export async function fetchGa4WebsiteJourney(startDate: string, endDate: string): Promise<Ga4WebsiteJourneyResponse> {
+  const params = new URLSearchParams({ startDate, endDate });
+  const response = await apiFetch(`/api/analytics/ga4-website-journey?${params.toString()}`);
+  if (!response.ok) {
+    throw new ApiError(`Failed to fetch GA4 website journey (${response.status}).`, response.status);
+  }
+  return response.json();
+}
+
 // Education 2026 campaign downstream attribution (Email page) — real GA4
 // sessions/enquiries filtered to the campaign's own tagged links. A fully
 // separate response from Ga4EnquiriesResponse above — never touched by or

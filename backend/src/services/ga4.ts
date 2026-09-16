@@ -58,6 +58,43 @@ export interface Ga4Result {
   errors: string[];
 }
 
+export interface WebsiteEntryPageRow {
+  pagePath: string;
+  sessions: number;
+  users: number;
+}
+
+export interface WebsiteViewedPageRow {
+  pagePath: string;
+  pageViews: number;
+  users: number;
+}
+
+export interface WebsiteEnquiryPageRow {
+  pagePath: string;
+  enquiries: number;
+}
+
+export interface BrandWebsiteJourney {
+  brand: Brand;
+  // null means the report was unavailable. An empty array is a genuine
+  // successful report with no matching activity in the selected period.
+  entryPages: WebsiteEntryPageRow[] | null;
+  topPages: WebsiteViewedPageRow[] | null;
+  // Also null where this brand has no verified enquiry event definition.
+  enquiryPages: WebsiteEnquiryPageRow[] | null;
+}
+
+export interface Ga4WebsiteJourneyResult {
+  configured: boolean;
+  startDate: string;
+  endDate: string;
+  brands: BrandWebsiteJourney[];
+  configuredBrands: Brand[];
+  enquiryConfiguredBrands: Brand[];
+  errors: string[];
+}
+
 // GA4's own earliest supported date for the Analytics Data API — used as
 // the honest "all time" floor when a caller doesn't supply a date range,
 // rather than an unbounded or fabricated period. This isn't a guess at
@@ -408,6 +445,134 @@ const ENQUIRY_EVENTS_BY_BRAND: Partial<Record<Brand, BrandEnquiryDefinition>> = 
     email: ['click_email'],
   },
 };
+
+interface Ga4ReportRow {
+  dimensionValues: { value: string }[];
+  metricValues: { value: string }[];
+}
+
+async function runWebsiteJourneyReport(
+  propertyId: string,
+  token: string,
+  startDate: string,
+  endDate: string,
+  dimension: 'landingPage' | 'unifiedPagePathScreen',
+  metrics: string[],
+  eventNames?: string[]
+): Promise<Ga4ReportRow[]> {
+  const res = await fetch(`${DATA_API_BASE}/properties/${propertyId}:runReport`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [...(eventNames ? [{ name: 'eventName' }] : []), { name: dimension }],
+      metrics: metrics.map((name) => ({ name })),
+      ...(eventNames
+        ? { dimensionFilter: { filter: { fieldName: 'eventName', inListFilter: { values: eventNames } } } }
+        : {}),
+      orderBys: [{ metric: { metricName: metrics[0] }, desc: true }],
+      // Include every event/page combination before summing verified
+      // enquiry types by page. GA4's maximum response size is 250,000.
+      limit: 100000,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GA4 website journey runReport failed for property ${propertyId} (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { rows?: Ga4ReportRow[] };
+  return json.rows ?? [];
+}
+
+// Read-only aggregate page reporting for the Website screen. These are
+// three deliberately separate observations: the first page in a session,
+// pages viewed, and the page where a verified enquiry event fired. They do
+// not claim an ordered, person-level route between aggregate page totals.
+export async function getWebsiteJourney(startDate?: string, endDate?: string): Promise<Ga4WebsiteJourneyResult> {
+  const errors: string[] = [];
+  const configuredBrands = (Object.keys(PROPERTY_ID_ENV) as Brand[]).filter(
+    (brand) => !!process.env[PROPERTY_ID_ENV[brand] as string]
+  );
+  const enquiryConfiguredBrands = configuredBrands.filter((brand) => !!ENQUIRY_EVENTS_BY_BRAND[brand]);
+  const range = startDate && endDate ? { startDate, endDate } : defaultMonthToDateRange();
+
+  if (!process.env.GA4_SERVICE_ACCOUNT_JSON || configuredBrands.length === 0) {
+    return {
+      configured: false,
+      startDate: range.startDate,
+      endDate: range.endDate,
+      brands: [],
+      configuredBrands: [],
+      enquiryConfiguredBrands: [],
+      errors: ['GA4 is not configured — set GA4_SERVICE_ACCOUNT_JSON and at least one GA4_PROPERTY_ID_* variable.'],
+    };
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[ga4] failed to get access token for website journey:', msg);
+    return { configured: true, startDate: range.startDate, endDate: range.endDate, brands: [], configuredBrands, enquiryConfiguredBrands, errors: [msg] };
+  }
+
+  const brands: BrandWebsiteJourney[] = [];
+  for (const brand of configuredBrands) {
+    const propertyId = process.env[PROPERTY_ID_ENV[brand] as string] as string;
+    let entryPages: WebsiteEntryPageRow[] | null = null;
+    let topPages: WebsiteViewedPageRow[] | null = null;
+    let enquiryPages: WebsiteEnquiryPageRow[] | null = null;
+
+    try {
+      const rows = await runWebsiteJourneyReport(propertyId, token, range.startDate, range.endDate, 'landingPage', ['sessions', 'activeUsers']);
+      entryPages = rows.map((row) => ({
+        pagePath: row.dimensionValues[0]?.value ?? '(not set)',
+        sessions: Number(row.metricValues[0]?.value ?? 0),
+        users: Number(row.metricValues[1]?.value ?? 0),
+      }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${brand} entry pages: ${msg}`);
+    }
+
+    try {
+      const rows = await runWebsiteJourneyReport(propertyId, token, range.startDate, range.endDate, 'unifiedPagePathScreen', ['screenPageViews', 'activeUsers']);
+      topPages = rows.map((row) => ({
+        pagePath: row.dimensionValues[0]?.value ?? '(not set)',
+        pageViews: Number(row.metricValues[0]?.value ?? 0),
+        users: Number(row.metricValues[1]?.value ?? 0),
+      }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${brand} viewed pages: ${msg}`);
+    }
+
+    const def = ENQUIRY_EVENTS_BY_BRAND[brand];
+    if (def) {
+      // Deliberately exclude the rollup event, which would duplicate the
+      // specific verified form/phone/email/live-chat events.
+      const eventNames = [...(def.form ?? []), ...(def.phone ?? []), ...(def.email ?? []), ...(def.livechat ?? [])];
+      try {
+        const rows = await runWebsiteJourneyReport(propertyId, token, range.startDate, range.endDate, 'unifiedPagePathScreen', ['eventCount'], eventNames);
+        const totals = new Map<string, number>();
+        for (const row of rows) {
+          const pagePath = row.dimensionValues[1]?.value ?? '(not set)';
+          totals.set(pagePath, (totals.get(pagePath) ?? 0) + Number(row.metricValues[0]?.value ?? 0));
+        }
+        enquiryPages = Array.from(totals, ([pagePath, enquiries]) => ({ pagePath, enquiries }))
+          .sort((a, b) => b.enquiries - a.enquiries);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${brand} enquiry pages: ${msg}`);
+      }
+    }
+
+    brands.push({ brand, entryPages, topPages, enquiryPages });
+  }
+
+  return { configured: true, startDate: range.startDate, endDate: range.endDate, brands, configuredBrands, enquiryConfiguredBrands, errors };
+}
 
 export type EnquiryType = 'form' | 'phone' | 'email' | 'livechat';
 
