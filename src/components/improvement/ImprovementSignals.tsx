@@ -3,6 +3,7 @@ import type { Brand } from '@/types/index';
 import type { Ga4WebsiteJourneyResponse } from '@/services/ga4Api';
 import type { GoogleAdsResponse } from '@/services/googleAdsApi';
 import type { WebsiteSite } from '@/services/websiteImprovementsApi';
+import type { EntitySelection } from '@/contexts/EntityContext';
 import { getWebsiteImprovementSignals } from '@/utils/improvementSignals';
 import { getGa4PageUrl } from '@/utils/websitePageLinks';
 import { getGoogleAdsCampaigns } from '@/utils/googleAdsPerformance';
@@ -24,11 +25,10 @@ function MiniBar({ value, maximum, colour }: { value: number; maximum: number; c
   </div>;
 }
 
-export function WebsiteSignals({ journey, loading, sites, selectedSite }: {
-  journey: Ga4WebsiteJourneyResponse | null; loading: boolean; sites: WebsiteSite[]; selectedSite: string;
+export function WebsiteSignals({ journey, loading, sites }: {
+  journey: Ga4WebsiteJourneyResponse | null; loading: boolean; sites: WebsiteSite[];
 }) {
-  const scopedSites = useMemo(() => sites.filter((site) => selectedSite === 'all' || site.id === selectedSite), [sites, selectedSite]);
-  const brands = useMemo(() => scopedSites.map((site) => site.brand).filter((brand): brand is Brand => Boolean(brand)) as Brand[], [scopedSites]);
+  const brands = useMemo(() => sites.map((site) => site.brand).filter((brand): brand is Brand => Boolean(brand)) as Brand[], [sites]);
   const signals = useMemo(() => getWebsiteImprovementSignals(journey, brands), [journey, brands]);
   const lists = [
     { title: 'People enter here', subtitle: 'GA4 landing sessions', rows: signals.entries.map((row) => ({ ...row, count: row.sessions })), reported: signals.reportedSites, colour: '#3B82F6' },
@@ -36,6 +36,8 @@ export function WebsiteSignals({ journey, loading, sites, selectedSite }: {
     { title: 'Enquiry action pages', subtitle: 'Verified GA4 events, not CRM leads', rows: signals.enquiryActions, reported: signals.enquiryReportedSites, colour: '#16A34A' },
   ];
   const configuredEnquiry = journey?.enquiryConfiguredBrands.some((brand) => brands.includes(brand)) ?? false;
+
+  if (!loading && sites.length === 0) return <section className="card p-5"><h2 className="v2-section-title mb-1">Where people go</h2><p className="text-sm text-text-secondary">No website is mapped to this entity, so there is no page journey to show.</p></section>;
 
   return <section className="space-y-3">
     <div className="flex flex-wrap justify-between items-end gap-2">
@@ -64,8 +66,8 @@ export function WebsiteSignals({ journey, loading, sites, selectedSite }: {
   </section>;
 }
 
-export function PpcSignals({ googleAds, loading }: { googleAds: GoogleAdsResponse | null; loading: boolean }) {
-  const campaigns = useMemo(() => getGoogleAdsCampaigns(googleAds, true, 'mtech'), [googleAds]);
+export function PpcSignals({ googleAds, loading, isGroupView, selectedEntity }: { googleAds: GoogleAdsResponse | null; loading: boolean; isGroupView: boolean; selectedEntity: EntitySelection }) {
+  const campaigns = useMemo(() => getGoogleAdsCampaigns(googleAds, isGroupView, selectedEntity), [googleAds, isGroupView, selectedEntity]);
   const top = campaigns.rows.slice(0, 5);
   const checks = campaigns.rows.filter((row) => row.spend > 0 && row.conversions === 0).slice(0, 3);
   return <section className="grid lg:grid-cols-3 gap-3">

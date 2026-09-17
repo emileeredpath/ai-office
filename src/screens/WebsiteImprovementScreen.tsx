@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { KpiCard } from '@/components/common/KpiCard';
 import { fetchGa4Traffic, fetchGa4WebsiteJourney, type Ga4TrafficResponse, type Ga4WebsiteJourneyResponse } from '@/services/ga4Api';
@@ -10,6 +11,7 @@ import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAd
 import { resolveSearchConsoleDateRange } from '@/utils/searchConsole';
 import { useAppStore } from '@/store/useAppStore';
 import { PpcSignals, WebsiteSignals } from '@/components/improvement/ImprovementSignals';
+import { getImprovementScope } from '@/utils/improvementScope';
 import {
   fetchWebsiteImprovements, fetchWebsiteSites, createWebsiteImprovement, updateWebsiteImprovement,
   type WebsiteSite, type WebsiteImprovement,
@@ -60,6 +62,8 @@ function dateOffset(value: string, days: number): string {
 export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website' | 'ppc' }) {
   const { period } = usePeriod();
   const { isEditor } = useAuth();
+  const { isGroupView, selectedEntity } = useEntity();
+  const entityLabel = ENTITY_OPTIONS.find((option) => option.value === selectedEntity)?.label ?? selectedEntity;
   const searchConsole = useAppStore((s) => s.searchConsolePerformance);
   const syncSearchConsole = useAppStore((s) => s.syncSearchConsolePerformance);
   const [sites, setSites] = useState<WebsiteSite[]>([]);
@@ -130,12 +134,15 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
     return () => { active = false; };
   }, [mode, range.startDate, range.endDate]);
 
-  const visibleRows = rows.filter((row) => selectedSite === 'all' || row.site_id === selectedSite);
+  const scope = useMemo(() => getImprovementScope(sites, rows, selectedEntity, selectedSite), [sites, rows, selectedEntity, selectedSite]);
+  const scopedSites = scope.sites;
+  const visibleRows = scope.rows;
   const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
   const rankedRows = [...visibleRows].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority] || a.id.localeCompare(b.id));
   const suggestedRows = rankedRows.filter((row) => row.status === 'Suggested');
   const activeRows = visibleRows.filter((row) => !['Suggested', 'Reverted'].includes(row.status));
-  const selected = selectedId ? rows.find((row) => row.id === selectedId) : null;
+  const selected = selectedId ? visibleRows.find((row) => row.id === selectedId) : null;
+  useEffect(() => { setSelectedSite('all'); setSelectedId(null); setShowAllLog(false); }, [selectedEntity, mode]);
   useEffect(() => {
     let active = true;
     if (mode === 'ppc') {
@@ -150,7 +157,7 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
       setWindowSessions({ before: null, after: null, state: 'The measurement window is still open. Do not treat it as a final result.' });
       return;
     }
-    const site = sites.find((item) => item.id === selected.site_id);
+    const site = scopedSites.find((item) => item.id === selected.site_id);
     if (!site?.brand) { setWindowSessions({ before: null, after: null, state: 'No GA4 property is mapped to this website.' }); return; }
     setWindowSessions({ before: null, after: null, state: 'Loading GA4 sessions for both windows…' });
     Promise.all([
@@ -164,15 +171,15 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
         { before: null, after: null, state: 'GA4 did not return both windows for this website.' });
     }).catch(() => { if (active) setWindowSessions({ before: null, after: null, state: 'GA4 could not load the comparison.' }); });
     return () => { active = false; };
-  }, [mode, selected?.id, selected?.site_id, selected?.baseline_start, selected?.baseline_end, selected?.measurement_start, selected?.measurement_end, sites]);
-  const measuredSites = sites.filter((site) => site.brand && ga4?.brands.some((item) => item.brand === site.brand));
-  const allMeasured = sites.length > 0 && measuredSites.length === sites.length && (ga4?.errors.length ?? 0) === 0;
+  }, [mode, selected?.id, selected?.site_id, selected?.baseline_start, selected?.baseline_end, selected?.measurement_start, selected?.measurement_end, scopedSites]);
+  const measuredSites = scopedSites.filter((site) => site.brand && ga4?.brands.some((item) => item.brand === site.brand));
+  const allMeasured = scopedSites.length > 0 && measuredSites.length === scopedSites.length;
   const sessions = measuredSites.reduce((sum, site) => sum + (ga4?.brands.find((row) => row.brand === site.brand)?.sessions ?? 0), 0);
-  const maxSiteSessions = Math.max(0, ...(ga4?.brands.map((row) => row.sessions) ?? []));
-  const adsSummary = getGoogleAdsSummary(googleAds, true, 'mtech');
+  const maxSiteSessions = Math.max(0, ...measuredSites.map((site) => ga4?.brands.find((row) => row.brand === site.brand)?.sessions ?? 0));
+  const adsSummary = getGoogleAdsSummary(googleAds, isGroupView, selectedEntity);
 
   const selectRow = (row: WebsiteImprovement) => { setSelectedId(row.id); setDraft(fromRow(row)); setError(''); };
-  const startNew = () => { setSelectedId('new'); setDraft({ ...emptyDraft, siteId: selectedSite !== 'all' ? selectedSite : (sites[0]?.id ?? ''), improvementType: mode === 'ppc' ? 'PPC landing page' : 'Content' }); setError(''); };
+  const startNew = () => { if (!scopedSites.length) return; setSelectedId('new'); setDraft({ ...emptyDraft, siteId: scope.selectedSite !== 'all' ? scope.selectedSite : scopedSites[0].id, improvementType: mode === 'ppc' ? 'PPC landing page' : 'Content' }); setError(''); };
   const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const setImplementedOn = (value: string) => setDraft((current) => ({
     ...current, implementedOn: value,
@@ -183,6 +190,7 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
   }));
   const save = async () => {
     if (!draft.siteId || !draft.title.trim() || !draft.improvementType.trim()) { setError('Add a website, change and improvement type.'); return; }
+    if (!scopedSites.some((site) => site.id === draft.siteId)) { setError('Choose a website for the selected entity.'); return; }
     if (draft.baselineStart && draft.baselineEnd && draft.baselineStart > draft.baselineEnd) { setError('The baseline dates are reversed.'); return; }
     if (draft.measurementStart && draft.measurementEnd && draft.measurementStart > draft.measurementEnd) { setError('The measurement dates are reversed.'); return; }
     setSaving(true); setError('');
@@ -197,32 +205,32 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
   return <div className="v2-page"><div className="max-w-7xl mx-auto space-y-6">
     <div className="v2-page-header"><div>
       <h1 className="text-3xl font-bold text-text-primary mb-2">{mode === 'ppc' ? 'PPC Improvement' : 'Website Improvement'}</h1>
-      <p className="text-text-secondary">{mode === 'ppc' ? 'Track paid search changes, landing-page work and what to improve next.' : 'Track what we change, what improves and where the next lead opportunity is.'}</p>
+      <p className="text-text-secondary">{mode === 'ppc' ? 'Track paid search changes, landing-page work and what to improve next.' : 'Track what we change, what improves and where the next lead opportunity is.'} <span className="font-semibold">Showing: {entityLabel}</span></p>
     </div><PeriodSelector /></div>
 
     {mode === 'website'
-      ? <WebsiteSignals journey={journey} loading={journeyLoading} sites={sites} selectedSite="all" />
-      : <PpcSignals googleAds={googleAds} loading={adsLoading} />}
+      ? loadError ? <section className="card p-5"><h2 className="v2-section-title mb-1">Where people go</h2><p className="text-sm text-text-secondary">Website list unavailable.</p></section> : <WebsiteSignals journey={journey} loading={journeyLoading || loading} sites={scopedSites} />
+      : <PpcSignals googleAds={googleAds} loading={adsLoading} isGroupView={isGroupView} selectedEntity={selectedEntity} />}
 
     {mode === 'website' ? <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-      <KpiCard title="GA4 Website Sessions" value={ga4Loading ? 'Loading…' : allMeasured ? sessions.toLocaleString('en-GB') : undefined} status={ga4Loading || allMeasured ? 'available' : 'not-connected'} notConnectedLabel="Incomplete" subtitle={allMeasured ? `${range.startDate} to ${range.endDate}` : `${measuredSites.length} of ${sites.length} sites returned data; no group total shown`} accent="var(--v2-green)" />
-      <KpiCard title="Sites reporting" value={journeyLoading || loading ? 'Loading…' : journey?.configured && sites.length ? `${journey.brands.filter((brand) => brand.entryPages !== null && sites.some((site) => site.brand === brand.brand)).length} / ${sites.length}` : undefined} status={journeyLoading || loading || Boolean(journey?.configured && sites.length) ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="GA4 entry-page reports" accent="var(--v2-blue)" />
-      <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="From the audit backlog" accent="var(--v2-orange)" />
-      <KpiCard title="Changes progressed" value={loading ? 'Loading…' : activeRows.length} status={loading || !loadError ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Beyond Suggested status" accent="var(--v2-purple)" />
+      <KpiCard title="GA4 Website Sessions" value={ga4Loading || loading ? 'Loading…' : allMeasured ? sessions.toLocaleString('en-GB') : undefined} status={ga4Loading || loading || allMeasured ? 'available' : 'not-connected'} notConnectedLabel={scopedSites.length ? 'Incomplete' : 'Unavailable'} subtitle={allMeasured ? `${range.startDate} to ${range.endDate}` : scopedSites.length ? `${measuredSites.length} of ${scopedSites.length} sites returned data; no total shown` : 'No website mapped to this entity'} accent="var(--v2-green)" />
+      <KpiCard title="Sites reporting" value={journeyLoading || loading ? 'Loading…' : journey?.configured && scopedSites.length ? `${journey.brands.filter((brand) => brand.entryPages !== null && scopedSites.some((site) => site.brand === brand.brand)).length} / ${scopedSites.length}` : undefined} status={journeyLoading || loading || Boolean(journey?.configured && scopedSites.length) ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="GA4 entry-page reports" accent="var(--v2-blue)" />
+      <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError && scopedSites.length > 0 ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="From the audit backlog" accent="var(--v2-orange)" />
+      <KpiCard title="Changes progressed" value={loading ? 'Loading…' : activeRows.length} status={loading || !loadError && scopedSites.length > 0 ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Beyond Suggested status" accent="var(--v2-purple)" />
     </div> : <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       <KpiCard title="Google Ads Clicks" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.clicks!.toLocaleString('en-GB') : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--v2-blue)" />
       <KpiCard title="Google Ads Spend" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? `£${adsSummary.spend!.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--v2-orange)" />
       <KpiCard title="Google Ads Conversions" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.conversions : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle="Google Ads' own conversion metric; not verified leads" accent="var(--v2-purple)" />
-      <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Paid landing-page and PPC work" accent="var(--v2-green)" />
+      <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError && scopedSites.length > 0 ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Paid landing-page and PPC work" accent="var(--v2-green)" />
     </div>}
 
     <details className="card p-4" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
       <summary className="font-semibold text-text-primary cursor-pointer">{mode === 'website' ? 'Website leads and conversion rate: Not available' : 'Paid leads and landing-page conversion rate: Not available'} <span className="font-normal text-text-secondary">· Why?</span></summary>
       <p className="text-sm text-text-secondary mt-3">{mode === 'website' ? 'GA4 visits and verified enquiry actions are available as separate measures, but enquiries are not confirmed CRM leads. A lead conversion rate or drop-off calculation needs a reliable website-origin lead count for the same eligible sessions and dates.' : 'Google Ads clicks and its own conversions do not identify verified CRM leads on individual landing pages. Paid conversion needs matched paid sessions and leads for the same page and dates.'}</p>
       <div className="flex flex-wrap gap-2 mt-3 text-xs">
-        <span className="rounded px-2 py-1 bg-slate-100">GA4: {ga4Loading ? 'Checking' : ga4?.configured && measuredSites.length ? ga4.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>
-        {mode === 'website' && <span className="rounded px-2 py-1 bg-slate-100">Search Console: {searchConsole?.configured ? searchConsole.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>}
-        <span className="rounded px-2 py-1 bg-slate-100">Google Ads: {mode === 'website' ? 'Not assessed here' : adsLoading ? 'Checking' : googleAds?.configured ? googleAds.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>
+        <span className="rounded px-2 py-1 bg-slate-100">GA4: {ga4Loading ? 'Checking' : ga4?.configured && measuredSites.length ? measuredSites.length < scopedSites.length || isGroupView && ga4.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>
+        {mode === 'website' && <span className="rounded px-2 py-1 bg-slate-100">Search Console: {searchConsole?.configured && scopedSites.some((site) => searchConsole.brands.some((brand) => brand.brand === site.brand)) ? isGroupView && searchConsole.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>}
+        <span className="rounded px-2 py-1 bg-slate-100">Google Ads: {mode === 'website' ? 'Not assessed here' : adsLoading ? 'Checking' : adsSummary.status === 'available' ? isGroupView && googleAds?.errors.length ? 'Partial / error' : 'Connected' : 'Not connected'}</span>
         <span className="rounded px-2 py-1 bg-slate-100">Infinity: Not assessed for {mode === 'ppc' ? 'paid leads' : 'website leads'}</span>
         <span className="rounded px-2 py-1 bg-slate-100">CRM {mode === 'ppc' ? 'paid' : 'website'} attribution: Not verified</span>
       </div>
@@ -231,41 +239,43 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
     {mode === 'website' ? <section className="card p-5"><h2 className="v2-section-title mb-1">Websites at a glance</h2>
       <p className="text-xs text-text-secondary mb-4">GA4 website sessions for the selected period. A missing site report stays unavailable.</p>
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {sites.map((site) => { const entry = ga4?.brands.find((row) => row.brand === site.brand); const count = rows.filter((row) => row.site_id === site.id && !['Suggested', 'Reverted'].includes(row.status)).length; return <div key={site.id} className="rounded-lg bg-slate-50 p-3 min-w-0">
+        {scopedSites.map((site) => { const entry = ga4?.brands.find((row) => row.brand === site.brand); const count = rows.filter((row) => row.site_id === site.id && !['Suggested', 'Reverted'].includes(row.status)).length; return <div key={site.id} className="rounded-lg bg-slate-50 p-3 min-w-0">
           <a className="font-semibold text-sm text-text-primary hover:underline" href={site.url} target="_blank" rel="noopener noreferrer">{site.name} ↗</a>
           <div className="flex justify-between items-end mt-2"><strong className="text-2xl tabular-nums text-text-primary">{ga4Loading ? '…' : entry ? entry.sessions.toLocaleString('en-GB') : '—'}</strong><span className="text-xs text-text-secondary">{entry ? 'sessions' : ga4Loading ? 'loading' : 'not connected'}</span></div>
           {entry && <div className="h-1.5 bg-slate-200 rounded-full mt-2"><div className="h-full rounded-full bg-blue-500" style={{ width: `${maxSiteSessions > 0 ? entry.sessions / maxSiteSessions * 100 : 0}%` }} /></div>}
           <p className="text-xs text-text-secondary mt-2">{count ? `${count} changes progressed` : 'No changes progressed yet'}</p>
         </div>; })}
+        {!loading && scopedSites.length === 0 && <p className="text-sm text-text-secondary">{loadError ? 'Website list unavailable.' : `No website is mapped to ${entityLabel}.`}</p>}
       </div>
     </section> : <section className="card p-5"><h2 className="v2-section-title mb-1">Paid performance by entity</h2>
       <p className="text-xs text-text-secondary mb-3">Google Ads account totals; these are not assigned to individual landing pages.</p>
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">Entity</th><th>Clicks</th><th>Spend</th><th>Ads conversions</th></tr></thead><tbody>
-        {sites.map((site) => { const entry = googleAds?.brands.find((row) => row.brand === site.brand); return <tr key={site.id} className="border-b last:border-0"><td className="py-3 font-medium">{site.name}</td><td>{adsLoading ? 'Loading…' : entry ? entry.clicks.toLocaleString('en-GB') : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? `£${entry.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? entry.conversions.toLocaleString('en-GB') : 'Not connected'}</td></tr>; })}
+        {scopedSites.map((site) => { const entry = googleAds?.brands.find((row) => row.brand === site.brand); return <tr key={site.id} className="border-b last:border-0"><td className="py-3 font-medium">{site.name}</td><td>{adsLoading ? 'Loading…' : entry ? entry.clicks.toLocaleString('en-GB') : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? `£${entry.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? entry.conversions.toLocaleString('en-GB') : 'Not connected'}</td></tr>; })}
+        {!loading && scopedSites.length === 0 && <tr><td colSpan={4} className="py-3 text-text-secondary">{loadError ? 'Website list unavailable.' : `No website is mapped to ${entityLabel}.`}</td></tr>}
       </tbody></table></div>
     </section>}
 
     <section className="grid lg:grid-cols-2 gap-3">
       <div className="card p-5" style={{ borderTop: '4px solid #F97316' }}>
         <h2 className="v2-section-title mb-1">What to review next</h2><p className="text-xs text-text-secondary mb-3">Highest-priority suggestions from the audit. Priority is from the brief, not an automatic conversion score.</p>
-        {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : suggestedRows.length === 0 ? <p className="text-sm text-text-secondary">No suggested improvements for this selection.</p> : <div className="space-y-2">{suggestedRows.slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-orange-50 hover:bg-orange-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}>
-          <span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-orange-800 whitespace-nowrap">{row.priority}</span>
+        {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : scopedSites.length === 0 ? <p className="text-sm text-text-secondary">No website is mapped to {entityLabel}.</p> : suggestedRows.length === 0 ? <p className="text-sm text-text-secondary">No suggested improvements for this selection.</p> : <div className="space-y-2">{suggestedRows.slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-orange-50 hover:bg-orange-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}>
+          <span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{scopedSites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-orange-800 whitespace-nowrap">{row.priority}</span>
         </button>)}</div>}
       </div>
       <div className="card p-5" style={{ borderTop: '4px solid #8B5CF6' }}>
         <h2 className="v2-section-title mb-1">Changes being tracked</h2><p className="text-xs text-text-secondary mb-3">Work moved beyond Suggested. Open a record to check dates and results.</p>
-        {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : activeRows.length === 0 ? <div className="rounded-lg bg-violet-50 p-4"><strong className="text-sm text-text-primary">No changes recorded yet</strong><p className="text-xs text-text-secondary mt-1">When a recommendation is approved or implemented, it will appear here.</p></div> : <div className="space-y-2">{[...activeRows].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-violet-50 hover:bg-violet-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}><span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-violet-800 whitespace-nowrap">{row.status}</span></button>)}</div>}
+        {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : scopedSites.length === 0 ? <p className="text-sm text-text-secondary">No website is mapped to {entityLabel}.</p> : activeRows.length === 0 ? <div className="rounded-lg bg-violet-50 p-4"><strong className="text-sm text-text-primary">No changes recorded yet</strong><p className="text-xs text-text-secondary mt-1">When a recommendation is approved or implemented, it will appear here.</p></div> : <div className="space-y-2">{[...activeRows].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-violet-50 hover:bg-violet-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}><span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{scopedSites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-violet-800 whitespace-nowrap">{row.status}</span></button>)}</div>}
       </div>
     </section>
 
-    <section className="card p-5"><div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div><h2 className="v2-section-title mb-1">{mode === 'ppc' ? 'PPC improvement log' : 'Improvement log'}</h2><p className="text-xs text-text-secondary">{mode === 'ppc' ? 'Paid landing-page recommendations share the Website log so each change has one record.' : 'Audit recommendations start as Suggested. Open a row to plan or measure a change.'}</p></div><div className="flex gap-2"><select className="input" aria-label="Filter website" value={selectedSite} onChange={(event) => { setSelectedSite(event.target.value); setShowAllLog(false); }}><option value="all">All websites</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>{isEditor && <button className="btn btn-primary" onClick={startNew}>Add improvement</button>}</div></div>
-      {loading ? <p className="text-sm text-text-secondary">Loading improvement log…</p> : loadError ? <p className="text-sm text-text-secondary">Could not load the improvement log.</p> : <><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">ID</th><th>Website</th><th>Improvement</th><th>Priority</th><th>Status</th><th>Implemented</th></tr></thead><tbody>{(showAllLog ? rankedRows : rankedRows.slice(0, 5)).map((row) => <tr key={row.id} className="border-b last:border-0"><td className="py-2"><button className="underline font-medium text-text-primary" onClick={() => selectRow(row)}>{row.id}</button></td><td>{sites.find((site) => site.id === row.site_id)?.name ?? row.site_id}</td><td>{row.title}</td><td>{row.priority}</td><td>{row.status}</td><td>{row.implemented_on ?? '—'}</td></tr>)}</tbody></table></div>{rankedRows.length > 5 && <button className="btn btn-secondary mt-3" onClick={() => setShowAllLog((current) => !current)}>{showAllLog ? 'Show less' : `Show all ${rankedRows.length} improvements`}</button>}</>}
+    <section className="card p-5"><div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div><h2 className="v2-section-title mb-1">{mode === 'ppc' ? 'PPC improvement log' : 'Improvement log'}</h2><p className="text-xs text-text-secondary">{mode === 'ppc' ? 'Paid landing-page recommendations share the Website log so each change has one record.' : 'Audit recommendations start as Suggested. Open a row to plan or measure a change.'}</p></div><div className="flex gap-2"><select className="input" aria-label="Filter website" value={scope.selectedSite} onChange={(event) => { setSelectedSite(event.target.value); setShowAllLog(false); }}><option value="all">All websites</option>{scopedSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>{isEditor && scopedSites.length > 0 && <button className="btn btn-primary" onClick={startNew}>Add improvement</button>}</div></div>
+      {loading ? <p className="text-sm text-text-secondary">Loading improvement log…</p> : loadError ? <p className="text-sm text-text-secondary">Could not load the improvement log.</p> : scopedSites.length === 0 ? <p className="text-sm text-text-secondary">No website is mapped to {entityLabel}.</p> : <><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">ID</th><th>Website</th><th>Improvement</th><th>Priority</th><th>Status</th><th>Implemented</th></tr></thead><tbody>{(showAllLog ? rankedRows : rankedRows.slice(0, 5)).map((row) => <tr key={row.id} className="border-b last:border-0"><td className="py-2"><button className="underline font-medium text-text-primary" onClick={() => selectRow(row)}>{row.id}</button></td><td>{scopedSites.find((site) => site.id === row.site_id)?.name ?? row.site_id}</td><td>{row.title}</td><td>{row.priority}</td><td>{row.status}</td><td>{row.implemented_on ?? '—'}</td></tr>)}</tbody></table></div>{rankedRows.length > 5 && <button className="btn btn-secondary mt-3" onClick={() => setShowAllLog((current) => !current)}>{showAllLog ? 'Show less' : `Show all ${rankedRows.length} improvements`}</button>}</>}
     </section>
 
-    {selectedId && <section className="card p-5"><div className="flex justify-between gap-3"><h2 className="v2-section-title">{selected ? `${selected.id} · ${selected.title}` : 'New improvement'}</h2><button className="btn btn-secondary" onClick={() => setSelectedId(null)}>Close</button></div>
+    {selectedId && (selected || (selectedId === 'new' && scopedSites.some((site) => site.id === draft.siteId))) && <section className="card p-5"><div className="flex justify-between gap-3"><h2 className="v2-section-title">{selected ? `${selected.id} · ${selected.title}` : 'New improvement'}</h2><button className="btn btn-secondary" onClick={() => setSelectedId(null)}>Close</button></div>
       {selected?.page_url ? <a href={selected.page_url} target="_blank" rel="noopener noreferrer" className="text-sm underline">Open affected page ↗</a> : selected ? <p className="text-xs text-text-secondary">Exact page URL has not been identified.</p> : null}
       <div className="grid md:grid-cols-2 gap-3 mt-4 text-sm">
-        <label>Website<select className="input mt-1 w-full" value={draft.siteId} disabled={!isEditor} onChange={(e) => setField('siteId', e.target.value)}>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+        <label>Website<select className="input mt-1 w-full" value={draft.siteId} disabled={!isEditor} onChange={(e) => setField('siteId', e.target.value)}>{scopedSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
         <label>Page URL<input className="input mt-1 w-full" type="url" value={draft.pageUrl} disabled={!isEditor} onChange={(e) => setField('pageUrl', e.target.value)} placeholder="Exact page, when confirmed" /></label>
         <label>Change<input className="input mt-1 w-full" value={draft.title} disabled={!isEditor} onChange={(e) => setField('title', e.target.value)} /></label>
         <label>Improvement type<input className="input mt-1 w-full" value={draft.improvementType} disabled={!isEditor} onChange={(e) => setField('improvementType', e.target.value)} /></label>
