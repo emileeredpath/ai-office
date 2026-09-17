@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/contexts/EntityContext';
-import { usePeriod, periodStartDate } from '@/contexts/PeriodContext';
+import { usePeriod } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { KpiCard } from '@/components/common/KpiCard';
 import { BrandBadge } from '@/components/common/BrandBadge';
@@ -15,11 +15,10 @@ import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMarketingEvents } from '@/utils/marketingEvents';
-import { filterCampaignsByPeriod } from '@/utils/campaignMetrics';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
-import { resolveEmailDateRange, getEmailPerformance, getEmailHeadlineMetrics, getEmailPerformanceForCampaign } from '@/utils/emailPerformance';
+import { resolveEmailDateRange, getEmailHeadlineMetrics, getEmailPerformanceForCampaign } from '@/utils/emailPerformance';
 import { resolveCallDateRange, getCallPerformance } from '@/utils/callPerformance';
 import { resolveSearchConsoleDateRange, getSearchConsoleSummary } from '@/utils/searchConsole';
 import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
@@ -147,11 +146,6 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     () => fundingRecords.filter((r) => matchesSelectedEntity(r.brand)),
     [fundingRecords, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const periodStart = useMemo(() => periodStartDate(period), [period]);
-  const periodCampaigns = useMemo(
-    () => filterCampaignsByPeriod(entityCampaigns, periodStart),
-    [entityCampaigns, periodStart]
-  );
   // Campaign rows use lifetime costs and the existing all-time media range.
   // Keep these reads separate from the period-scoped Google Ads headline.
   const [homeCampaignCosts, setHomeCampaignCosts] = useState<CampaignCost[] | null>(null);
@@ -176,10 +170,6 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const callPerformance = useMemo(
     () => getCallPerformance(infinityCalls, isGroupView, selectedEntity),
     [infinityCalls, isGroupView, selectedEntity]
-  );
-  const emailPerf = useMemo(
-    () => getEmailPerformance(emailPerformance, isGroupView, selectedEntity),
-    [emailPerformance, isGroupView, selectedEntity]
   );
   const emailHeadline = useMemo(
     () => getEmailHeadlineMetrics(emailPerformance, isGroupView, selectedEntity),
@@ -337,7 +327,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       includeCompleted: false,
       includeCampaignMarkers: true,
     });
-    return events.slice(0, 8).map((e) => ({
+    return events.slice(0, 3).map((e) => ({
       id: e.id,
       kind: e.kind,
       title: e.title,
@@ -389,6 +379,8 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       })
       .sort((a, b) => (a.progress.statusInconsistent === b.progress.statusInconsistent ? 0 : a.progress.statusInconsistent ? -1 : 1));
   }, [entityCampaigns, entityTasks, emailPerformance, googleAdsPerformance, homeCampaignCosts, campaignSpendAds, onNavigate]);
+  const allCampaignsNeedingAction = activeCampaigns.filter(({ nextAction }) => nextAction);
+  const campaignsNeedingAction = allCampaignsNeedingAction.slice(0, 3);
 
   const today = new Date();
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -411,7 +403,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               {getGreeting()}, {userName}
             </h1>
             <p className="text-text-secondary">
-              {dayName} {dateStr} · Here's what's happening with MTech marketing this month.
+              {dayName} {dateStr} · Here's what needs attention across MTech marketing.
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -425,8 +417,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </div>
         </div>
 
+        <div className="mb-3">
+          <h2 className="v2-section-title mb-1">Your priorities</h2>
+          <p className="text-sm text-text-secondary">What needs a decision and what is coming up next.</p>
+        </div>
         {/* Needs Your Attention + Coming Up */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           <div className="card" style={{ padding: 0 }}>
             <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
               <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Needs Your Attention</h2>
@@ -507,11 +503,11 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </div>
         </div>
 
-        {/* Marketing Performance */}
+        {/* Decision-first snapshot. Existing source definitions and period semantics are unchanged. */}
         <div className="mb-8">
-          <h2 className="v2-section-title" style={{ marginBottom: 2 }}>Marketing Performance</h2>
-          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>Key activity this month vs previous period</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="flex items-center justify-between gap-3 mb-2"><h2 className="v2-section-title mb-0">At a glance</h2><button type="button" className="text-sm font-medium text-violet-700 hover:underline" onClick={() => onNavigate?.('dashboard')}>Full performance <ArrowRight size={14} className="inline" /></button></div>
+          <p className="text-sm text-text-secondary mb-3">Independent measures for the selected view. Won Revenue is from the latest Acumatica export, not the selected period.</p>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             <KpiCard
               title="Website Enquiries"
               value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
@@ -527,33 +523,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               onClick={() => onNavigate?.('infinity')}
             />
             <KpiCard
-              title="Email Clicks"
-              value={emailPerf.status === 'available' ? emailPerf.clicks : undefined}
-              status={emailPerf.status}
-              subtitle={emailPerf.subtitle}
-              onClick={() => onNavigate?.('email')}
-            />
-            <KpiCard
               title="Google Ads Spend"
               value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined}
               status={googleAds.status}
               subtitle={googleAds.subtitle}
               comparison={googleAds.status === 'available' ? googleAdsSpendComparison : undefined}
               onClick={() => onNavigate?.('ppc')}
-            />
-            <KpiCard
-              title="Opportunities"
-              value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined}
-              status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
-              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
-              subtitle={
-                acumaticaNotAvailable
-                  ? `Not available — ${acumaticaSummary?.notAvailableReason}`
-                  : acumaticaSummary?.hasImportedData
-                    ? 'Latest Acumatica export'
-                    : acumaticaMissingLabel
-              }
-              onClick={() => onNavigate?.('leads')}
             />
             <KpiCard
               title="Won Revenue"
@@ -572,72 +547,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </div>
         </div>
 
-        {/* Marketing Impact */}
-        <div className="mb-8">
-          <div className="card">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-3">Marketing Response</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <div className="text-xs text-text-secondary mb-1">Google Ads Spend</div>
-                    <div className="text-xl font-bold text-text-primary">
-                      {googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-text-secondary mb-1">Enquiries + Calls</div>
-                    <div className="text-xl font-bold text-text-primary">
-                      {(ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total! : 0) +
-                        (callPerformance.status === 'available' ? callPerformance.totalCalls! : 0) || (ga4EnquiriesInfo.status !== 'available' && callPerformance.status !== 'available' ? '—' : 0)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-text-secondary mb-1">Marketing Leads</div>
-                    <div className="text-xl font-bold text-text-primary">{campaigns.length > 0 ? periodCampaigns.reduce((sum, c) => sum + (c.leads || 0), 0) : '—'}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: '1.5rem' }}>
-                <h3 className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-3">Overall Commercial Performance</h3>
-                {acumaticaNotAvailable ? (
-                  <p className="text-sm text-text-secondary">Not available — {acumaticaSummary?.notAvailableReason}</p>
-                ) : acumaticaSummary?.hasImportedData ? (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <div className="text-xs text-text-secondary mb-1">Opportunities</div>
-                      <div className="text-xl font-bold text-text-primary">{acumaticaSummary.opportunities}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-secondary mb-1">Open Pipeline</div>
-                      <div className="text-xl font-bold text-text-primary">£{Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-secondary mb-1">Won Revenue</div>
-                      <div className="text-xl font-bold text-text-primary">£{Math.round(acumaticaSummary.wonRevenue).toLocaleString()}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-secondary">{acumaticaMissingLabel}</p>
-                )}
-              </div>
-            </div>
-
-            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
-              <p className="text-xs text-text-secondary">
-                Commercial figures are from the latest Acumatica manual export
-                {acumaticaSummary?.lastImportedAt ? ` (imported ${new Date(acumaticaSummary.lastImportedAt).toLocaleDateString('en-GB')})` : ''} and are not yet fully attributed to marketing campaigns.
-                {isGroupView && ' Acumatica covers Brentwood, Radio Links, Capcom and Brentwood Marine. IRCL is not managed in Acumatica.'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Active Campaigns */}
+        {/* Campaign actions first; the full campaign table remains available below. */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Active Campaigns</h2>
+            <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Campaigns to review</h2>
             <button
               onClick={() => onNavigate?.('campaigns')}
               className="text-sm font-medium flex items-center gap-1"
@@ -646,9 +559,27 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               View all campaigns <ArrowRight size={14} />
             </button>
           </div>
-          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>Campaigns that need monitoring or action</p>
+          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>
+            Active campaigns with a status issue or overdue linked task.{allCampaignsNeedingAction.length > 3 ? ` Showing 3 of ${allCampaignsNeedingAction.length}.` : ''}
+          </p>
+          {campaignsNeedingAction.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              {campaignsNeedingAction.map(({ campaign, nextAction }) => (
+                <button key={campaign.id} type="button" onClick={() => selectCampaign(campaign.id)} className="card text-left">
+                  <span className="text-sm font-semibold text-text-primary block mb-1">{campaign.name}</span>
+                  <span className="text-sm text-text-secondary">{nextAction}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="card text-sm text-text-secondary mb-3">
+              {activeCampaigns.length === 0 ? `No active campaigns${isGroupView ? '' : ' for this entity'}.` : 'No active campaigns are flagged for a status review or overdue linked task.'}
+            </p>
+          )}
           {activeCampaigns.length > 0 ? (
-            <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <details className="card" style={{ padding: '0.75rem 1rem' }}>
+              <summary className="text-sm font-medium text-text-primary cursor-pointer">Explore all active campaigns ({activeCampaigns.length})</summary>
+              <div style={{ overflowX: 'auto', marginTop: '0.75rem' }}>
               <table className="table" style={{ width: '100%', minWidth: 640 }}>
                 <thead>
                   <tr>
@@ -693,24 +624,23 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
-          ) : (
-            <p className="text-text-secondary">No active campaigns{isGroupView ? '' : ' for this entity'}</p>
-          )}
+              </div>
+            </details>
+          ) : null}
         </div>
 
-        {/* Channel Performance */}
-        <div className="mb-4">
-          <h2 className="v2-section-title" style={{ marginBottom: 2 }}>Channel Performance</h2>
-          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>Key metrics from connected channels (this month)</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* Channel detail remains available without repeating six cards in the main view. */}
+        <details className="card mb-4">
+          <summary className="text-sm font-medium text-text-primary cursor-pointer">Explore channel metrics</summary>
+          <p className="text-sm text-text-secondary mt-3 mb-3">Key metrics from connected channels for the selected period.</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             <KpiCard
               title="Website"
               value={websiteUsers.status === 'available' ? websiteUsers.sessions : undefined}
               status={websiteUsers.status}
               subtitle={
                 websiteUsers.status === 'available'
-                  ? `${ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : 0} enquiries`
+                  ? ga4EnquiriesInfo.status === 'available' ? `${ga4EnquiriesInfo.total} enquiries` : 'Enquiries unavailable'
                   : websiteUsers.subtitle
               }
               size="compact"
@@ -757,7 +687,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               onClick={() => onNavigate?.('social')}
             />
           </div>
-        </div>
+        </details>
       </div>
     </div>
   );
