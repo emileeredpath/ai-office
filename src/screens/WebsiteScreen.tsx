@@ -38,15 +38,31 @@ function SearchConsolePageLink({ page }: { page: string }) {
   ) : <span className="text-text-primary">{page}</span>;
 }
 
-function JourneyPageList({ title, description, data, loading, isGroupView }: {
+function JourneyPageList({ title, description, data, loading, isGroupView, accent }: {
   title: string;
   description: string;
   data: WebsiteJourneyList;
   loading: boolean;
   isGroupView: boolean;
+  accent: string;
 }) {
+  const renderRows = (rows: WebsiteJourneyList['rows'], start: number) => (
+    <ol className="space-y-3">
+      {rows.map((row, index) => (
+        <li key={`${row.brand}:${row.pagePath}`} className="flex items-start gap-3 text-sm">
+          <span className="text-text-secondary" style={{ minWidth: 18 }}>{start + index}.</span>
+          <span className="min-w-0 flex-1">
+            <span className="block" title={row.pagePath}><Ga4PageLink brand={row.brand} pagePath={row.pagePath} /></span>
+            {isGroupView && <span className="text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}
+          </span>
+          <strong className="text-text-primary tabular-nums">{row.count.toLocaleString('en-GB')}</strong>
+        </li>
+      ))}
+    </ol>
+  );
+
   return (
-    <div className="card p-5" style={{ borderTop: '4px solid var(--v2-blue)' }}>
+    <div className="card p-5" style={{ borderTop: `4px solid ${accent}` }}>
       <h3 className="font-bold text-text-primary mb-1">{title}</h3>
       <p className="text-xs text-text-secondary mb-4">{description}</p>
       {loading ? <p className="text-sm text-text-secondary">Loading GA4 pages…</p> : data.status !== 'available' ? (
@@ -54,18 +70,15 @@ function JourneyPageList({ title, description, data, loading, isGroupView }: {
       ) : data.rows.length === 0 ? (
         <p className="text-sm text-text-secondary">No matching activity in this period.</p>
       ) : (
-        <ol className="space-y-3">
-          {data.rows.map((row, index) => (
-            <li key={`${row.brand}:${row.pagePath}`} className="flex items-start gap-3 text-sm">
-              <span className="text-text-secondary" style={{ minWidth: 18 }}>{index + 1}.</span>
-              <span className="min-w-0 flex-1">
-                <span className="block" title={row.pagePath}><Ga4PageLink brand={row.brand} pagePath={row.pagePath} /></span>
-                {isGroupView && <span className="text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}
-              </span>
-              <strong className="text-text-primary tabular-nums">{row.count.toLocaleString('en-GB')}</strong>
-            </li>
-          ))}
-        </ol>
+        <>
+          {renderRows(data.rows.slice(0, 3), 1)}
+          {data.rows.length > 3 && (
+            <details className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+              <summary className="text-sm font-medium text-text-primary cursor-pointer">Show {data.rows.length - 3} more pages</summary>
+              <div className="mt-3">{renderRows(data.rows.slice(3), 4)}</div>
+            </details>
+          )}
+        </>
       )}
       {data.status === 'available' && <p className="text-xs text-text-secondary mt-4">{data.subtitle}</p>}
     </div>
@@ -93,8 +106,10 @@ export function WebsiteScreen() {
   const [journey, setJourney] = useState<Ga4WebsiteJourneyResponse | null>(null);
   const [journeyLoading, setJourneyLoading] = useState(true);
   const [journeyError, setJourneyError] = useState(false);
+  const [showAllEngagement, setShowAllEngagement] = useState(false);
   const { isGroupView, selectedEntity } = useEntity();
   const { period } = usePeriod();
+  useEffect(() => { setShowAllEngagement(false); }, [period, selectedEntity]);
 
   const scRange = useMemo(() => resolveSearchConsoleDateRange(period), [period]);
   useEffect(() => {
@@ -167,7 +182,7 @@ export function WebsiteScreen() {
           <div>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Website</h1>
             <p className="text-text-secondary">
-              {isGroupView ? 'Real organic search performance across connected MTech Group entities' : `Showing ${entityLabel}`}
+              {isGroupView ? 'Website pages and organic search across MTech Group' : `Showing ${entityLabel}`}
             </p>
           </div>
           <PeriodSelector />
@@ -178,35 +193,35 @@ export function WebsiteScreen() {
         <div className="mb-8">
           <h2 className="v2-section-title">Where people go</h2>
           <p className="text-sm text-text-secondary mb-4" style={{ marginTop: -8 }}>
-            Real GA4 page activity for the selected period. These lists show where sessions start, which pages are viewed
-            and where verified enquiry actions happen. They are separate totals, not a step-by-step visitor path or a drop-off rate.
+            GA4 shows where sessions start, which pages are viewed and where verified enquiry actions occur. These are separate totals, not a linked path or drop-off rate.
           </p>
           {journeyError && <p className="text-sm text-text-secondary mb-3">GA4 page reporting could not load. Please try again.</p>}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <JourneyPageList title="Entry pages" description="First page of a GA4 session · sessions" data={entryPages} loading={journeyLoading} isGroupView={isGroupView} />
-            <JourneyPageList title="Most viewed pages" description="Pages people looked at · page views" data={viewedPages} loading={journeyLoading} isGroupView={isGroupView} />
-            <JourneyPageList title="Enquiry pages" description="Page where a verified form, phone, email or live chat event fired · events" data={enquiryPages} loading={journeyLoading} isGroupView={isGroupView} />
+            <JourneyPageList title="Entry pages" description="First page of a GA4 session · sessions" data={entryPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--v2-blue)" />
+            <JourneyPageList title="Most viewed pages" description="Pages people looked at · page views" data={viewedPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--v2-purple)" />
+            <JourneyPageList title="Enquiry pages" description="Page where a verified form, phone, email or live chat event fired · events" data={enquiryPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--v2-green)" />
           </div>
           <p className="text-xs text-text-secondary mt-3">
-            Page paths are shown without query strings to avoid exposing information in URLs. A phone or email click may happen on a page other than the contact page.
-            Enquiry pages are only available for entities with confirmed event definitions; they do not include CRM leads.
+            Page links omit query strings. Enquiry events can occur on any page and are not CRM leads. Enquiry pages require confirmed event definitions.
           </p>
         </div>
 
         <div className="mb-8">
           <h2 className="v2-section-title">Where engagement weakens</h2>
           <p className="text-sm text-text-secondary mb-4" style={{ marginTop: -8 }}>
-            GA4 bounce rate for the busiest entry pages. A bounce is a session that was not engaged: it did not last
-            longer than 10 seconds, record a key event or include at least two page views. This is a signal to review
-            the page, not proof that a person left there or failed to enquire.
+            GA4 bounce rate highlights busy entry pages to review. It does not prove someone left that page or failed to enquire.
           </p>
+          <details className="text-xs text-text-secondary mb-3">
+            <summary className="cursor-pointer">What counts as a bounce?</summary>
+            <p className="mt-2">A session is counted as bounced when it lasts no longer than 10 seconds, has no key event and includes fewer than two page views.</p>
+          </details>
           <div className="card p-0" style={{ overflowX: 'auto' }}>
             {journeyLoading ? <p className="p-5 text-sm text-text-secondary">Loading GA4 engagement…</p>
               : entryEngagement.status !== 'available' ? <p className="p-5 text-sm text-text-secondary">{entryEngagement.subtitle}</p>
               : entryEngagement.rows.length === 0 ? <p className="p-5 text-sm text-text-secondary">No entry page activity in this period.</p>
               : <table className="table w-full text-sm" style={{ minWidth: 600 }}>
                 <thead><tr><th>Entry page</th><th style={{ textAlign: 'right' }}>Sessions</th><th style={{ textAlign: 'right' }}>Engaged sessions</th><th style={{ textAlign: 'right' }}>Bounce rate</th></tr></thead>
-                <tbody>{entryEngagement.rows.map((row) => (
+                <tbody>{entryEngagement.rows.slice(0, showAllEngagement ? undefined : 3).map((row) => (
                   <tr key={`${row.brand}:${row.pagePath}`}>
                     <td><Ga4PageLink brand={row.brand} pagePath={row.pagePath} />{isGroupView && <span className="block text-xs text-text-secondary">{BRAND_LABEL[row.brand]}</span>}</td>
                     <td style={{ textAlign: 'right' }}>{row.sessions.toLocaleString('en-GB')}</td>
@@ -215,6 +230,11 @@ export function WebsiteScreen() {
                   </tr>
                 ))}</tbody>
               </table>}
+            {entryEngagement.status === 'available' && entryEngagement.rows.length > 3 && (
+              <button type="button" className="w-full text-left text-sm font-medium p-4" style={{ color: 'var(--v2-purple)' }} onClick={() => setShowAllEngagement((show) => !show)}>
+                {showAllEngagement ? 'Show fewer entry pages' : `Show all ${entryEngagement.rows.length} entry pages`}
+              </button>
+            )}
           </div>
           <p className="text-xs text-text-secondary mt-3">Sorted by entry sessions, so a high rate on a very small page is not presented as the biggest issue. {entryEngagement.status === 'available' ? entryEngagement.subtitle : ''}</p>
         </div>
@@ -223,11 +243,7 @@ export function WebsiteScreen() {
         <div className="mb-8">
           <h2 className="v2-section-title">Organic Search Performance</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Real Google Search Console data — searches that brought people to the website. A separate measurement
-            from GA4 Enquiries below; a Search Console click never implies an enquiry happened. Search Console
-            typically takes 2–3 days to index and report a given day's data, so very recent dates (including "This
-            month" in the first few days of a new month) can genuinely show little or nothing yet — that's a real
-            reporting lag, not a broken connection. Try "This quarter" or "This year" to see recent activity.
+            Google Search Console clicks do not imply GA4 enquiries. Recent search data can lag by 2–3 days; try a longer reporting period if activity looks sparse.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
@@ -257,6 +273,8 @@ export function WebsiteScreen() {
           </div>
         </div>
 
+        <details className="mb-8">
+          <summary className="card text-sm font-medium text-text-primary cursor-pointer">Explore search terms and landing pages</summary>
         {/* Top Search Queries */}
         <div className="mb-8">
           <h2 className="v2-section-title">Top Search Queries</h2>
@@ -402,12 +420,13 @@ export function WebsiteScreen() {
           )}
         </div>
 
+        </details>
+
         {/* GA4 Enquiries — deliberately separate source */}
         <div className="mb-8">
           <h2 className="v2-section-title">GA4 Enquiries</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            A different, independently-verified source from Search Console above — genuine website actions (form,
-            phone, email, live chat), not derived from or implying any Search Console click.
+            Verified website actions from GA4, separate from Search Console clicks and not confirmed CRM leads.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
@@ -425,14 +444,13 @@ export function WebsiteScreen() {
 
         {/* Search Console coverage disclosure */}
         {isGroupView && (
-          <div className="mb-4">
-            <h2 className="v2-section-title">Search Console Coverage</h2>
-            <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+          <details className="card mb-4">
+            <summary className="text-sm font-medium text-text-primary cursor-pointer">Search Console coverage by entity</summary>
+            <p className="text-xs text-text-secondary mt-3 mb-3">
               MTech Group above combines only the entities marked Connected below. IDARO has a real Search Console
               property but is switched to individually in the entity selector — it is not included in any MTech Group total.
             </p>
-            <div className="card p-0">
-              <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto' }}>
                 <table className="table w-full text-sm" style={{ minWidth: 320 }}>
                   <thead>
                     <tr>
@@ -455,9 +473,8 @@ export function WebsiteScreen() {
                     ))}
                   </tbody>
                 </table>
-              </div>
             </div>
-          </div>
+          </details>
         )}
       </div>
     </div>
