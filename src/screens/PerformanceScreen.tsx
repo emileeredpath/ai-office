@@ -1,5 +1,6 @@
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod, periodStartDate } from '@/contexts/PeriodContext';
@@ -66,10 +67,9 @@ function toBrandAcumaticaInfo(summary: AcumaticaSummary | null | undefined, enti
 }
 
 // The strategic Marketing Manager reporting page — deliberately not
-// another integration dashboard. Answers, in order: what did Marketing
-// spend, what response did it generate, how is that changing, which
-// entities/campaigns/channels are performing, what commercial outcome do
-// we know, and where is data/attribution incomplete. Every figure here is
+// another integration dashboard. Shows marketing activity and response,
+// then the separate commercial outcome, with entity/campaign/channel
+// detail and data coverage available on demand. Every figure here is
 // either real or an honest "Not connected"/"Not available" state — never
 // a fabricated number or chart. Spend, GA4 Enquiries, and Acumatica figures
 // deliberately reuse the exact same canonical utilities as Campaign
@@ -421,15 +421,29 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
           <PeriodSelector />
         </div>
 
-        {/* A. Marketing Performance — what did Marketing spend, and the
-            top-line response/change-vs-previous-period summary. */}
+        {/* Separate measures show the available journey signals without
+            implying a linked funnel or a calculable drop-off rate. */}
         <section className="v2-perf-section">
-          <h2 className="v2-section-title">Marketing Performance</h2>
-          <p className="v2-perf-section-subtitle">
-            Spend across this page combines lifetime fixed costs for the selected campaigns with available mapped media in the reporting period.
-            This is not spend incurred within the period. Unmapped or unavailable media is excluded; period spend comparisons are unavailable.
-          </p>
+          <h2 className="v2-section-title">Marketing activity and response</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KpiCard
+              title="Website Users"
+              value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
+              status={websiteUsers.status}
+              subtitle={websiteUsers.subtitle}
+              comparison={websiteUsers.status === 'available' ? websiteUsersComparison : undefined}
+              accent="var(--v2-blue)"
+            />
+            <KpiCard
+              title="GA4 Enquiries"
+              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
+              status={ga4EnquiriesInfo.status}
+              subtitle={ga4EnquiriesInfo.status === 'available' ? 'Verified GA4 key events — a website action, not a qualified lead' : ga4EnquiriesInfo.subtitle}
+              subtitleWrap
+              comparison={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesComparison : undefined}
+              accent="var(--v2-orange)"
+            />
+            <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} subtitleWrap accent="var(--v2-green)" comparison={leadsComparison} />
             <KpiCard
               title="Known Campaign Spend"
               value={`£${Math.round(marketingSpend).toLocaleString()}`}
@@ -437,53 +451,22 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               subtitleWrap
               onClick={() => onNavigate?.('campaigns')}
             />
-            <KpiCard title="Marketing Leads" value={marketingLeads} subtitle={MARKETING_LEADS_CAVEAT} accent="var(--v2-green)" comparison={leadsComparison} />
-            <KpiCard
-              title="GA4 Enquiries"
-              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
-              status={ga4EnquiriesInfo.status}
-              subtitle={ga4EnquiriesInfo.status === 'available' ? 'Verified GA4 key events — a website action, not a qualified lead' : ga4EnquiriesInfo.subtitle}
-              comparison={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesComparison : undefined}
-            />
-            <KpiCard
-              title="Website Users"
-              value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
-              status={websiteUsers.status}
-              subtitle={websiteUsers.subtitle}
-              comparison={websiteUsers.status === 'available' ? websiteUsersComparison : undefined}
-            />
           </div>
-        </section>
-
-        {/* C. Performance by Entity — group level only; at entity level
-            the campaign table below already covers this without
-            repeating it. */}
-        {isGroupView && (
-          <section className="v2-perf-section">
-            <h2 className="v2-section-title">Performance by Entity</h2>
-            <div className="card">
-              <PerformanceByBrandTable rows={brandPerformanceRows} />
+          <p className="v2-perf-section-subtitle" style={{ marginTop: 12 }}>
+            These are separate measures, not linked steps. Known Campaign Spend combines lifetime fixed costs for selected campaigns with available mapped media in the reporting period; it is not spend incurred in that period. Unavailable media is excluded and period spend comparisons are unavailable.
+          </p>
+          <div className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary mb-1">Where visitors go</h3>
+              <p className="text-sm text-text-secondary">Explore entry, viewed and enquiry pages where GA4 reports are available. The reports do not establish a linked visitor path or a drop-off rate.</p>
             </div>
-          </section>
-        )}
-
-        {/* D. Campaign Performance — canonical spend; attribution stays
-            honest and Wave-1-scoped, never expanded here. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">{isGroupView ? 'Campaign Performance' : `Campaign Performance — ${entityLabel}`}</h2>
-          <div className="card">
-            <CampaignPerformanceTable
-              campaigns={periodCampaigns}
-              wave1Performance={wave1Performance}
-              campaignCosts={campaignCosts}
-              googleAdsPerformance={googleAdsPerformance}
-              showEntityColumn={isGroupView}
-              onSelectCampaign={(id) => selectCampaign(id, 'performance')}
-            />
+            <button type="button" className="text-sm font-medium flex items-center gap-1 shrink-0" style={{ color: 'var(--v2-purple)' }} onClick={() => onNavigate?.('website')}>
+              Open page journey <ArrowRight size={14} />
+            </button>
           </div>
         </section>
 
-        {/* E. Overall Commercial Performance — visually distinct from
+        {/* Overall Commercial Performance — visually distinct from
             Marketing Response: these are real Acumatica opportunities,
             never implied to be caused by a campaign or channel. */}
         <section className="v2-perf-section">
@@ -532,85 +515,104 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               />
             </div>
             <p className="v2-perf-section-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
-              Overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked. When a period is selected, Won Revenue sums Total for opportunities created within that period whose current Status is Won. It does not measure revenue that became Won during the period.
+              Acumatica totals are overall commercial results, not attributed to Marketing unless explicitly linked. For a selected period, Won Revenue includes opportunities created in that period whose current Status is Won; it is not revenue won in that period.
             </p>
           </div>
         </section>
 
-        {/* F. Channel Performance — compact, link-through only; detailed
-            metrics stay on each channel's own dedicated page. */}
+        {/* Full entity, campaign and channel breakdowns remain available
+            after the headline measures and commercial context. */}
         <section className="v2-perf-section">
-          <h2 className="v2-section-title">Channel Performance</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-            <KpiCard
-              title="Website"
-              value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
-              status={websiteUsers.status}
-              subtitle={websiteUsers.subtitle}
-              onClick={() => onNavigate?.('website')}
-              size="compact"
-            />
-            {searchConsoleSummary.status === 'available' ? (
+          <h2 className="v2-section-title">Explore the detail</h2>
+          {isGroupView && (
+            <details className="card mb-3">
+              <summary className="text-sm font-medium text-text-primary cursor-pointer">Performance by entity</summary>
+              <div className="mt-3"><PerformanceByBrandTable rows={brandPerformanceRows} /></div>
+            </details>
+          )}
+          <details className="card mb-3">
+            <summary className="text-sm font-medium text-text-primary cursor-pointer">Campaign performance ({periodCampaigns.length})</summary>
+            <div className="mt-3">
+              <CampaignPerformanceTable
+                campaigns={periodCampaigns}
+                wave1Performance={wave1Performance}
+                campaignCosts={campaignCosts}
+                googleAdsPerformance={googleAdsPerformance}
+                showEntityColumn={isGroupView}
+                onSelectCampaign={(id) => selectCampaign(id, 'performance')}
+              />
+            </div>
+          </details>
+          <details className="card mb-3">
+            <summary className="text-sm font-medium text-text-primary cursor-pointer">Channel performance</summary>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mt-3">
               <KpiCard
-                title="Organic Search"
-                value={`${searchConsoleSummary.clicks!.toLocaleString()} clicks`}
-                subtitle={`${searchConsoleSummary.impressions!.toLocaleString()} impressions — see Website`}
+                title="Website"
+                value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
+                status={websiteUsers.status}
+                subtitle={websiteUsers.subtitle}
                 onClick={() => onNavigate?.('website')}
                 size="compact"
               />
-            ) : (
-              <KpiCard title="Organic Search" status="not-connected" subtitle={searchConsoleSummary.subtitle} onClick={() => onNavigate?.('website')} size="compact" />
-            )}
-            {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
+              {searchConsoleSummary.status === 'available' ? (
+                <KpiCard
+                  title="Organic Search"
+                  value={`${searchConsoleSummary.clicks!.toLocaleString()} clicks`}
+                  subtitle={`${searchConsoleSummary.impressions!.toLocaleString()} impressions — see Website`}
+                  onClick={() => onNavigate?.('website')}
+                  size="compact"
+                />
+              ) : (
+                <KpiCard title="Organic Search" status="not-connected" subtitle={searchConsoleSummary.subtitle} onClick={() => onNavigate?.('website')} size="compact" />
+              )}
+              {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
+                <KpiCard
+                  title="Email"
+                  value={`${emailPerf.opens} opens`}
+                  subtitle={`${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients — see Email`}
+                  onClick={() => onNavigate?.('email')}
+                  size="compact"
+                />
+              ) : (
+                <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} onClick={() => onNavigate?.('email')} size="compact" />
+              )}
+              {googleAds.status === 'available' ? (
+                <KpiCard
+                  title="PPC"
+                  value={`£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+                  subtitle={`${googleAds.clicks} clicks — see PPC`}
+                  onClick={() => onNavigate?.('ppc')}
+                  size="compact"
+                />
+              ) : (
+                <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
+              )}
               <KpiCard
-                title="Email"
-                value={`${emailPerf.opens} opens`}
-                subtitle={`${emailPerf.campaignsSent} sends · ${emailPerf.recipients} recipients — see Email`}
-                onClick={() => onNavigate?.('email')}
+                title="Calls"
+                value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
+                status={callPerformance.status}
+                subtitle={callPerformance.subtitle}
+                onClick={() => onNavigate?.('infinity')}
                 size="compact"
               />
-            ) : (
-              <KpiCard title="Email" status="not-connected" subtitle={emailPerf.subtitle} onClick={() => onNavigate?.('email')} size="compact" />
-            )}
-            {googleAds.status === 'available' ? (
-              <KpiCard
-                title="PPC"
-                value={`£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-                subtitle={`${googleAds.clicks} clicks — see PPC`}
-                onClick={() => onNavigate?.('ppc')}
-                size="compact"
-              />
-            ) : (
-              <KpiCard title="PPC" status="not-connected" subtitle={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} size="compact" />
-            )}
-            <KpiCard
-              title="Calls"
-              value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
-              status={callPerformance.status}
-              subtitle={callPerformance.subtitle}
-              onClick={() => onNavigate?.('infinity')}
-              size="compact"
-            />
-            {socialTraffic.status === 'available' ? (
-              <KpiCard
-                title="Social"
-                value={`${socialTraffic.sessions} sessions`}
-                subtitle={`${socialTraffic.users} users — see Social`}
-                onClick={() => onNavigate?.('social')}
-                size="compact"
-              />
-            ) : (
-              <KpiCard title="Social" status="not-connected" subtitle={socialTraffic.subtitle} onClick={() => onNavigate?.('social')} size="compact" />
-            )}
-          </div>
-        </section>
+              {socialTraffic.status === 'available' ? (
+                <KpiCard
+                  title="Social"
+                  value={`${socialTraffic.sessions} sessions`}
+                  subtitle={`${socialTraffic.users} users — see Social`}
+                  onClick={() => onNavigate?.('social')}
+                  size="compact"
+                />
+              ) : (
+                <KpiCard title="Social" status="not-connected" subtitle={socialTraffic.subtitle} onClick={() => onNavigate?.('social')} size="compact" />
+              )}
+            </div>
+          </details>
 
-        {/* G. Coverage / Data Quality — one compact strip for the whole
-            page's source state, replacing the previously scattered
-            per-section messaging. */}
-        <section className="v2-perf-section v2-perf-coverage" style={{ marginBottom: 8 }}>
-          <h2 className="v2-section-title">Coverage &amp; Data Quality</h2>
-          <DataFreshnessBar entries={freshnessEntries} />
+          <details className="card v2-perf-coverage">
+            <summary className="text-sm font-medium text-text-primary cursor-pointer">Coverage and data quality</summary>
+            <div className="mt-3"><DataFreshnessBar entries={freshnessEntries} /></div>
+          </details>
         </section>
       </div>
     </div>
