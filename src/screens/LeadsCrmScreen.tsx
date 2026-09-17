@@ -349,7 +349,8 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
             <KpiCard
               title="Marketing Leads"
               value={marketingLeads}
-              subtitle="Manually logged against campaigns"
+              subtitle={MARKETING_LEADS_CAVEAT}
+              subtitleWrap
               accent="var(--v2-green)"
               onClick={() => onNavigate?.('campaigns')}
             />
@@ -357,9 +358,14 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               title="GA4 Enquiries"
               value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
               status={ga4EnquiriesInfo.status}
-              subtitle={ga4EnquiriesInfo.status === 'available' ? 'Verified website enquiry events' : ga4EnquiriesInfo.subtitle}
+              subtitle={ga4EnquiriesInfo.status === 'available' ? 'Verified website actions, not qualified CRM leads' : ga4EnquiriesInfo.subtitle}
+              subtitleWrap
             />
             <KpiCard title="Logged Enquiries" value={enquiriesTotal} subtitle="Manually entered campaign results" />
+          </div>
+          <div className="card mt-4" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+            <h3 className="text-sm font-semibold text-text-primary mb-1">Where the measured journey stops</h3>
+            <p className="text-sm text-text-secondary">Campaign-to-opportunity matching is not available. Marketing responses and Acumatica opportunities are separate measures, so this page cannot show a reliable lead-to-sale drop-off or marketing-attributed revenue.</p>
           </div>
         </section>
 
@@ -438,15 +444,15 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
               />
             </div>
             <p className="v2-perf-section-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
-              Overall commercial performance from imported Acumatica opportunity data. Not attributed to Marketing unless explicitly linked. When a period is selected, Won Revenue sums Total for opportunities created within that period whose current Status is Won. It does not measure revenue that became Won during the period.
+              Acumatica totals are overall commercial results, not attributed to Marketing unless explicitly linked. For a selected period, Won Revenue includes opportunities created in that period whose current Status is Won; it is not revenue won in that period.
             </p>
           </div>
 
           {isGroupView && (
-            <div className="card mt-4">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Commercial Performance by Entity</h3>
-              <CommercialByEntityTable rows={entityCommercialRows} />
-            </div>
+            <details className="card mt-4">
+              <summary className="text-sm font-semibold text-text-primary cursor-pointer">Commercial performance by entity</summary>
+              <div className="mt-3"><CommercialByEntityTable rows={entityCommercialRows} /></div>
+            </details>
           )}
         </section>
 
@@ -455,65 +461,70 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
             commercial classification (Status alone decides that). */}
         <section className="v2-perf-section">
           <h2 className="v2-section-title">Pipeline & Opportunity Analysis</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="card">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Pipeline by Stage</h3>
-              <AcumaticaBreakdownBars
-                entries={acumaticaBreakdowns?.byStage ?? []}
-                emptyLabel={acumaticaBreakdownEmptyLabel}
-              />
-            </div>
-            <div className="card">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Opportunity Class</h3>
-              <AcumaticaBreakdownBars
-                entries={acumaticaBreakdowns?.byOpportunityClass ?? []}
-                emptyLabel={acumaticaBreakdownEmptyLabel}
-                color="#2E9ECC"
-              />
-            </div>
-            <div className="card">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Product Focus</h3>
-              <AcumaticaBreakdownBars
-                entries={acumaticaBreakdowns?.byProductFocus ?? []}
-                emptyLabel={acumaticaBreakdownEmptyLabel}
-                color="var(--v2-green)"
-              />
-            </div>
-          </div>
+          <details className="card mb-4">
+            <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore pipeline and opportunity breakdowns</summary>
+            <div className="mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-text-primary mb-3">Pipeline by Stage</h3>
+                  <AcumaticaBreakdownBars
+                    entries={acumaticaBreakdowns?.byStage ?? []}
+                    emptyLabel={acumaticaBreakdownEmptyLabel}
+                  />
+                </div>
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-text-primary mb-3">Opportunity Class</h3>
+                  <AcumaticaBreakdownBars
+                    entries={acumaticaBreakdowns?.byOpportunityClass ?? []}
+                    emptyLabel={acumaticaBreakdownEmptyLabel}
+                    color="#2E9ECC"
+                  />
+                </div>
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-text-primary mb-3">Product Focus</h3>
+                  <AcumaticaBreakdownBars
+                    entries={acumaticaBreakdowns?.byProductFocus ?? []}
+                    emptyLabel={acumaticaBreakdownEmptyLabel}
+                    color="var(--v2-green)"
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* D. Sales-reported Source — never merged with deterministic
-                Marketing attribution; see the note below the table. */}
-            <div className="card">
-              <h3 className="text-sm font-semibold text-text-primary mb-1">Sales-reported Source</h3>
-              <p className="text-xs text-text-secondary mb-3">
-                Sales-entered source information from Acumatica. This is not deterministic Marketing attribution.
-              </p>
-              <AcumaticaBreakdownTable
-                columnLabel="Sales-reported Source"
-                entries={acumaticaBreakdowns?.bySalesReportedSource ?? []}
-                emptyLabel={acumaticaBreakdownEmptyLabel}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 {/* D. Sales-reported Source — never merged with deterministic
+                     Marketing attribution; see the note above the table. */}
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-text-primary mb-1">Sales-reported Source</h3>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Sales-entered source information from Acumatica. This is not deterministic Marketing attribution.
+                  </p>
+                  <AcumaticaBreakdownTable
+                    columnLabel="Sales-reported Source"
+                    entries={acumaticaBreakdowns?.bySalesReportedSource ?? []}
+                    emptyLabel={acumaticaBreakdownEmptyLabel}
+                  />
+                </div>
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-text-primary mb-3">Commercial Status</h3>
+                  <AcumaticaBreakdownTable
+                    columnLabel="Status"
+                    entries={acumaticaBreakdowns?.byCommercialStatus ?? []}
+                    emptyLabel={acumaticaBreakdownEmptyLabel}
+                    labelFor={(key) => STATUS_LABEL[key] ?? key}
+                  />
+                </div>
+                <div className="card">
+                  <h3 className="text-sm font-semibold text-text-primary mb-3">Entity</h3>
+                  <AcumaticaBreakdownTable
+                    columnLabel="Entity"
+                    entries={acumaticaBreakdowns?.byEntity ?? []}
+                    emptyLabel={acumaticaBreakdownEmptyLabel}
+                    labelFor={(key) => BRAND_LABEL[key as Brand] ?? key}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="card">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Commercial Status</h3>
-              <AcumaticaBreakdownTable
-                columnLabel="Status"
-                entries={acumaticaBreakdowns?.byCommercialStatus ?? []}
-                emptyLabel={acumaticaBreakdownEmptyLabel}
-                labelFor={(key) => STATUS_LABEL[key] ?? key}
-              />
-            </div>
-            <div className="card">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Entity</h3>
-              <AcumaticaBreakdownTable
-                columnLabel="Entity"
-                entries={acumaticaBreakdowns?.byEntity ?? []}
-                emptyLabel={acumaticaBreakdownEmptyLabel}
-                labelFor={(key) => BRAND_LABEL[key as Brand] ?? key}
-              />
-            </div>
-          </div>
+          </details>
 
           {/* E. Data Quality — only shown when there is something to flag. */}
           {acumaticaBreakdowns && !acumaticaNotAvailable && (acumaticaSummary?.unclassifiedCount ?? 0) + (acumaticaSummary?.undated ?? 0) > 0 && (
@@ -534,39 +545,34 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
           )}
         </section>
 
-        {/* F. Attribution boundary — real, computed marketing-side gaps
-            (Unmatched Activity) are preserved in full below; only the
-            Acumatica-pending Attribution Health stub is replaced by this
-            one compact note. */}
-        <section className="v2-perf-section">
-          <p className="v2-not-connected-text" style={{ fontSize: 13 }}>
-            Campaign-to-opportunity attribution is not currently available. CRM figures above represent overall commercial performance and are not attributed to Marketing.
-          </p>
-        </section>
-
         {/* Unmatched Activity — genuine, computed today from data AI
             Office already has (Campaign Monitor sends, Infinity calls,
             campaign records). Distinct from CRM/Commercial Performance
             above: this never depends on Acumatica. */}
         <section className="v2-perf-section">
           <h2 className="v2-section-title">Unmatched Activity</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Real activity that isn't confidently linked to an AI Office campaign — using only the existing,
-            deterministic links each integration already computes. Nothing here is a weak or inferred match; where
-            a source has no linkage mechanism at all yet, that's shown as "N/A", never guessed.
-          </p>
-          <UnmatchedActivity
-            unmappedEmailSends={unmappedEmailSends}
-            unclassifiedCalls={unclassifiedCalls}
-            googleAdsGap={googleAdsGap}
-            ga4EnquiryGap={ga4EnquiryGap}
-            spendGap={SPEND_WITHOUT_CAMPAIGN_GAP}
-            campaignsWithNoActivity={campaignsWithNoActivity}
-            unmatchedGoogleAdsCampaigns={unmatchedGoogleAdsCampaigns}
-            campaigns={campaigns}
-            isEditor={isEditor}
-            onMapGoogleAdsCampaign={handleMapGoogleAdsCampaign}
-          />
+          <details className="card">
+            <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore unmatched activity and mapping actions</summary>
+            <div className="mt-4">
+              <p className="text-xs text-text-secondary mb-3">
+                Real activity that isn't confidently linked to an AI Office campaign — using only the existing,
+                deterministic links each integration already computes. Nothing here is a weak or inferred match; where
+                a source has no linkage mechanism at all yet, that's shown as "N/A", never guessed.
+              </p>
+              <UnmatchedActivity
+                unmappedEmailSends={unmappedEmailSends}
+                unclassifiedCalls={unclassifiedCalls}
+                googleAdsGap={googleAdsGap}
+                ga4EnquiryGap={ga4EnquiryGap}
+                spendGap={SPEND_WITHOUT_CAMPAIGN_GAP}
+                campaignsWithNoActivity={campaignsWithNoActivity}
+                unmatchedGoogleAdsCampaigns={unmatchedGoogleAdsCampaigns}
+                campaigns={campaigns}
+                isEditor={isEditor}
+                onMapGoogleAdsCampaign={handleMapGoogleAdsCampaign}
+              />
+            </div>
+          </details>
         </section>
       </div>
     </div>
