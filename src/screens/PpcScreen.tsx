@@ -20,8 +20,8 @@ import { getEnquiries } from '@/utils/ga4Enquiries';
 // Enquiry combines real Google Ads spend with real GA4 Enquiries for the
 // same entity/period, never assuming Google Ads conversions equal GA4
 // Enquiries. Marketing Leads, Opportunities, Pipeline, Won Revenue and
-// ROAS still require CRM attribution from Acumatica and remain honestly
-// "Not connected" in the Commercial section below.
+// ROAS still require paid-to-CRM attribution and remain honestly
+// "Not connected" in the Commercial details below.
 export function PpcScreen() {
   const googleAdsPerformance = useAppStore((s) => s.googleAdsPerformance);
   const syncGoogleAdsPerformance = useAppStore((s) => s.syncGoogleAdsPerformance);
@@ -59,14 +59,13 @@ export function PpcScreen() {
 
   const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
 
-  const googleAdsConfigured = googleAdsPerformance?.configured === true;
   const googleAdsHasErrors = (googleAdsPerformance?.errors?.length ?? 0) > 0;
 
   const freshnessEntries: FreshnessEntry[] = [
-    googleAdsConfigured
-      ? { label: 'Google Ads', status: googleAdsHasErrors ? 'error' : 'live', detail: googleAdsHasErrors ? 'Sync error' : 'Connected' }
-      : { label: 'Google Ads', status: 'not-connected', detail: 'Not connected' },
-    { label: 'Acumatica CRM', status: 'not-connected', detail: 'Not connected' },
+    googleAds.status === 'available'
+      ? { label: 'Google Ads', status: googleAdsHasErrors ? 'error' : 'live', detail: googleAdsHasErrors ? 'Some account sync errors' : 'Available for selected view' }
+      : { label: 'Google Ads', status: 'not-connected', detail: googleAds.subtitle },
+    { label: 'Paid-to-CRM attribution', status: 'not-connected', detail: 'Not available' },
   ];
 
   return (
@@ -84,10 +83,17 @@ export function PpcScreen() {
 
         <DataFreshnessBar entries={freshnessEntries} />
 
-        {/* Headline KPIs */}
+        <div className="card mb-8" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+          <h2 className="text-sm font-semibold text-text-primary mb-1">Where the paid journey stops</h2>
+          <p className="text-sm text-text-secondary">
+            Google Ads conversions are reported by Google Ads. GA4 Enquiries are separate website events and cannot currently be assigned to paid clicks or Acumatica revenue.
+          </p>
+        </div>
+
+        {/* The three paid-activity headlines stay visible; supporting measures are below. */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Google Ads Performance</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <h2 className="v2-section-title">Paid activity</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KpiCard
               title="Spend"
               value={googleAds.status === 'available' ? `£${googleAds.spend!.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined}
@@ -95,14 +101,43 @@ export function PpcScreen() {
               subtitle={googleAds.subtitle}
             />
             <KpiCard
-              title="Impressions"
-              value={googleAds.status === 'available' ? googleAds.impressions!.toLocaleString('en-GB') : undefined}
+              title="Clicks"
+              value={googleAds.status === 'available' ? googleAds.clicks!.toLocaleString('en-GB') : undefined}
               status={googleAds.status}
               subtitle={googleAds.subtitle}
             />
             <KpiCard
-              title="Clicks"
-              value={googleAds.status === 'available' ? googleAds.clicks!.toLocaleString('en-GB') : undefined}
+              title="Google Ads Conversions"
+              value={googleAds.status === 'available' ? googleAds.conversions : undefined}
+              status={googleAds.status}
+              subtitle={googleAds.status === 'available' ? "Google Ads' own conversions metric — not GA4 Enquiries" : googleAds.subtitle}
+              subtitleWrap
+            />
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="v2-section-title">Website response</h2>
+          <p className="text-sm text-text-secondary mb-3">GA4 Enquiries include verified website actions from all channels in the selected view, not just paid traffic.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KpiCard
+              title="GA4 Enquiries"
+              value={enquiries.status === 'available' ? enquiries.total : undefined}
+              status={enquiries.status}
+              subtitle={enquiries.status === 'available' ? 'Verified GA4 key events — a separate measurement from Google Ads Conversions' : enquiries.subtitle}
+              subtitleWrap
+              accent="var(--v2-green)"
+            />
+          </div>
+        </div>
+
+        <details className="card mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore reach and cost measures</summary>
+          <p className="text-xs text-text-secondary mt-3 mb-4">Cost per GA4 Enquiry divides Google Ads spend by verified GA4 Enquiries for the selected scope and period. The card notes partial GA4 coverage. This does not prove the enquiries came from Google Ads.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KpiCard
+              title="Impressions"
+              value={googleAds.status === 'available' ? googleAds.impressions!.toLocaleString('en-GB') : undefined}
               status={googleAds.status}
               subtitle={googleAds.subtitle}
             />
@@ -119,55 +154,44 @@ export function PpcScreen() {
               subtitle={googleAds.status === 'available' ? 'Spend ÷ Clicks' : googleAds.subtitle}
             />
             <KpiCard
-              title="Google Ads Conversions"
-              value={googleAds.status === 'available' ? googleAds.conversions : undefined}
-              status={googleAds.status}
-              subtitle={googleAds.status === 'available' ? "Google Ads' own conversions metric — not GA4 Enquiries" : googleAds.subtitle}
-            />
-            <KpiCard
               title="Cost per Google Ads Conversion"
               value={googleAds.status === 'available' && googleAds.costPerConversion != null ? `£${googleAds.costPerConversion.toFixed(2)}` : undefined}
               status={googleAds.status === 'available' && googleAds.costPerConversion != null ? 'available' : 'not-connected'}
               subtitle={googleAds.status === 'available' ? 'Spend ÷ Google Ads Conversions' : googleAds.subtitle}
             />
             <KpiCard
-              title="GA4 Enquiries"
-              value={enquiries.status === 'available' ? enquiries.total : undefined}
-              status={enquiries.status}
-              subtitle={enquiries.status === 'available' ? 'Verified GA4 key events — a separate measurement from Google Ads Conversions' : enquiries.subtitle}
-              accent="var(--v2-green)"
-            />
-            <KpiCard
               title="Cost per GA4 Enquiry"
               value={costPerEnquiry.status === 'available' && costPerEnquiry.costPerEnquiry != null ? `£${costPerEnquiry.costPerEnquiry.toFixed(2)}` : undefined}
               status={costPerEnquiry.status === 'available' && costPerEnquiry.costPerEnquiry != null ? 'available' : 'not-connected'}
-              subtitle={costPerEnquiry.status === 'available' ? costPerEnquiry.subtitle : costPerEnquiry.subtitle}
+              subtitle={costPerEnquiry.subtitle}
+              subtitleWrap
               accent="var(--v2-green)"
             />
           </div>
-        </div>
+        </details>
 
         {/* Campaign Performance */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Campaign Performance</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+        <details className="card mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore Google Ads campaigns</summary>
+          <p className="text-xs text-text-secondary mt-3 mb-3">
             Real Google Ads campaigns, shown exactly as returned — never matched to a dashboard campaign record.
           </p>
           <div className="card" style={{ padding: 0 }}>
             <PpcCampaignTable campaigns={campaigns} showEntityColumn={isGroupView} />
           </div>
-        </div>
+        </details>
 
-        {/* Commercial — still pending Acumatica */}
-        <div className="mb-4">
-          <h2 className="v2-section-title">Commercial</h2>
+        {/* Commercial — still pending verified paid-to-CRM attribution. */}
+        <details className="card mb-4">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Why paid revenue is unavailable</summary>
+          <p className="text-xs text-text-secondary mt-3 mb-4">These measures need a verified link from paid activity to CRM outcomes.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard title="Marketing Leads" status="not-connected" subtitle="Requires CRM attribution" size="compact" />
-            <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
-            <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
-            <KpiCard title="ROAS" status="not-connected" subtitle="Requires Acumatica revenue attribution" size="compact" />
+            <KpiCard title="Marketing Leads" status="not-connected" subtitle="Requires paid-to-CRM attribution" size="compact" />
+            <KpiCard title="Open Pipeline" status="not-connected" subtitle="Requires paid-to-CRM attribution" size="compact" />
+            <KpiCard title="Won Revenue" status="not-connected" subtitle="Requires paid-to-CRM attribution" size="compact" />
+            <KpiCard title="ROAS" status="not-connected" subtitle="Requires paid-to-CRM revenue attribution" size="compact" />
           </div>
-        </div>
+        </details>
       </div>
     </div>
   );
