@@ -111,6 +111,49 @@ test('edits, entity replacement and archival remain auditable and reversible', a
   assert.equal((await (await fetch(`${base}/plans/${planId}/objectives`, { headers: viewer })).json()).result.length, 1);
 });
 
+test('objective priorities and milestones use the same edit boundary and retain unknown dates', async () => {
+  const priorityInput = JSON.stringify({ objectiveId, title: 'Clarify market priorities', status: 'draft', sortOrder: 0 });
+  assert.equal((await fetch(`${base}/priorities`, { method: 'POST', headers: viewer, body: priorityInput })).status, 403);
+  const priorityResponse = await fetch(`${base}/priorities`, { method: 'POST', headers: editor, body: priorityInput });
+  assert.equal(priorityResponse.status, 201);
+  const priority = (await priorityResponse.json()).result;
+  const secondPriority = (await (await fetch(`${base}/priorities`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, title: 'Second priority', status: 'draft', sortOrder: 1 }),
+  })).json()).result;
+  const reorderResponse = await fetch(`${base}/priorities/reorder`, {
+    method: 'POST', headers: editor, body: JSON.stringify({ objectiveId, ids: [secondPriority.id, priority.id] }),
+  });
+  assert.equal(reorderResponse.status, 200);
+  assert.deepEqual((await reorderResponse.json()).result.map((item) => item.id), [secondPriority.id, priority.id]);
+
+  const invalidLink = await fetch(`${base}/milestones`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, priorityId: 'not-a-priority', level: 'monthly-milestone', title: 'Invalid link' }),
+  });
+  assert.equal(invalidLink.status, 400);
+
+  const milestoneResponse = await fetch(`${base}/milestones`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, priorityId: priority.id, level: 'monthly-milestone', title: 'Define the first milestone', periodYear: 2027 }),
+  });
+  assert.equal(milestoneResponse.status, 201);
+  const milestone = (await milestoneResponse.json()).result;
+  assert.equal(milestone.dueDate, null);
+  assert.equal(milestone.attentionType, null);
+
+  const priorities = (await (await fetch(`${base}/objectives/${objectiveId}/priorities`, { headers: viewer })).json()).result;
+  const milestones = (await (await fetch(`${base}/objectives/${objectiveId}/milestones`, { headers: viewer })).json()).result;
+  assert.equal(priorities.length, 2);
+  assert.deepEqual(priorities.map((item) => item.id), [secondPriority.id, priority.id]);
+  assert.equal(milestones.length, 1);
+  assert.equal(milestones[0].priorityId, priority.id);
+  const history = (await (await fetch(`${base}/objectives/${objectiveId}/history`, { headers: viewer })).json()).result;
+  assert.ok(history.some((entry) => entry.resourceType === 'priority' && entry.action === 'create'));
+  assert.ok(history.some((entry) => entry.resourceType === 'milestone' && entry.action === 'create'));
+  assert.ok(history.some((entry) => entry.resourceType === 'objective' && entry.action === 'reorder-priorities'));
+});
+
 test.after(() => {
   server.close();
   db.close();

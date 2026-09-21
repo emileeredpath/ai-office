@@ -16,6 +16,7 @@ import {
   Globe,
   Mail,
   Building2,
+  Waypoints,
 } from 'lucide-react';
 import { isWebglAvailable, isLikelyMobileViewport } from '@/utils/webgl';
 import { Sidebar, type NavItem } from '@/components/layout/Sidebar';
@@ -37,6 +38,7 @@ import { WebsiteImprovementScreen } from '@/screens/WebsiteImprovementScreen';
 import { EmailScreen } from '@/screens/EmailScreen';
 import { FundingScreen } from '@/screens/FundingScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
+import { MarketingPlanScreen } from '@/screens/MarketingPlanScreen';
 import { useAppStore } from '@/store/useAppStore';
 import { API_URL } from '@/services/apiConfig';
 import '@/styles/main.css';
@@ -47,13 +49,14 @@ import '@/styles/main.css';
 // src/screens/MTechHQScreen.tsx's header comment and DATA_INTEGRITY.md.
 const MTechHQScreen = lazy(() => import('@/screens/MTechHQScreen'));
 
-type Screen = 'home' | 'tasks' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'ppc-improvement' | 'infinity' | 'social' | 'website' | 'website-improvement' | 'email' | 'funding' | 'metrics' | 'settings' | 'mtech-hq';
+type Screen = 'home' | 'tasks' | 'marketing-plan' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'ppc-improvement' | 'infinity' | 'social' | 'website' | 'website-improvement' | 'email' | 'funding' | 'metrics' | 'settings' | 'mtech-hq';
 
 // Sidebar labels map to real screens. Website and PPC each reveal an
 // Improvement subcategory when selected. Uploads remains disabled until it
 // has a real screen. Reports keeps its existing 'metrics' route id.
 const PRIMARY_NAV: NavItem[] = [
   { id: 'home' as Screen, icon: LayoutDashboard, label: 'Overview' },
+  { id: 'marketing-plan' as Screen, icon: Waypoints, label: 'Marketing Plan' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
   { id: 'calendar' as Screen, icon: Calendar, label: 'Content & Calendar' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Performance' },
@@ -147,6 +150,8 @@ export default function App() {
         return <HomeScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'tasks':
         return <MyTasksScreen />;
+      case 'marketing-plan':
+        return <MarketingPlanScreen />;
       case 'campaigns':
         return <CampaignsScreen />;
       case 'dashboard':

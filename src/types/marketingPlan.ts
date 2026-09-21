@@ -3,6 +3,9 @@ import type { Brand } from './index';
 export type MarketingPlanStatus = 'draft' | 'proposed' | 'approved' | 'complete' | 'needs-confirmation';
 export type MarketingObjectiveStatus = MarketingPlanStatus | 'tbc';
 export type MarketingObjectivePriority = 'high' | 'medium' | 'low' | 'tbc';
+export type MarketingMilestoneLevel = 'quarterly-outcome' | 'monthly-milestone' | 'current-focus';
+export type MarketingMilestoneStatus = MarketingObjectiveStatus | 'in-progress';
+export type MarketingAttentionType = 'decision-required' | 'review-required' | 'approval-required' | 'missing-information';
 
 export interface MarketingPlan {
   id: string;
@@ -35,6 +38,42 @@ export interface MarketingPlanObjective {
   sortOrder: number;
   notes: string;
   entities: Brand[];
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+  archivedAt: string | null;
+}
+
+export interface MarketingPlanPriority {
+  id: string;
+  objectiveId: string;
+  title: string;
+  description: string;
+  status: MarketingObjectiveStatus;
+  sortOrder: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+  archivedAt: string | null;
+}
+
+export interface MarketingPlanMilestone {
+  id: string;
+  objectiveId: string;
+  priorityId: string | null;
+  level: MarketingMilestoneLevel;
+  title: string;
+  description: string;
+  status: MarketingMilestoneStatus;
+  periodYear: number | null;
+  quarter: number | null;
+  month: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  attentionType: MarketingAttentionType | null;
+  sortOrder: number;
+  notes: string;
   createdAt: string;
   updatedAt: string;
   archived: boolean;
