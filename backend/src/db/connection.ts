@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { runMigrations } from './migrations.js';
 
 const DB_PATH = process.env.DATABASE_PATH || './data/ai-office.db';
 
@@ -550,5 +551,10 @@ const websiteImprovementColumns = db.prepare('PRAGMA table_info(website_improvem
 if (!websiteImprovementColumns.some((column) => column.name === 'channel')) {
   db.exec("ALTER TABLE website_improvements ADD COLUMN channel TEXT NOT NULL DEFAULT 'website'");
 }
+
+// Numbered, transactional migrations are used for the new Marketing Plan
+// domain. They are deliberately additive and do not seed plan records or
+// alter any existing campaign, KPI, attribution, CRM or task data.
+runMigrations(db);
 
 export default db;

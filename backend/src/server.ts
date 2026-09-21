@@ -17,6 +17,7 @@ import analyticsRouter from './routes/analytics.js';
 import websiteImprovementsRouter from './routes/websiteImprovements.js';
 import mcpRouter from './routes/mcp.js';
 import marketingosRouter from './routes/marketingos.js';
+import marketingPlanRouter from './routes/marketingPlan.js';
 import authRouter from './routes/auth.js';
 import msGraphRouter from './routes/msGraph.js';
 import { requireSession } from './middleware/session.js';
@@ -121,6 +122,7 @@ app.use('/api/analytics', requireSession, analyticsRouter);
 app.use('/api/website-improvements', requireSession, websiteImprovementsRouter);
 app.use('/api/actions', requireSession, actionsRouter);
 app.use('/api/marketingos', requireSession, marketingosRouter);
+app.use('/api/marketing-plan', requireSession, marketingPlanRouter);
 
 // Claude's MCP connection is a separate access path from the dashboard's
 // shared edit/view password — authenticated by its own dedicated
