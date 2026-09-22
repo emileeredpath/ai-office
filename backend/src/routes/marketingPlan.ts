@@ -303,6 +303,21 @@ router.delete('/kpis/:id', requireEdit, (req: Request, res: Response) => {
   res.json({ success: true, result });
 });
 
+router.get('/plans/:planId/strategy', (req: Request, res: Response) => {
+  if (!getMarketingPlan(req.params.planId)) {
+    res.status(404).json({ success: false, message: 'Marketing plan not found.' });
+    return;
+  }
+  const result = listMarketingObjectives(req.params.planId).map((objective) => ({
+    objective,
+    priorities: listMarketingPriorities(objective.id),
+    milestones: listMarketingMilestones(objective.id),
+    campaignLinks: listMarketingCampaignLinks(objective.id),
+    kpis: listMarketingKpis(objective.id),
+  }));
+  res.json({ success: true, result });
+});
+
 router.get('/plans/:planId/objectives', (req: Request, res: Response) => {
   if (!getMarketingPlan(req.params.planId)) {
     res.status(404).json({ success: false, message: 'Marketing plan not found.' });

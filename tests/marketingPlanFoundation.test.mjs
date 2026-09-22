@@ -172,6 +172,12 @@ test('campaign relationships link existing records without changing or deleting 
 
   const links = (await (await fetch(`${base}/objectives/${objectiveId}/campaign-links`, { headers: viewer })).json()).result;
   assert.equal(links.length, 1);
+  const strategy = (await (await fetch(`${base}/plans/${planId}/strategy`, { headers: viewer })).json()).result;
+  assert.equal(strategy.length, 1);
+  assert.equal(strategy[0].objective.id, objectiveId);
+  assert.equal(strategy[0].campaignLinks[0].campaignId, campaign.id);
+  assert.equal(strategy[0].priorities.length, 2);
+  assert.equal(strategy[0].milestones.length, 1);
   assert.equal((await fetch(`${base}/campaign-links/${link.id}`, { method: 'DELETE', headers: viewer })).status, 403);
   assert.equal((await fetch(`${base}/campaign-links/${link.id}`, { method: 'DELETE', headers: editor })).status, 200);
   assert.equal((await (await fetch(`${base}/objectives/${objectiveId}/campaign-links`, { headers: viewer })).json()).result.length, 0);
@@ -184,6 +190,7 @@ test('KPI relationships use only canonical definitions and preserve nulls and ge
   const wonRevenue = registry.find((item) => item.key === 'won-revenue');
   assert.match(openPipeline.definition, /Status Open plus Status New/);
   assert.match(openPipeline.definition, /Stage is never used/);
+  assert.equal(openPipeline.destination, 'leads');
   assert.match(wonRevenue.definition, /no trustworthy Won Date/);
 
   const unknown = await fetch(`${base}/kpis`, {
@@ -229,6 +236,9 @@ test('KPI relationships use only canonical definitions and preserve nulls and ge
 
   const kpis = (await (await fetch(`${base}/objectives/${objectiveId}/kpis`, { headers: viewer })).json()).result;
   assert.equal(kpis.length, 2);
+  const strategy = (await (await fetch(`${base}/plans/${planId}/strategy`, { headers: viewer })).json()).result;
+  assert.equal(strategy[0].kpis.length, 2);
+  assert.equal(strategy[0].kpis.find((item) => item.id === zeroKpi.id).targetValue, null);
   assert.equal((await fetch(`${base}/kpis/${tbcKpi.id}`, { method: 'DELETE', headers: viewer })).status, 403);
   assert.equal((await fetch(`${base}/kpis/${tbcKpi.id}`, { method: 'DELETE', headers: editor })).status, 200);
   assert.equal((await fetch(`${base}/kpis/${zeroKpi.id}`, { method: 'DELETE', headers: editor })).status, 200);

@@ -151,7 +151,7 @@ export default function App() {
       case 'tasks':
         return <MyTasksScreen />;
       case 'marketing-plan':
-        return <MarketingPlanScreen />;
+        return <MarketingPlanScreen onNavigate={(screen) => setCurrentScreen(screen as Screen)} />;
       case 'campaigns':
         return <CampaignsScreen />;
       case 'dashboard':

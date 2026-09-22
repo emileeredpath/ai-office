@@ -95,6 +95,7 @@ export interface MarketingPlanKpiDefinition {
   label: string;
   unit: 'count' | 'gbp' | 'percent';
   source: string;
+  destination: 'website' | 'campaigns' | 'leads' | 'ppc' | 'infinity';
   definition: string;
 }
 
@@ -111,4 +112,12 @@ export interface MarketingPlanKpi {
   notes: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MarketingPlanStrategyObjective {
+  objective: MarketingPlanObjective;
+  priorities: MarketingPlanPriority[];
+  milestones: MarketingPlanMilestone[];
+  campaignLinks: MarketingPlanCampaignLink[];
+  kpis: MarketingPlanKpi[];
 }

@@ -1,9 +1,9 @@
 import { apiFetch, ApiError } from './apiConfig';
-import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority } from '@/types/marketingPlan';
+import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
 
 export interface MarketingPlanHistoryEntry {
   id: string;
-  resourceType: 'objective' | 'priority' | 'milestone';
+  resourceType: 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi';
   resourceId: string;
   action: string;
   reason: string | null;
@@ -26,6 +26,7 @@ export const createMarketingPlan = (payload: Record<string, unknown>) => apiFetc
 export const updateMarketingPlan = (id: string, payload: Record<string, unknown>) => apiFetch(`/api/marketing-plan/plans/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlan>(response, 'update the marketing plan'));
 
 export const fetchMarketingObjectives = (planId: string) => apiFetch(`/api/marketing-plan/plans/${planId}/objectives`).then((response) => handle<MarketingPlanObjective[]>(response, 'load marketing objectives'));
+export const fetchMarketingStrategy = (planId: string) => apiFetch(`/api/marketing-plan/plans/${planId}/strategy`).then((response) => handle<MarketingPlanStrategyObjective[]>(response, 'load the strategy views'));
 export const createMarketingObjective = (payload: Record<string, unknown>) => apiFetch('/api/marketing-plan/objectives', { method: 'POST', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanObjective>(response, 'create the objective'));
 export const updateMarketingObjective = (id: string, payload: Record<string, unknown>) => apiFetch(`/api/marketing-plan/objectives/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanObjective>(response, 'update the objective'));
 export const archiveMarketingObjective = (id: string) => apiFetch(`/api/marketing-plan/objectives/${id}/archive`, { method: 'POST', body: '{}' }).then((response) => handle<MarketingPlanObjective>(response, 'archive the objective'));
