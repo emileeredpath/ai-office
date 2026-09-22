@@ -4,10 +4,10 @@ import type { Campaign } from '@/types';
 import type { MarketingPlan, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
 import { BRAND_LABEL } from '@/utils/brandColors';
 
-export type MarketingPlanView = 'strategy-map' | 'quarter' | 'month' | 'week' | 'objectives';
+export type MarketingPlanView = 'strategy-map' | 'quarter' | 'month' | 'week' | 'progress' | 'health' | 'objectives';
 
 interface Props {
-  view: Exclude<MarketingPlanView, 'objectives'>;
+  view: Exclude<MarketingPlanView, 'objectives' | 'progress' | 'health'>;
   plan: MarketingPlan;
   rows: MarketingPlanStrategyObjective[];
   registry: MarketingPlanKpiDefinition[];
