@@ -120,6 +120,45 @@ export const updateMarketingKpiSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
 
+export const createMarketingReviewSchema = z.object({
+  planId: z.string().trim().min(1),
+  objectiveId: z.string().trim().min(1).nullable().optional(),
+  reviewType: z.enum(['quarterly', 'monthly', 'annual', 'ad-hoc']),
+  periodYear: z.number().int().min(2000).max(2200),
+  quarter: z.number().int().min(1).max(4).nullable().optional(),
+  month: z.number().int().min(1).max(12).nullable().optional(),
+  status: z.enum(MARKETING_PLAN_STATUSES).optional(),
+  reviewDate: z.string().date(),
+  whatHappened: optionalText(20000),
+  whatChanged: optionalText(20000),
+  whyItMatters: optionalText(20000),
+  worked: optionalText(20000),
+  didNotWork: optionalText(20000),
+  learned: optionalText(20000),
+  changesNext: optionalText(20000),
+});
+
+export const updateMarketingReviewSchema = createMarketingReviewSchema.omit({ planId: true }).partial().extend({
+  reason: z.string().trim().max(1000).optional(),
+});
+
+export const reviewEvidenceSchema = z.object({
+  objectiveKpiId: z.string().trim().min(1),
+  kpiKey: z.enum(MARKETING_KPI_KEYS),
+  targetValue: z.number().finite().nullable(),
+  targetUnit: z.string().trim().max(50).nullable(),
+  actualValue: z.number().finite().nullable(),
+  actualDisplay: z.string().trim().max(200).nullable(),
+  dataStatus: z.enum(['available', 'partial', 'unavailable']),
+  trendDisplay: z.string().trim().max(200).nullable(),
+  sourceLabel: z.string().trim().min(1).max(200),
+  measurementStart: optionalDate,
+  measurementEnd: optionalDate,
+  measurementPeriod: z.string().trim().max(200).nullable(),
+});
+
+export const replaceMarketingReviewEvidenceSchema = z.object({ evidence: z.array(reviewEvidenceSchema).max(100) });
+
 export type CreateMarketingPlanInput = z.infer<typeof createMarketingPlanSchema>;
 export type UpdateMarketingPlanInput = z.infer<typeof updateMarketingPlanSchema>;
 export type CreateMarketingObjectiveInput = z.infer<typeof createMarketingObjectiveSchema>;
@@ -131,3 +170,6 @@ export type UpdateMarketingMilestoneInput = z.infer<typeof updateMarketingMilest
 export type CreateMarketingCampaignLinkInput = z.infer<typeof createMarketingCampaignLinkSchema>;
 export type CreateMarketingKpiInput = z.infer<typeof createMarketingKpiSchema>;
 export type UpdateMarketingKpiInput = z.infer<typeof updateMarketingKpiSchema>;
+export type CreateMarketingReviewInput = z.infer<typeof createMarketingReviewSchema>;
+export type UpdateMarketingReviewInput = z.infer<typeof updateMarketingReviewSchema>;
+export type ReviewEvidenceInput = z.infer<typeof reviewEvidenceSchema>;

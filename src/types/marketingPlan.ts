@@ -121,3 +121,45 @@ export interface MarketingPlanStrategyObjective {
   campaignLinks: MarketingPlanCampaignLink[];
   kpis: MarketingPlanKpi[];
 }
+
+export interface MarketingPlanReviewEvidence {
+  id: string;
+  reviewId: string;
+  objectiveKpiId: string;
+  kpiKey: string;
+  targetValue: number | null;
+  targetUnit: string | null;
+  actualValue: number | null;
+  actualDisplay: string | null;
+  dataStatus: 'available' | 'partial' | 'unavailable';
+  trendDisplay: string | null;
+  sourceLabel: string;
+  measurementStart: string | null;
+  measurementEnd: string | null;
+  measurementPeriod: string | null;
+  capturedAt: string;
+}
+
+export interface MarketingPlanReview {
+  id: string;
+  planId: string;
+  objectiveId: string | null;
+  reviewType: 'quarterly' | 'monthly' | 'annual' | 'ad-hoc';
+  periodYear: number;
+  quarter: number | null;
+  month: number | null;
+  status: MarketingPlanStatus;
+  reviewDate: string;
+  whatHappened: string;
+  whatChanged: string;
+  whyItMatters: string;
+  worked: string;
+  didNotWork: string;
+  learned: string;
+  changesNext: string;
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+  archivedAt: string | null;
+  evidence: MarketingPlanReviewEvidence[];
+}

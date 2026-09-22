@@ -14,6 +14,9 @@ import {
   createMarketingCampaignLinkSchema,
   createMarketingKpiSchema,
   updateMarketingKpiSchema,
+  createMarketingReviewSchema,
+  updateMarketingReviewSchema,
+  replaceMarketingReviewEvidenceSchema,
 } from '../marketingPlan/schemas.js';
 import { MARKETING_PLAN_KPI_REGISTRY } from '../marketingPlan/kpiRegistry.js';
 import { getCampaignById } from '../db/campaignRepository.js';
@@ -49,6 +52,12 @@ import {
   getMarketingKpi,
   listMarketingKpis,
   updateMarketingKpi,
+  createMarketingReview,
+  getMarketingReview,
+  listMarketingReviews,
+  replaceMarketingReviewEvidence,
+  setMarketingReviewArchived,
+  updateMarketingReview,
 } from '../db/marketingPlanRepository.js';
 
 const router = Router();
@@ -303,6 +312,56 @@ router.delete('/kpis/:id', requireEdit, (req: Request, res: Response) => {
   res.json({ success: true, result });
 });
 
+router.get('/plans/:planId/reviews', (req: Request, res: Response) => {
+  if (!getMarketingPlan(req.params.planId)) return res.status(404).json({ success: false, message: 'Marketing plan not found.' });
+  res.json({ success: true, result: listMarketingReviews(req.params.planId, req.query.includeArchived === 'true') });
+});
+
+router.post('/reviews', requireEdit, (req: Request, res: Response) => {
+  const parsed = createMarketingReviewSchema.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  if (!getMarketingPlan(parsed.data.planId)) return res.status(404).json({ success: false, message: 'Marketing plan not found.' });
+  if (parsed.data.objectiveId) {
+    const objective = getMarketingObjective(parsed.data.objectiveId);
+    if (!objective || objective.planId !== parsed.data.planId) return res.status(400).json({ success: false, message: 'The selected objective does not belong to this plan.' });
+  }
+  res.status(201).json({ success: true, result: createMarketingReview(parsed.data) });
+});
+
+router.patch('/reviews/:id', requireEdit, (req: Request, res: Response) => {
+  const parsed = updateMarketingReviewSchema.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  const existing = getMarketingReview(req.params.id);
+  if (!existing) return res.status(404).json({ success: false, message: 'Marketing review not found.' });
+  if (parsed.data.objectiveId) {
+    const objective = getMarketingObjective(parsed.data.objectiveId);
+    if (!objective || objective.planId !== existing.planId) return res.status(400).json({ success: false, message: 'The selected objective does not belong to this plan.' });
+  }
+  res.json({ success: true, result: updateMarketingReview(req.params.id, parsed.data) });
+});
+
+router.post('/reviews/:id/evidence', requireEdit, (req: Request, res: Response) => {
+  const parsed = replaceMarketingReviewEvidenceSchema.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  const review = getMarketingReview(req.params.id);
+  if (!review) return res.status(404).json({ success: false, message: 'Marketing review not found.' });
+  for (const item of parsed.data.evidence) {
+    const kpi = getMarketingKpi(item.objectiveKpiId);
+    if (!kpi || kpi.kpiKey !== item.kpiKey) return res.status(400).json({ success: false, message: 'Review evidence must reference an existing matching KPI relationship.' });
+    const objective = getMarketingObjective(kpi.objectiveId);
+    if (!objective || objective.planId !== review.planId || (review.objectiveId && review.objectiveId !== objective.id)) return res.status(400).json({ success: false, message: 'Review evidence is outside the review scope.' });
+  }
+  res.json({ success: true, result: replaceMarketingReviewEvidence(req.params.id, parsed.data.evidence) });
+});
+
+router.post('/reviews/:id/archive', requireEdit, (req: Request, res: Response) => {
+  const parsed = reasonSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return invalid(res, parsed.error);
+  const result = setMarketingReviewArchived(req.params.id, true, parsed.data.reason);
+  if (!result) return res.status(404).json({ success: false, message: 'Marketing review not found.' });
+  res.json({ success: true, result });
+});
+
 router.get('/plans/:planId/strategy', (req: Request, res: Response) => {
   if (!getMarketingPlan(req.params.planId)) {
     res.status(404).json({ success: false, message: 'Marketing plan not found.' });
@@ -378,7 +437,7 @@ for (const [path, archived] of [['archive', true], ['restore', false]] as const)
 }
 
 router.get('/history/:resourceType/:resourceId', (req: Request, res: Response) => {
-  const resourceType = z.enum(['plan', 'objective', 'priority', 'milestone', 'campaign-link', 'kpi']).safeParse(req.params.resourceType);
+  const resourceType = z.enum(['plan', 'objective', 'priority', 'milestone', 'campaign-link', 'kpi', 'review']).safeParse(req.params.resourceType);
   if (!resourceType.success) {
     res.status(400).json({ success: false, message: 'Invalid Marketing Plan resource type.' });
     return;

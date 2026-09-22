@@ -12,6 +12,9 @@ import type {
   CreateMarketingCampaignLinkInput,
   CreateMarketingKpiInput,
   UpdateMarketingKpiInput,
+  CreateMarketingReviewInput,
+  UpdateMarketingReviewInput,
+  ReviewEvidenceInput,
 } from '../marketingPlan/schemas.js';
 import { getMarketingPlanKpiDefinition } from '../marketingPlan/kpiRegistry.js';
 
@@ -76,6 +79,13 @@ interface KpiRow {
   created_at: string; updated_at: string;
 }
 
+interface ReviewRow {
+  id: string; plan_id: string; objective_id: string | null; review_type: string; period_year: number;
+  quarter: number | null; month: number | null; status: string; review_date: string; what_happened: string;
+  what_changed: string; why_it_matters: string; worked: string; did_not_work: string; learned: string;
+  changes_next: string; created_at: string; updated_at: string; archived: number; archived_at: string | null;
+}
+
 function mapPlan(row: PlanRow) {
   return {
     id: row.id,
@@ -121,7 +131,7 @@ function mapObjective(row: ObjectiveRow) {
   };
 }
 
-function addHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi', resourceId: string, action: string, previousValue: unknown, newValue: unknown, reason?: string) {
+function addHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi' | 'review', resourceId: string, action: string, previousValue: unknown, newValue: unknown, reason?: string) {
   db.prepare(`
     INSERT INTO marketing_plan_history
       (id, resource_type, resource_id, action, field_name, previous_value, new_value, reason, source, changed_at)
@@ -512,7 +522,97 @@ export function deleteMarketingKpi(id: string) {
   });
 }
 
-export function listMarketingPlanHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi', resourceId: string) {
+function mapReview(row: ReviewRow) {
+  return {
+    id: row.id, planId: row.plan_id, objectiveId: row.objective_id, reviewType: row.review_type,
+    periodYear: row.period_year, quarter: row.quarter, month: row.month, status: row.status,
+    reviewDate: row.review_date, whatHappened: row.what_happened, whatChanged: row.what_changed,
+    whyItMatters: row.why_it_matters, worked: row.worked, didNotWork: row.did_not_work,
+    learned: row.learned, changesNext: row.changes_next, createdAt: row.created_at, updatedAt: row.updated_at,
+    archived: Boolean(row.archived), archivedAt: row.archived_at,
+  };
+}
+
+export function listMarketingReviews(planId: string, includeArchived = false) {
+  const rows = db.prepare(`SELECT * FROM marketing_plan_reviews WHERE plan_id = ? ${includeArchived ? '' : 'AND archived = 0'} ORDER BY review_date DESC, created_at DESC`).all(planId) as unknown as ReviewRow[];
+  return rows.map((row) => ({ ...mapReview(row), evidence: listMarketingReviewEvidence(row.id) }));
+}
+
+export function getMarketingReview(id: string) {
+  const row = db.prepare('SELECT * FROM marketing_plan_reviews WHERE id = ?').get(id) as unknown as ReviewRow | undefined;
+  return row ? { ...mapReview(row), evidence: listMarketingReviewEvidence(id) } : null;
+}
+
+export function createMarketingReview(input: CreateMarketingReviewInput) {
+  const id = `mpr_${nanoid()}`;
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO marketing_plan_reviews
+    (id, plan_id, objective_id, review_type, period_year, quarter, month, status, review_date, what_happened,
+     what_changed, why_it_matters, worked, did_not_work, learned, changes_next, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, input.planId, input.objectiveId ?? null, input.reviewType, input.periodYear, input.quarter ?? null, input.month ?? null,
+    input.status ?? 'draft', input.reviewDate, input.whatHappened ?? '', input.whatChanged ?? '', input.whyItMatters ?? '',
+    input.worked ?? '', input.didNotWork ?? '', input.learned ?? '', input.changesNext ?? '', now, now);
+  const review = getMarketingReview(id)!;
+  addHistory('review', id, 'create', undefined, review);
+  return review;
+}
+
+const reviewColumns: Record<string, string> = {
+  objectiveId: 'objective_id', reviewType: 'review_type', periodYear: 'period_year', quarter: 'quarter', month: 'month',
+  status: 'status', reviewDate: 'review_date', whatHappened: 'what_happened', whatChanged: 'what_changed',
+  whyItMatters: 'why_it_matters', worked: 'worked', didNotWork: 'did_not_work', learned: 'learned', changesNext: 'changes_next',
+};
+
+export function updateMarketingReview(id: string, input: UpdateMarketingReviewInput) {
+  const previous = getMarketingReview(id);
+  if (!previous) return null;
+  const entries = Object.entries(input).filter(([key, value]) => key !== 'reason' && value !== undefined && reviewColumns[key]);
+  if (!entries.length) return previous;
+  const set = entries.map(([key]) => `${reviewColumns[key]} = ?`).concat('updated_at = ?').join(', ');
+  db.prepare(`UPDATE marketing_plan_reviews SET ${set} WHERE id = ?`).run(...entries.map(([, value]) => value as SqlValue), new Date().toISOString(), id);
+  const updated = getMarketingReview(id)!;
+  addHistory('review', id, 'edit', previous, updated, input.reason);
+  return updated;
+}
+
+export function setMarketingReviewArchived(id: string, archived: boolean, reason?: string) {
+  const previous = getMarketingReview(id);
+  if (!previous) return null;
+  const now = new Date().toISOString();
+  db.prepare('UPDATE marketing_plan_reviews SET archived = ?, archived_at = ?, updated_at = ? WHERE id = ?').run(archived ? 1 : 0, archived ? now : null, now, id);
+  const updated = getMarketingReview(id)!;
+  addHistory('review', id, archived ? 'archive' : 'restore', previous, updated, reason);
+  return updated;
+}
+
+export function listMarketingReviewEvidence(reviewId: string) {
+  return db.prepare(`SELECT id, review_id AS reviewId, objective_kpi_id AS objectiveKpiId, kpi_key AS kpiKey,
+    target_value AS targetValue, target_unit AS targetUnit, actual_value AS actualValue, actual_display AS actualDisplay,
+    data_status AS dataStatus, trend_display AS trendDisplay, source_label AS sourceLabel,
+    measurement_start AS measurementStart, measurement_end AS measurementEnd, measurement_period AS measurementPeriod,
+    captured_at AS capturedAt FROM marketing_plan_review_evidence WHERE review_id = ? ORDER BY captured_at, id`).all(reviewId);
+}
+
+export function replaceMarketingReviewEvidence(reviewId: string, evidence: ReviewEvidenceInput[]) {
+  const previous = listMarketingReviewEvidence(reviewId);
+  return runTransaction(() => {
+    db.prepare('DELETE FROM marketing_plan_review_evidence WHERE review_id = ?').run(reviewId);
+    const insert = db.prepare(`INSERT INTO marketing_plan_review_evidence
+      (id, review_id, objective_kpi_id, kpi_key, target_value, target_unit, actual_value, actual_display, data_status,
+       trend_display, source_label, measurement_start, measurement_end, measurement_period, captured_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const capturedAt = new Date().toISOString();
+    for (const item of evidence) insert.run(`mpre_${nanoid()}`, reviewId, item.objectiveKpiId, item.kpiKey, item.targetValue,
+      item.targetUnit, item.actualValue, item.actualDisplay, item.dataStatus, item.trendDisplay, item.sourceLabel,
+      item.measurementStart ?? null, item.measurementEnd ?? null, item.measurementPeriod, capturedAt);
+    const next = listMarketingReviewEvidence(reviewId);
+    addHistory('review', reviewId, 'capture-evidence', previous, next);
+    return next;
+  });
+}
+
+export function listMarketingPlanHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi' | 'review', resourceId: string) {
   return db.prepare(`
     SELECT id, resource_type AS resourceType, resource_id AS resourceId, action, field_name AS fieldName,
            previous_value AS previousValue, new_value AS newValue, reason, source, changed_at AS changedAt

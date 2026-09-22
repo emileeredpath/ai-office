@@ -7,6 +7,7 @@ import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, Market
 import { useAppStore } from '@/store/useAppStore';
 import { StrategyViews, type MarketingPlanView } from '@/components/marketingPlan/StrategyViews';
 import { ProgressAndHealth } from '@/components/marketingPlan/ProgressAndHealth';
+import { StrategyReviewsView } from '@/components/marketingPlan/StrategyReviewsView';
 import {
   archiveMarketingMilestone, archiveMarketingObjective, archiveMarketingPriority,
   createMarketingCampaignLink, createMarketingKpi, deleteMarketingCampaignLink, deleteMarketingKpi,
@@ -178,7 +179,7 @@ export function MarketingPlanScreen({ onNavigate }: { onNavigate?: (screen: stri
       </section>
 
       <nav className="mb-5 flex gap-1 overflow-x-auto rounded-xl border bg-white p-1.5" role="tablist" aria-label="Marketing Plan views">{([
-        ['strategy-map', 'Strategy Map'], ['quarter', 'Quarter'], ['month', 'Month'], ['week', 'This Week'], ['progress', 'Progress'], ['health', 'Strategy Health'], ['objectives', 'Objectives'],
+        ['strategy-map', 'Strategy Map'], ['quarter', 'Quarter'], ['month', 'Month'], ['week', 'This Week'], ['progress', 'Progress'], ['health', 'Strategy Health'], ['reviews', 'Reviews'], ['objectives', 'Objectives'],
       ] as const).map(([value, text]) => <button key={value} role="tab" aria-selected={activeView === value} className={`flex min-w-max items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold ${activeView === value ? 'bg-violet-700 text-white shadow-sm' : 'text-text-secondary hover:bg-violet-50 hover:text-violet-800'}`} onClick={() => setActiveView(value)}>{value === 'strategy-map' && <Map size={15}/>} {text}</button>)}</nav>
 
       {activeView === 'objectives' ? <>
@@ -206,7 +207,9 @@ export function MarketingPlanScreen({ onNavigate }: { onNavigate?: (screen: stri
           <section className="card p-5"><p className="v2-section-title mb-1">Change history</p><p className="text-sm text-text-secondary mb-3">A chronological record of objective, priority, milestone, campaign and KPI relationship changes.</p>{history.length === 0 ? <p className="text-sm text-text-secondary">No changes recorded yet.</p> : <div className="divide-y">{history.slice(0, 20).map((entry) => <div key={entry.id} className="py-3 flex flex-wrap justify-between gap-2"><div><strong className="text-sm text-text-primary">{label(entry.action)}</strong><span className="text-xs text-text-secondary ml-2">{label(entry.resourceType)}</span>{entry.reason && <p className="text-xs text-text-secondary mt-1">{entry.reason}</p>}</div><time className="text-xs text-text-secondary">{new Date(entry.changedAt).toLocaleString('en-GB')}</time></div>)}</div>}</section>
         </main>}
       </div>
-      </> : activeView === 'progress' || activeView === 'health'
+      </> : activeView === 'reviews'
+        ? <StrategyReviewsView plan={plan} rows={strategyRows} registry={kpiRegistry} campaigns={campaigns} isEditor={isEditor} onOpenObjective={openObjective}/>
+        : activeView === 'progress' || activeView === 'health'
         ? <ProgressAndHealth mode={activeView} rows={strategyRows} registry={kpiRegistry} campaigns={campaigns} onOpenObjective={openObjective} onOpenKpi={openKpi}/>
         : <StrategyViews view={activeView} plan={plan} rows={strategyRows} registry={kpiRegistry} campaigns={campaigns} onOpenObjective={openObjective} onOpenCampaign={selectCampaign} onOpenKpi={openKpi}/>}
     </>}

@@ -40,7 +40,7 @@ function scopeLabel(row: MarketingPlanStrategyObjective) {
   return scope.isGroupView ? 'MTech Group' : BRAND_LABEL[scope.selectedEntity as Brand];
 }
 
-async function loadActual(
+export async function loadMarketingPlanActual(
   row: MarketingPlanStrategyObjective,
   kpiId: string,
   campaigns: Campaign[],
@@ -126,7 +126,7 @@ export function ProgressAndHealth(props: Props) {
     setLoading(true); setActuals({});
     const cache = new Map<string, Promise<unknown>>();
     const rowsToResolve = props.mode === 'health' ? props.rows : selected ? [selected] : [];
-    Promise.all(rowsToResolve.flatMap((row) => row.kpis.map(async (kpi) => [kpi.id, await loadActual(row, kpi.id, props.campaigns, cache)] as const)))
+    Promise.all(rowsToResolve.flatMap((row) => row.kpis.map(async (kpi) => [kpi.id, await loadMarketingPlanActual(row, kpi.id, props.campaigns, cache)] as const)))
       .then((entries) => { if (!cancelled) setActuals(Object.fromEntries(entries)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

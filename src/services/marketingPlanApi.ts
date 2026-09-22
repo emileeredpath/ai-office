@@ -1,5 +1,5 @@
 import { apiFetch, ApiError } from './apiConfig';
-import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
+import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority, MarketingPlanReview, MarketingPlanReviewEvidence, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
 
 export interface MarketingPlanHistoryEntry {
   id: string;
@@ -52,3 +52,9 @@ export const fetchMarketingKpis = (objectiveId: string) => apiFetch(`/api/market
 export const createMarketingKpi = (payload: Record<string, unknown>) => apiFetch('/api/marketing-plan/kpis', { method: 'POST', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanKpi>(response, 'link the KPI'));
 export const updateMarketingKpi = (id: string, payload: Record<string, unknown>) => apiFetch(`/api/marketing-plan/kpis/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanKpi>(response, 'update the KPI target'));
 export const deleteMarketingKpi = (id: string) => apiFetch(`/api/marketing-plan/kpis/${id}`, { method: 'DELETE' }).then((response) => handle<MarketingPlanKpi>(response, 'unlink the KPI'));
+
+export const fetchMarketingReviews = (planId: string) => apiFetch(`/api/marketing-plan/plans/${planId}/reviews`).then((response) => handle<MarketingPlanReview[]>(response, 'load strategy reviews'));
+export const createMarketingReview = (payload: Record<string, unknown>) => apiFetch('/api/marketing-plan/reviews', { method: 'POST', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanReview>(response, 'create the strategy review'));
+export const updateMarketingReview = (id: string, payload: Record<string, unknown>) => apiFetch(`/api/marketing-plan/reviews/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanReview>(response, 'save the strategy review'));
+export const archiveMarketingReview = (id: string) => apiFetch(`/api/marketing-plan/reviews/${id}/archive`, { method: 'POST', body: '{}' }).then((response) => handle<MarketingPlanReview>(response, 'archive the strategy review'));
+export const replaceMarketingReviewEvidence = (id: string, evidence: Record<string, unknown>[]) => apiFetch(`/api/marketing-plan/reviews/${id}/evidence`, { method: 'POST', body: JSON.stringify({ evidence }) }).then((response) => handle<MarketingPlanReviewEvidence[]>(response, 'capture review evidence'));

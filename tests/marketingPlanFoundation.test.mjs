@@ -248,6 +248,42 @@ test('KPI relationships use only canonical definitions and preserve nulls and ge
   assert.ok(history.some((entry) => entry.resourceType === 'objective' && entry.action === 'unlink-kpi'));
 });
 
+test('strategy reviews keep conclusions user-authored and capture explicit evidence states', async () => {
+  const body = JSON.stringify({ planId, objectiveId, reviewType: 'quarterly', periodYear: 2027, quarter: 2, reviewDate: '2027-06-30' });
+  assert.equal((await fetch(`${base}/reviews`, { method: 'POST', headers: viewer, body })).status, 403);
+  const response = await fetch(`${base}/reviews`, { method: 'POST', headers: editor, body });
+  assert.equal(response.status, 201);
+  const review = (await response.json()).result;
+  assert.equal(review.whatHappened, '');
+  assert.equal(review.learned, '');
+  assert.deepEqual(review.evidence, []);
+
+  const kpiResponse = await fetch(`${base}/kpis`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, kpiKey: 'website-users', targetValue: 100, targetStatus: 'approved' }),
+  });
+  const reviewKpi = (await kpiResponse.json()).result;
+  const evidence = [{
+    objectiveKpiId: reviewKpi.id, kpiKey: 'website-users', targetValue: 100, targetUnit: 'count',
+    actualValue: 0, actualDisplay: '0', dataStatus: 'available', trendDisplay: null,
+    sourceLabel: 'GA4', measurementStart: '2027-04-01', measurementEnd: '2027-06-30', measurementPeriod: 'Q2 2027',
+  }];
+  const capture = await fetch(`${base}/reviews/${review.id}/evidence`, { method: 'POST', headers: editor, body: JSON.stringify({ evidence }) });
+  assert.equal(capture.status, 200);
+  assert.equal((await capture.json()).result[0].actualValue, 0);
+
+  const mismatch = await fetch(`${base}/reviews/${review.id}/evidence`, { method: 'POST', headers: editor, body: JSON.stringify({ evidence: [{ ...evidence[0], kpiKey: 'sessions' }] }) });
+  assert.equal(mismatch.status, 400);
+  const edited = await fetch(`${base}/reviews/${review.id}`, { method: 'PATCH', headers: editor, body: JSON.stringify({ learned: 'Keep the confirmed lesson.', status: 'complete' }) });
+  assert.equal(edited.status, 200);
+  assert.equal((await edited.json()).result.learned, 'Keep the confirmed lesson.');
+  const listed = (await (await fetch(`${base}/plans/${planId}/reviews`, { headers: viewer })).json()).result;
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].evidence[0].actualValue, 0);
+  assert.equal((await fetch(`${base}/reviews/${review.id}/archive`, { method: 'POST', headers: editor, body: '{}' })).status, 200);
+  assert.equal((await (await fetch(`${base}/plans/${planId}/reviews`, { headers: viewer })).json()).result.length, 0);
+});
+
 test.after(() => {
   server.close();
   db.close();
