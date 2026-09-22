@@ -12,6 +12,7 @@ const { default: router } = await import('../backend/dist/routes/marketingPlan.j
 const { requireSession, createSession } = await import('../backend/dist/middleware/session.js');
 const { default: db } = await import('../backend/dist/db/connection.js');
 const { runMigrations } = await import('../backend/dist/db/migrations.js');
+const { insertCampaign, getCampaignById } = await import('../backend/dist/db/campaignRepository.js');
 
 const app = express();
 app.use(express.json());
@@ -152,6 +153,89 @@ test('objective priorities and milestones use the same edit boundary and retain 
   assert.ok(history.some((entry) => entry.resourceType === 'priority' && entry.action === 'create'));
   assert.ok(history.some((entry) => entry.resourceType === 'milestone' && entry.action === 'create'));
   assert.ok(history.some((entry) => entry.resourceType === 'objective' && entry.action === 'reorder-priorities'));
+});
+
+test('campaign relationships link existing records without changing or deleting campaigns', async () => {
+  const campaign = insertCampaign({
+    name: 'Existing campaign', brand: 'mtech', entities: ['mtech'], status: 'active',
+    startDate: '2027-01-01', endDate: '2027-03-31',
+  });
+  const body = JSON.stringify({ objectiveId, campaignId: campaign.id });
+  assert.equal((await fetch(`${base}/campaign-links`, { method: 'POST', headers: viewer, body })).status, 403);
+
+  const response = await fetch(`${base}/campaign-links`, { method: 'POST', headers: editor, body });
+  assert.equal(response.status, 201);
+  const link = (await response.json()).result;
+  assert.equal(link.campaignId, campaign.id);
+  assert.equal(link.campaign.name, 'Existing campaign');
+  assert.equal((await fetch(`${base}/campaign-links`, { method: 'POST', headers: editor, body })).status, 409);
+
+  const links = (await (await fetch(`${base}/objectives/${objectiveId}/campaign-links`, { headers: viewer })).json()).result;
+  assert.equal(links.length, 1);
+  assert.equal((await fetch(`${base}/campaign-links/${link.id}`, { method: 'DELETE', headers: viewer })).status, 403);
+  assert.equal((await fetch(`${base}/campaign-links/${link.id}`, { method: 'DELETE', headers: editor })).status, 200);
+  assert.equal((await (await fetch(`${base}/objectives/${objectiveId}/campaign-links`, { headers: viewer })).json()).result.length, 0);
+  assert.equal(getCampaignById(campaign.id).name, 'Existing campaign');
+});
+
+test('KPI relationships use only canonical definitions and preserve nulls and genuine zero targets', async () => {
+  const registry = (await (await fetch(`${base}/kpis/registry`, { headers: viewer })).json()).result;
+  const openPipeline = registry.find((item) => item.key === 'open-pipeline');
+  const wonRevenue = registry.find((item) => item.key === 'won-revenue');
+  assert.match(openPipeline.definition, /Status Open plus Status New/);
+  assert.match(openPipeline.definition, /Stage is never used/);
+  assert.match(wonRevenue.definition, /no trustworthy Won Date/);
+
+  const unknown = await fetch(`${base}/kpis`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, kpiKey: 'invented-kpi', targetValue: 10 }),
+  });
+  assert.equal(unknown.status, 400);
+
+  const blankProposed = await fetch(`${base}/kpis`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, kpiKey: 'sessions', targetValue: null, targetStatus: 'proposed' }),
+  });
+  assert.equal(blankProposed.status, 400);
+
+  const tbcBody = JSON.stringify({ objectiveId, kpiKey: 'sessions', targetValue: null, targetStatus: 'tbc' });
+  assert.equal((await fetch(`${base}/kpis`, { method: 'POST', headers: viewer, body: tbcBody })).status, 403);
+  const tbcResponse = await fetch(`${base}/kpis`, { method: 'POST', headers: editor, body: tbcBody });
+  assert.equal(tbcResponse.status, 201);
+  const tbcKpi = (await tbcResponse.json()).result;
+  assert.equal(tbcKpi.targetValue, null);
+
+  const zeroResponse = await fetch(`${base}/kpis`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, kpiKey: 'google-ads-spend', targetValue: 0, targetStatus: 'approved' }),
+  });
+  assert.equal(zeroResponse.status, 201);
+  const zeroKpi = (await zeroResponse.json()).result;
+  assert.equal(zeroKpi.targetValue, 0);
+  assert.equal(zeroKpi.targetUnit, 'gbp');
+
+  assert.equal((await fetch(`${base}/kpis`, {
+    method: 'POST', headers: editor,
+    body: JSON.stringify({ objectiveId, kpiKey: 'google-ads-spend', targetValue: 1 }),
+  })).status, 409);
+  assert.equal((await fetch(`${base}/kpis/${zeroKpi.id}`, {
+    method: 'PATCH', headers: editor, body: JSON.stringify({ targetValue: null }),
+  })).status, 400);
+  const clearResponse = await fetch(`${base}/kpis/${zeroKpi.id}`, {
+    method: 'PATCH', headers: editor, body: JSON.stringify({ targetValue: null, targetStatus: 'tbc' }),
+  });
+  assert.equal(clearResponse.status, 200);
+  assert.equal((await clearResponse.json()).result.targetValue, null);
+
+  const kpis = (await (await fetch(`${base}/objectives/${objectiveId}/kpis`, { headers: viewer })).json()).result;
+  assert.equal(kpis.length, 2);
+  assert.equal((await fetch(`${base}/kpis/${tbcKpi.id}`, { method: 'DELETE', headers: viewer })).status, 403);
+  assert.equal((await fetch(`${base}/kpis/${tbcKpi.id}`, { method: 'DELETE', headers: editor })).status, 200);
+  assert.equal((await fetch(`${base}/kpis/${zeroKpi.id}`, { method: 'DELETE', headers: editor })).status, 200);
+
+  const history = (await (await fetch(`${base}/objectives/${objectiveId}/history`, { headers: viewer })).json()).result;
+  assert.ok(history.some((entry) => entry.resourceType === 'objective' && entry.action === 'unlink-campaign'));
+  assert.ok(history.some((entry) => entry.resourceType === 'objective' && entry.action === 'unlink-kpi'));
 });
 
 test.after(() => {

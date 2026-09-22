@@ -79,3 +79,36 @@ export interface MarketingPlanMilestone {
   archived: boolean;
   archivedAt: string | null;
 }
+
+export interface MarketingPlanCampaignLink {
+  id: string;
+  objectiveId: string;
+  priorityId: string | null;
+  campaignId: string;
+  sortOrder: number;
+  createdAt: string;
+  campaign: { name: string; status: string | null; archived: boolean } | null;
+}
+
+export interface MarketingPlanKpiDefinition {
+  key: string;
+  label: string;
+  unit: 'count' | 'gbp' | 'percent';
+  source: string;
+  definition: string;
+}
+
+export interface MarketingPlanKpi {
+  id: string;
+  objectiveId: string;
+  kpiKey: string;
+  targetValue: number | null;
+  targetUnit: string | null;
+  targetDirection: 'increase' | 'decrease' | 'maintain' | 'reach';
+  targetStatus: 'tbc' | 'proposed' | 'approved';
+  periodScope: 'objective' | 'quarter' | 'month' | 'all-time';
+  sortOrder: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}

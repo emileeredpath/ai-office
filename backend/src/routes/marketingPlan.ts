@@ -11,7 +11,12 @@ import {
   createMarketingMilestoneSchema,
   updateMarketingMilestoneSchema,
   reorderMarketingPrioritiesSchema,
+  createMarketingCampaignLinkSchema,
+  createMarketingKpiSchema,
+  updateMarketingKpiSchema,
 } from '../marketingPlan/schemas.js';
+import { MARKETING_PLAN_KPI_REGISTRY } from '../marketingPlan/kpiRegistry.js';
+import { getCampaignById } from '../db/campaignRepository.js';
 import {
   createMarketingObjective,
   createMarketingPlan,
@@ -36,6 +41,14 @@ import {
   updateMarketingMilestone,
   reorderMarketingPriorities,
   listMarketingObjectiveHistory,
+  createMarketingCampaignLink,
+  deleteMarketingCampaignLink,
+  listMarketingCampaignLinks,
+  createMarketingKpi,
+  deleteMarketingKpi,
+  getMarketingKpi,
+  listMarketingKpis,
+  updateMarketingKpi,
 } from '../db/marketingPlanRepository.js';
 
 const router = Router();
@@ -193,6 +206,103 @@ router.post('/milestones/:id/archive', requireEdit, (req: Request, res: Response
   res.json({ success: true, result });
 });
 
+router.get('/objectives/:objectiveId/campaign-links', (req: Request, res: Response) => {
+  if (!getMarketingObjective(req.params.objectiveId)) {
+    res.status(404).json({ success: false, message: 'Marketing objective not found.' });
+    return;
+  }
+  res.json({ success: true, result: listMarketingCampaignLinks(req.params.objectiveId) });
+});
+
+router.post('/campaign-links', requireEdit, (req: Request, res: Response) => {
+  const parsed = createMarketingCampaignLinkSchema.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  if (!getMarketingObjective(parsed.data.objectiveId)) {
+    res.status(404).json({ success: false, message: 'Marketing objective not found.' });
+    return;
+  }
+  const campaign = getCampaignById(parsed.data.campaignId);
+  if (!campaign || campaign.archived) {
+    res.status(400).json({ success: false, message: 'Only an existing active campaign can be linked.' });
+    return;
+  }
+  if (parsed.data.priorityId) {
+    const priority = getMarketingPriority(parsed.data.priorityId);
+    if (!priority || priority.objectiveId !== parsed.data.objectiveId || priority.archived) {
+      res.status(400).json({ success: false, message: 'The selected priority does not belong to this objective.' });
+      return;
+    }
+  }
+  const duplicate = listMarketingCampaignLinks(parsed.data.objectiveId).some((link) => link.campaignId === parsed.data.campaignId && link.priorityId === (parsed.data.priorityId ?? null));
+  if (duplicate) {
+    res.status(409).json({ success: false, message: 'This campaign relationship already exists.' });
+    return;
+  }
+  res.status(201).json({ success: true, result: createMarketingCampaignLink(parsed.data) });
+});
+
+router.delete('/campaign-links/:id', requireEdit, (req: Request, res: Response) => {
+  const result = deleteMarketingCampaignLink(req.params.id);
+  if (!result) {
+    res.status(404).json({ success: false, message: 'Campaign relationship not found.' });
+    return;
+  }
+  res.json({ success: true, result });
+});
+
+router.get('/kpis/registry', (_req: Request, res: Response) => {
+  res.json({ success: true, result: MARKETING_PLAN_KPI_REGISTRY });
+});
+
+router.get('/objectives/:objectiveId/kpis', (req: Request, res: Response) => {
+  if (!getMarketingObjective(req.params.objectiveId)) {
+    res.status(404).json({ success: false, message: 'Marketing objective not found.' });
+    return;
+  }
+  res.json({ success: true, result: listMarketingKpis(req.params.objectiveId) });
+});
+
+router.post('/kpis', requireEdit, (req: Request, res: Response) => {
+  const parsed = createMarketingKpiSchema.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  if (!getMarketingObjective(parsed.data.objectiveId)) {
+    res.status(404).json({ success: false, message: 'Marketing objective not found.' });
+    return;
+  }
+  if (listMarketingKpis(parsed.data.objectiveId).some((item) => item.kpiKey === parsed.data.kpiKey)) {
+    res.status(409).json({ success: false, message: 'This KPI is already linked to the objective.' });
+    return;
+  }
+  res.status(201).json({ success: true, result: createMarketingKpi(parsed.data) });
+});
+
+router.patch('/kpis/:id', requireEdit, (req: Request, res: Response) => {
+  const parsed = updateMarketingKpiSchema.safeParse(req.body);
+  if (!parsed.success) return invalid(res, parsed.error);
+  const existing = getMarketingKpi(req.params.id);
+  if (!existing) {
+    res.status(404).json({ success: false, message: 'Marketing KPI relationship not found.' });
+    return;
+  }
+  const nextStatus = parsed.data.targetStatus ?? existing.targetStatus;
+  const nextValue = parsed.data.targetValue === undefined ? existing.targetValue : parsed.data.targetValue;
+  if (nextStatus !== 'tbc' && nextValue === null) {
+    res.status(400).json({ success: false, message: 'A proposed or approved target needs a value.' });
+    return;
+  }
+  const result = updateMarketingKpi(req.params.id, parsed.data);
+  res.json({ success: true, result });
+});
+
+router.delete('/kpis/:id', requireEdit, (req: Request, res: Response) => {
+  const result = deleteMarketingKpi(req.params.id);
+  if (!result) {
+    res.status(404).json({ success: false, message: 'Marketing KPI relationship not found.' });
+    return;
+  }
+  res.json({ success: true, result });
+});
+
 router.get('/plans/:planId/objectives', (req: Request, res: Response) => {
   if (!getMarketingPlan(req.params.planId)) {
     res.status(404).json({ success: false, message: 'Marketing plan not found.' });
@@ -253,7 +363,7 @@ for (const [path, archived] of [['archive', true], ['restore', false]] as const)
 }
 
 router.get('/history/:resourceType/:resourceId', (req: Request, res: Response) => {
-  const resourceType = z.enum(['plan', 'objective', 'priority', 'milestone']).safeParse(req.params.resourceType);
+  const resourceType = z.enum(['plan', 'objective', 'priority', 'milestone', 'campaign-link', 'kpi']).safeParse(req.params.resourceType);
   if (!resourceType.success) {
     res.status(400).json({ success: false, message: 'Invalid Marketing Plan resource type.' });
     return;

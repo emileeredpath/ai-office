@@ -9,7 +9,11 @@ import type {
   UpdateMarketingPriorityInput,
   CreateMarketingMilestoneInput,
   UpdateMarketingMilestoneInput,
+  CreateMarketingCampaignLinkInput,
+  CreateMarketingKpiInput,
+  UpdateMarketingKpiInput,
 } from '../marketingPlan/schemas.js';
+import { getMarketingPlanKpiDefinition } from '../marketingPlan/kpiRegistry.js';
 
 type SqlValue = string | number | null;
 
@@ -61,6 +65,17 @@ interface MilestoneRow {
   updated_at: string; archived: number; archived_at: string | null;
 }
 
+interface CampaignLinkRow {
+  id: string; objective_id: string; priority_id: string | null; campaign_id: string; sort_order: number; created_at: string;
+  campaign_name: string | null; campaign_status: string | null; campaign_archived: number | null;
+}
+
+interface KpiRow {
+  id: string; objective_id: string; kpi_key: string; target_value: number | null; target_unit: string | null;
+  target_direction: string; target_status: string; period_scope: string; sort_order: number; notes: string;
+  created_at: string; updated_at: string;
+}
+
 function mapPlan(row: PlanRow) {
   return {
     id: row.id,
@@ -106,7 +121,7 @@ function mapObjective(row: ObjectiveRow) {
   };
 }
 
-function addHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone', resourceId: string, action: string, previousValue: unknown, newValue: unknown, reason?: string) {
+function addHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi', resourceId: string, action: string, previousValue: unknown, newValue: unknown, reason?: string) {
   db.prepare(`
     INSERT INTO marketing_plan_history
       (id, resource_type, resource_id, action, field_name, previous_value, new_value, reason, source, changed_at)
@@ -394,7 +409,110 @@ export function setMarketingMilestoneArchived(id: string, archived: boolean, rea
   return updated;
 }
 
-export function listMarketingPlanHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone', resourceId: string) {
+function mapCampaignLink(row: CampaignLinkRow) {
+  return {
+    id: row.id, objectiveId: row.objective_id, priorityId: row.priority_id, campaignId: row.campaign_id,
+    sortOrder: row.sort_order, createdAt: row.created_at,
+    campaign: row.campaign_name === null ? null : { name: row.campaign_name, status: row.campaign_status, archived: Boolean(row.campaign_archived) },
+  };
+}
+
+export function listMarketingCampaignLinks(objectiveId: string) {
+  return (db.prepare(`SELECT l.*, c.name AS campaign_name, c.status AS campaign_status, c.archived AS campaign_archived
+    FROM marketing_plan_campaign_links l LEFT JOIN campaigns c ON c.id = l.campaign_id
+    WHERE l.objective_id = ? ORDER BY l.sort_order, l.created_at`).all(objectiveId) as unknown as CampaignLinkRow[]).map(mapCampaignLink);
+}
+
+export function createMarketingCampaignLink(input: CreateMarketingCampaignLinkInput) {
+  const id = `mpcl_${nanoid()}`;
+  const createdAt = new Date().toISOString();
+  return runTransaction(() => {
+    db.prepare(`INSERT INTO marketing_plan_campaign_links (id, objective_id, priority_id, campaign_id, sort_order, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(id, input.objectiveId, input.priorityId ?? null, input.campaignId, input.sortOrder ?? 0, createdAt);
+    const link = listMarketingCampaignLinks(input.objectiveId).find((item) => item.id === id)!;
+    addHistory('campaign-link', id, 'link', undefined, link);
+    return link;
+  });
+}
+
+export function deleteMarketingCampaignLink(id: string) {
+  const row = db.prepare(`SELECT l.*, c.name AS campaign_name, c.status AS campaign_status, c.archived AS campaign_archived
+    FROM marketing_plan_campaign_links l LEFT JOIN campaigns c ON c.id = l.campaign_id WHERE l.id = ?`).get(id) as unknown as CampaignLinkRow | undefined;
+  if (!row) return null;
+  const link = mapCampaignLink(row);
+  return runTransaction(() => {
+    db.prepare('DELETE FROM marketing_plan_campaign_links WHERE id = ?').run(id);
+    addHistory('campaign-link', id, 'unlink', link, undefined);
+    addHistory('objective', link.objectiveId, 'unlink-campaign', link, undefined);
+    return link;
+  });
+}
+
+function mapKpi(row: KpiRow) {
+  return {
+    id: row.id, objectiveId: row.objective_id, kpiKey: row.kpi_key, targetValue: row.target_value,
+    targetUnit: row.target_unit, targetDirection: row.target_direction, targetStatus: row.target_status,
+    periodScope: row.period_scope, sortOrder: row.sort_order, notes: row.notes,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export function listMarketingKpis(objectiveId: string) {
+  return (db.prepare('SELECT * FROM marketing_plan_kpis WHERE objective_id = ? ORDER BY sort_order, created_at').all(objectiveId) as unknown as KpiRow[]).map(mapKpi);
+}
+
+export function getMarketingKpi(id: string) {
+  const row = db.prepare('SELECT * FROM marketing_plan_kpis WHERE id = ?').get(id) as unknown as KpiRow | undefined;
+  return row ? mapKpi(row) : null;
+}
+
+export function createMarketingKpi(input: CreateMarketingKpiInput) {
+  const id = `mpk_${nanoid()}`;
+  const now = new Date().toISOString();
+  const definition = getMarketingPlanKpiDefinition(input.kpiKey)!;
+  return runTransaction(() => {
+    db.prepare(`INSERT INTO marketing_plan_kpis
+      (id, objective_id, kpi_key, target_value, target_unit, target_direction, target_status, period_scope, sort_order, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, input.objectiveId, input.kpiKey, input.targetValue ?? null, definition.unit, input.targetDirection ?? 'reach', input.targetStatus ?? 'tbc', input.periodScope ?? 'objective', input.sortOrder ?? 0, input.notes ?? '', now, now);
+    const kpi = getMarketingKpi(id)!;
+    addHistory('kpi', id, 'link', undefined, kpi);
+    return kpi;
+  });
+}
+
+const kpiColumns: Record<string, string> = {
+  targetValue: 'target_value', targetDirection: 'target_direction', targetStatus: 'target_status',
+  periodScope: 'period_scope', sortOrder: 'sort_order', notes: 'notes',
+};
+
+export function updateMarketingKpi(id: string, input: UpdateMarketingKpiInput) {
+  const previous = getMarketingKpi(id);
+  if (!previous) return null;
+  const entries = Object.entries(input).filter(([key, value]) => key !== 'reason' && value !== undefined && kpiColumns[key]);
+  if (!entries.length) return previous;
+  return runTransaction(() => {
+    const set = entries.map(([key]) => `${kpiColumns[key]} = ?`).concat('updated_at = ?').join(', ');
+    db.prepare(`UPDATE marketing_plan_kpis SET ${set} WHERE id = ?`).run(...entries.map(([, value]) => value as SqlValue), new Date().toISOString(), id);
+    const updated = getMarketingKpi(id)!;
+    addHistory('kpi', id, 'edit', previous, updated, input.reason);
+    return updated;
+  });
+}
+
+export function deleteMarketingKpi(id: string) {
+  const previous = getMarketingKpi(id);
+  if (!previous) return null;
+  return runTransaction(() => {
+    db.prepare('DELETE FROM marketing_plan_kpis WHERE id = ?').run(id);
+    addHistory('kpi', id, 'unlink', previous, undefined);
+    addHistory('objective', previous.objectiveId, 'unlink-kpi', previous, undefined);
+    return previous;
+  });
+}
+
+export function listMarketingPlanHistory(resourceType: 'plan' | 'objective' | 'priority' | 'milestone' | 'campaign-link' | 'kpi', resourceId: string) {
   return db.prepare(`
     SELECT id, resource_type AS resourceType, resource_id AS resourceId, action, field_name AS fieldName,
            previous_value AS previousValue, new_value AS newValue, reason, source, changed_at AS changedAt
@@ -412,6 +530,8 @@ export function listMarketingObjectiveHistory(objectiveId: string) {
     WHERE (resource_type = 'objective' AND resource_id = ?)
        OR (resource_type = 'priority' AND resource_id IN (SELECT id FROM marketing_plan_priorities WHERE objective_id = ?))
        OR (resource_type = 'milestone' AND resource_id IN (SELECT id FROM marketing_plan_milestones WHERE objective_id = ?))
+       OR (resource_type = 'campaign-link' AND resource_id IN (SELECT id FROM marketing_plan_campaign_links WHERE objective_id = ?))
+       OR (resource_type = 'kpi' AND resource_id IN (SELECT id FROM marketing_plan_kpis WHERE objective_id = ?))
     ORDER BY changed_at DESC, id DESC
-  `).all(objectiveId, objectiveId, objectiveId);
+  `).all(objectiveId, objectiveId, objectiveId, objectiveId, objectiveId);
 }

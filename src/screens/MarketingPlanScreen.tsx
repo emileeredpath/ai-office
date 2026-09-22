@@ -3,13 +3,16 @@ import { Archive, ArrowDown, ArrowUp, Plus, Save, Target } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { BRAND_LABEL } from '@/utils/brandColors';
 import type { Brand } from '@/types/index';
-import type { MarketingPlan, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority } from '@/types/marketingPlan';
+import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority } from '@/types/marketingPlan';
+import { useAppStore } from '@/store/useAppStore';
 import {
   archiveMarketingMilestone, archiveMarketingObjective, archiveMarketingPriority,
+  createMarketingCampaignLink, createMarketingKpi, deleteMarketingCampaignLink, deleteMarketingKpi,
   createMarketingMilestone, createMarketingObjective, createMarketingPlan, createMarketingPriority,
+  fetchMarketingCampaignLinks, fetchMarketingKpiRegistry, fetchMarketingKpis,
   fetchMarketingMilestones, fetchMarketingObjectives, fetchMarketingPlans, fetchMarketingPriorities,
   fetchMarketingObjectiveHistory,
-  reorderMarketingPriorities, updateMarketingMilestone, updateMarketingObjective, updateMarketingPlan, updateMarketingPriority,
+  reorderMarketingPriorities, updateMarketingKpi, updateMarketingMilestone, updateMarketingObjective, updateMarketingPlan, updateMarketingPriority,
 } from '@/services/marketingPlanApi';
 import type { MarketingPlanHistoryEntry } from '@/services/marketingPlanApi';
 
@@ -31,12 +34,17 @@ function Field({ label: fieldLabel, children }: { label: string; children: React
 
 export function MarketingPlanScreen() {
   const { isEditor } = useAuth();
+  const campaigns = useAppStore((state) => state.campaigns);
+  const selectCampaign = useAppStore((state) => state.selectCampaign);
   const [plan, setPlan] = useState<MarketingPlan | null>(null);
   const [objectives, setObjectives] = useState<MarketingPlanObjective[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [priorities, setPriorities] = useState<MarketingPlanPriority[]>([]);
   const [milestones, setMilestones] = useState<MarketingPlanMilestone[]>([]);
   const [history, setHistory] = useState<MarketingPlanHistoryEntry[]>([]);
+  const [campaignLinks, setCampaignLinks] = useState<MarketingPlanCampaignLink[]>([]);
+  const [kpis, setKpis] = useState<MarketingPlanKpi[]>([]);
+  const [kpiRegistry, setKpiRegistry] = useState<MarketingPlanKpiDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -47,16 +55,21 @@ export function MarketingPlanScreen() {
   const [newPriorityTitle, setNewPriorityTitle] = useState('');
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
   const [newMilestoneLevel, setNewMilestoneLevel] = useState<MarketingPlanMilestone['level']>('quarterly-outcome');
+  const [campaignToLink, setCampaignToLink] = useState('');
+  const [kpiToLink, setKpiToLink] = useState('');
 
   const selected = objectives.find((objective) => objective.id === selectedId) ?? null;
 
   const loadParts = useCallback(async (objectiveId: string) => {
-    const [nextPriorities, nextMilestones, nextHistory] = await Promise.all([
+    const [nextPriorities, nextMilestones, nextHistory, nextCampaignLinks, nextKpis] = await Promise.all([
       fetchMarketingPriorities(objectiveId), fetchMarketingMilestones(objectiveId), fetchMarketingObjectiveHistory(objectiveId),
+      fetchMarketingCampaignLinks(objectiveId), fetchMarketingKpis(objectiveId),
     ]);
     setPriorities(nextPriorities);
     setMilestones(nextMilestones);
     setHistory(nextHistory);
+    setCampaignLinks(nextCampaignLinks);
+    setKpis(nextKpis);
   }, []);
 
   const loadObjectives = useCallback(async (activePlan: MarketingPlan) => {
@@ -66,6 +79,7 @@ export function MarketingPlanScreen() {
   }, []);
 
   useEffect(() => {
+    fetchMarketingKpiRegistry().then(setKpiRegistry).catch(() => setError('Could not load the approved KPI catalogue.'));
     fetchMarketingPlans().then((next) => {
       const active = next[0] ?? null;
       setPlan(active);
@@ -161,7 +175,11 @@ export function MarketingPlanScreen() {
 
           <section className="card p-5"><div className="mb-4"><p className="v2-section-title mb-1">Outcomes and milestones</p><p className="text-sm text-text-secondary">Quarterly outcomes, monthly milestones and current focus. These are meaningful delivery points rather than personal tasks.</p></div>{milestones.length === 0 && <p className="text-sm text-text-secondary py-3">No outcomes or milestones added yet.</p>}{MILESTONE_LEVELS.map(([levelValue, levelLabel]) => { const rows = milestones.filter((item) => item.level === levelValue); if (!rows.length) return null; return <div key={levelValue} className="mb-4"><h3 className="text-sm font-bold text-text-primary mb-2">{levelLabel}</h3><div className="grid gap-2">{rows.map((milestone) => <div key={milestone.id} className="rounded-lg border p-3 grid md:grid-cols-[1fr_170px_145px_auto] gap-2 items-end"><Field label="Milestone"><input className="input" disabled={!isEditor} value={milestone.title} onChange={(event) => patchMilestone(milestone.id, { title: event.target.value })}/></Field><Field label="Status"><select className="input" disabled={!isEditor} value={milestone.status} onChange={(event) => patchMilestone(milestone.id, { status: event.target.value as MarketingPlanMilestone['status'] })}>{[...STATUSES,'in-progress'].map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></Field><Field label="Due date"><input className="input" type="date" disabled={!isEditor} value={milestone.dueDate ?? ''} onChange={(event) => patchMilestone(milestone.id, { dueDate: event.target.value || null })}/></Field>{isEditor && <div className="flex gap-1"><button className="btn btn-secondary" onClick={() => run(async () => { await updateMarketingMilestone(milestone.id, { title: milestone.title, status: milestone.status, dueDate: milestone.dueDate }); await loadParts(selected.id); })}><Save size={14}/></button><button className="btn btn-secondary" onClick={() => { if (window.confirm('Archive this outcome or milestone?')) run(async () => { await archiveMarketingMilestone(milestone.id); await loadParts(selected.id); }); }}><Archive size={14}/></button></div>}</div>)}</div></div>; })}{isEditor && <div className="grid sm:grid-cols-[190px_1fr_auto] gap-2 items-end mt-3"><Field label="Level"><select className="input" value={newMilestoneLevel} onChange={(event) => setNewMilestoneLevel(event.target.value as MarketingPlanMilestone['level'])}>{MILESTONE_LEVELS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></Field><Field label="Outcome or milestone"><input className="input" value={newMilestoneTitle} onChange={(event) => setNewMilestoneTitle(event.target.value)}/></Field><button className="btn btn-primary" disabled={!newMilestoneTitle.trim() || saving} onClick={() => run(async () => { await createMarketingMilestone({ objectiveId: selected.id, level: newMilestoneLevel, title: newMilestoneTitle, periodYear: selected.periodYear, quarter: selected.quarter, sortOrder: milestones.length }); setNewMilestoneTitle(''); await loadParts(selected.id); })}>Add</button></div>}</section>
 
-          <section className="card p-5"><p className="v2-section-title mb-1">Change history</p><p className="text-sm text-text-secondary mb-3">A chronological record of objective, priority and milestone changes.</p>{history.length === 0 ? <p className="text-sm text-text-secondary">No changes recorded yet.</p> : <div className="divide-y">{history.slice(0, 20).map((entry) => <div key={entry.id} className="py-3 flex flex-wrap justify-between gap-2"><div><strong className="text-sm text-text-primary">{label(entry.action)}</strong><span className="text-xs text-text-secondary ml-2">{label(entry.resourceType)}</span>{entry.reason && <p className="text-xs text-text-secondary mt-1">{entry.reason}</p>}</div><time className="text-xs text-text-secondary">{new Date(entry.changedAt).toLocaleString('en-GB')}</time></div>)}</div>}</section>
+          <section className="card p-5"><p className="v2-section-title mb-1">Campaign relationships</p><p className="text-sm text-text-secondary mb-4">Link existing AI Office campaigns. Campaign records and attribution remain unchanged.</p>{campaignLinks.length === 0 ? <p className="text-sm text-text-secondary py-2">No campaigns linked yet.</p> : <div className="grid gap-2">{campaignLinks.map((link) => <div key={link.id} className="rounded-lg border p-3 flex items-center justify-between gap-3"><button className="text-left" disabled={!link.campaign} onClick={() => link.campaign && selectCampaign(link.campaignId)}><strong className="block text-sm text-text-primary">{link.campaign?.name ?? 'Campaign unavailable'}</strong><span className="text-xs text-text-secondary">{link.campaign ? `${label(link.campaign.status ?? 'status unavailable')}${link.campaign.archived ? ' · Archived' : ''}` : 'The original campaign record no longer exists.'}</span></button>{isEditor && <button className="btn btn-secondary" onClick={() => { if (window.confirm('Unlink this campaign from the objective? The campaign itself will not be changed.')) run(async () => { await deleteMarketingCampaignLink(link.id); await loadParts(selected.id); }); }}>Unlink</button>}</div>)}</div>}{isEditor && <div className="flex gap-2 mt-4"><select className="input flex-1" value={campaignToLink} onChange={(event) => setCampaignToLink(event.target.value)}><option value="">Select an existing campaign</option>{campaigns.filter((campaign) => !campaignLinks.some((link) => link.campaignId === campaign.id)).map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select><button className="btn btn-primary" disabled={!campaignToLink || saving} onClick={() => run(async () => { await createMarketingCampaignLink({ objectiveId: selected.id, campaignId: campaignToLink, sortOrder: campaignLinks.length }); setCampaignToLink(''); await loadParts(selected.id); })}>Link campaign</button></div>}</section>
+
+          <section className="card p-5"><p className="v2-section-title mb-1">KPIs and targets</p><p className="text-sm text-text-secondary mb-4">Select an approved KPI. Actual performance will be connected through the canonical resolver in the Progress stage.</p>{kpis.length === 0 ? <p className="text-sm text-text-secondary py-2">No KPIs linked yet. Targets remain TBC until explicitly entered and approved.</p> : <div className="grid gap-3">{kpis.map((kpi) => { const definition = kpiRegistry.find((item) => item.key === kpi.kpiKey); return <div key={kpi.id} className="rounded-lg border p-4"><div className="flex flex-wrap justify-between gap-3"><div><strong className="text-sm text-text-primary">{definition?.label ?? kpi.kpiKey}</strong><p className="text-xs text-text-secondary mt-1">{definition?.definition ?? 'Definition unavailable'} · Source: {definition?.source ?? 'Unavailable'}</p></div>{isEditor && <button className="btn btn-secondary" onClick={() => { if (window.confirm('Unlink this KPI from the objective?')) run(async () => { await deleteMarketingKpi(kpi.id); await loadParts(selected.id); }); }}>Unlink</button>}</div><div className="grid sm:grid-cols-[150px_150px_160px_auto] gap-2 items-end mt-3"><Field label={`Target${definition?.unit === 'gbp' ? ' (£)' : ''}`}><input className="input" type="number" min="0" disabled={!isEditor} value={kpi.targetValue ?? ''} onChange={(event) => setKpis((current) => current.map((item) => item.id === kpi.id ? { ...item, targetValue: event.target.value === '' ? null : Number(event.target.value), targetStatus: event.target.value === '' ? 'tbc' : item.targetStatus } : item))} placeholder="TBC"/></Field><Field label="Target status"><select className="input" disabled={!isEditor} value={kpi.targetStatus} onChange={(event) => setKpis((current) => current.map((item) => item.id === kpi.id ? { ...item, targetStatus: event.target.value as MarketingPlanKpi['targetStatus'] } : item))}>{['tbc','proposed','approved'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></Field><Field label="Direction"><select className="input" disabled={!isEditor} value={kpi.targetDirection} onChange={(event) => setKpis((current) => current.map((item) => item.id === kpi.id ? { ...item, targetDirection: event.target.value as MarketingPlanKpi['targetDirection'] } : item))}>{['reach','increase','decrease','maintain'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></Field>{isEditor && <button className="btn btn-secondary flex items-center gap-2" onClick={() => run(async () => { await updateMarketingKpi(kpi.id, { targetValue: kpi.targetValue, targetStatus: kpi.targetStatus, targetDirection: kpi.targetDirection }); await loadParts(selected.id); })}><Save size={14}/> Save target</button>}</div></div>; })}</div>}{isEditor && <div className="flex gap-2 mt-4"><select className="input flex-1" value={kpiToLink} onChange={(event) => setKpiToLink(event.target.value)}><option value="">Select an approved KPI</option>{kpiRegistry.filter((definition) => !kpis.some((kpi) => kpi.kpiKey === definition.key)).map((definition) => <option key={definition.key} value={definition.key}>{definition.label} · {definition.source}</option>)}</select><button className="btn btn-primary" disabled={!kpiToLink || saving} onClick={() => run(async () => { await createMarketingKpi({ objectiveId: selected.id, kpiKey: kpiToLink, targetValue: null, targetStatus: 'tbc', sortOrder: kpis.length }); setKpiToLink(''); await loadParts(selected.id); })}>Link KPI</button></div>}</section>
+
+          <section className="card p-5"><p className="v2-section-title mb-1">Change history</p><p className="text-sm text-text-secondary mb-3">A chronological record of objective, priority, milestone, campaign and KPI relationship changes.</p>{history.length === 0 ? <p className="text-sm text-text-secondary">No changes recorded yet.</p> : <div className="divide-y">{history.slice(0, 20).map((entry) => <div key={entry.id} className="py-3 flex flex-wrap justify-between gap-2"><div><strong className="text-sm text-text-primary">{label(entry.action)}</strong><span className="text-xs text-text-secondary ml-2">{label(entry.resourceType)}</span>{entry.reason && <p className="text-xs text-text-secondary mt-1">{entry.reason}</p>}</div><time className="text-xs text-text-secondary">{new Date(entry.changedAt).toLocaleString('en-GB')}</time></div>)}</div>}</section>
         </main>}
       </div>
     </>}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MARKETING_PLAN_KPI_REGISTRY } from './kpiRegistry.js';
 
 export const MARKETING_PLAN_STATUSES = ['draft', 'proposed', 'approved', 'complete', 'needs-confirmation'] as const;
 export const MARKETING_OBJECTIVE_STATUSES = [...MARKETING_PLAN_STATUSES, 'tbc'] as const;
@@ -7,6 +8,7 @@ export const MARKETING_PLAN_BRANDS = ['mtech', 'brentwood', 'radio-links', 'capc
 export const MARKETING_MILESTONE_LEVELS = ['quarterly-outcome', 'monthly-milestone', 'current-focus'] as const;
 export const MARKETING_MILESTONE_STATUSES = ['draft', 'proposed', 'approved', 'in-progress', 'complete', 'tbc', 'needs-confirmation'] as const;
 export const MARKETING_ATTENTION_TYPES = ['decision-required', 'review-required', 'approval-required', 'missing-information'] as const;
+export const MARKETING_KPI_KEYS = MARKETING_PLAN_KPI_REGISTRY.map((item) => item.key) as [string, ...string[]];
 
 const optionalDate = z.string().date().nullable().optional();
 const optionalText = (max: number) => z.string().trim().max(max).optional();
@@ -86,6 +88,38 @@ export const updateMarketingMilestoneSchema = createMarketingMilestoneSchema.omi
   reason: z.string().trim().max(1000).optional(),
 });
 
+export const createMarketingCampaignLinkSchema = z.object({
+  objectiveId: z.string().trim().min(1),
+  priorityId: z.string().trim().min(1).nullable().optional(),
+  campaignId: z.string().trim().min(1),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export const createMarketingKpiSchema = z.object({
+  objectiveId: z.string().trim().min(1),
+  kpiKey: z.enum(MARKETING_KPI_KEYS),
+  targetValue: z.number().finite().min(0).nullable().optional(),
+  targetDirection: z.enum(['increase', 'decrease', 'maintain', 'reach']).optional(),
+  targetStatus: z.enum(['tbc', 'proposed', 'approved']).optional(),
+  periodScope: z.enum(['objective', 'quarter', 'month', 'all-time']).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  notes: optionalText(5000),
+}).superRefine((value, context) => {
+  if (value.targetStatus && value.targetStatus !== 'tbc' && value.targetValue == null) {
+    context.addIssue({ code: 'custom', path: ['targetValue'], message: 'A proposed or approved target needs a value.' });
+  }
+});
+
+export const updateMarketingKpiSchema = z.object({
+  targetValue: z.number().finite().min(0).nullable().optional(),
+  targetDirection: z.enum(['increase', 'decrease', 'maintain', 'reach']).optional(),
+  targetStatus: z.enum(['tbc', 'proposed', 'approved']).optional(),
+  periodScope: z.enum(['objective', 'quarter', 'month', 'all-time']).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  notes: optionalText(5000),
+  reason: z.string().trim().max(1000).optional(),
+});
+
 export type CreateMarketingPlanInput = z.infer<typeof createMarketingPlanSchema>;
 export type UpdateMarketingPlanInput = z.infer<typeof updateMarketingPlanSchema>;
 export type CreateMarketingObjectiveInput = z.infer<typeof createMarketingObjectiveSchema>;
@@ -94,3 +128,6 @@ export type CreateMarketingPriorityInput = z.infer<typeof createMarketingPriorit
 export type UpdateMarketingPriorityInput = z.infer<typeof updateMarketingPrioritySchema>;
 export type CreateMarketingMilestoneInput = z.infer<typeof createMarketingMilestoneSchema>;
 export type UpdateMarketingMilestoneInput = z.infer<typeof updateMarketingMilestoneSchema>;
+export type CreateMarketingCampaignLinkInput = z.infer<typeof createMarketingCampaignLinkSchema>;
+export type CreateMarketingKpiInput = z.infer<typeof createMarketingKpiSchema>;
+export type UpdateMarketingKpiInput = z.infer<typeof updateMarketingKpiSchema>;

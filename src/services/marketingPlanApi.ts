@@ -1,5 +1,5 @@
 import { apiFetch, ApiError } from './apiConfig';
-import type { MarketingPlan, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority } from '@/types/marketingPlan';
+import type { MarketingPlan, MarketingPlanCampaignLink, MarketingPlanKpi, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanObjective, MarketingPlanPriority } from '@/types/marketingPlan';
 
 export interface MarketingPlanHistoryEntry {
   id: string;
@@ -41,3 +41,13 @@ export const fetchMarketingMilestones = (objectiveId: string) => apiFetch(`/api/
 export const createMarketingMilestone = (payload: Record<string, unknown>) => apiFetch('/api/marketing-plan/milestones', { method: 'POST', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanMilestone>(response, 'create the milestone'));
 export const updateMarketingMilestone = (id: string, payload: Record<string, unknown>) => apiFetch(`/api/marketing-plan/milestones/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanMilestone>(response, 'update the milestone'));
 export const archiveMarketingMilestone = (id: string) => apiFetch(`/api/marketing-plan/milestones/${id}/archive`, { method: 'POST', body: '{}' }).then((response) => handle<MarketingPlanMilestone>(response, 'archive the milestone'));
+
+export const fetchMarketingCampaignLinks = (objectiveId: string) => apiFetch(`/api/marketing-plan/objectives/${objectiveId}/campaign-links`).then((response) => handle<MarketingPlanCampaignLink[]>(response, 'load campaign relationships'));
+export const createMarketingCampaignLink = (payload: Record<string, unknown>) => apiFetch('/api/marketing-plan/campaign-links', { method: 'POST', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanCampaignLink>(response, 'link the campaign'));
+export const deleteMarketingCampaignLink = (id: string) => apiFetch(`/api/marketing-plan/campaign-links/${id}`, { method: 'DELETE' }).then((response) => handle<MarketingPlanCampaignLink>(response, 'unlink the campaign'));
+
+export const fetchMarketingKpiRegistry = () => apiFetch('/api/marketing-plan/kpis/registry').then((response) => handle<MarketingPlanKpiDefinition[]>(response, 'load KPI definitions'));
+export const fetchMarketingKpis = (objectiveId: string) => apiFetch(`/api/marketing-plan/objectives/${objectiveId}/kpis`).then((response) => handle<MarketingPlanKpi[]>(response, 'load KPI relationships'));
+export const createMarketingKpi = (payload: Record<string, unknown>) => apiFetch('/api/marketing-plan/kpis', { method: 'POST', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanKpi>(response, 'link the KPI'));
+export const updateMarketingKpi = (id: string, payload: Record<string, unknown>) => apiFetch(`/api/marketing-plan/kpis/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }).then((response) => handle<MarketingPlanKpi>(response, 'update the KPI target'));
+export const deleteMarketingKpi = (id: string) => apiFetch(`/api/marketing-plan/kpis/${id}`, { method: 'DELETE' }).then((response) => handle<MarketingPlanKpi>(response, 'unlink the KPI'));
