@@ -13,7 +13,7 @@
 
   /* Brand colors — Phase 1 Audit Updated (Aug 2026) */
   --color-brand-mtech: #1d2a3a;
-  --color-brand-mtech-accent: #f97031;
+  --color-brand-mtech-accent: #f9701f;
   --color-brand-brentwood: #2E9ECC;
   --color-brand-brentwood-secondary: #45b2c4;
   --color-brand-radio-links: #4a9d4a;
@@ -58,6 +58,26 @@
   --v2-grey-soft: rgba(107, 114, 128, 0.12);
   --v2-surface: #f7f7fb;
   --v2-border: #e5e7eb;
+
+  /* MTech workspace theme.
+     These tokens are deliberately additive while the dark redesign is
+     reviewed page by page. The shell and Home use them first; legacy screens
+     keep their existing surface tokens until their own approved redesign. */
+  --workspace-canvas: #111b26;
+  --workspace-surface: #1d2a3a;
+  --workspace-surface-raised: #243347;
+  --workspace-surface-soft: #2e425b;
+  --workspace-border: #3a4f6a;
+  --workspace-border-subtle: rgba(240, 244, 248, 0.1);
+  --workspace-text: #f0f4f8;
+  --workspace-text-muted: #b4b6b9;
+  --workspace-text-subtle: #8f9194;
+  --workspace-accent: #f9701f;
+  --workspace-accent-hover: #e05e10;
+  --workspace-accent-soft: rgba(249, 112, 31, 0.14);
+  --workspace-positive: #16a34a;
+  --workspace-warning: #f59e0b;
+  --workspace-danger: #dc2626;
 }
 
 * {

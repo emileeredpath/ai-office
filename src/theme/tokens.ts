@@ -12,6 +12,8 @@ export const colors = {
   textPrimary: '#F0F4F8',
   textMuted: '#8F9194',
   background: '#111B26',
+  accentSoft: 'rgba(249, 112, 31, 0.14)',
+  borderSubtle: 'rgba(240, 244, 248, 0.10)',
 } as const;
 
 export const statusColors: Record<string, string> = {
