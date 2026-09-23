@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { LucideIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LucideIcon, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 
 export interface NavItem {
   id: string | null;
   icon: LucideIcon;
   label: string;
   comingSoon?: boolean;
+  externalUrl?: string;
   children?: NavItem[];
 }
 
@@ -28,9 +29,22 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
     const isActive = !item.comingSoon && item.id === currentScreen;
     const branchActive = item.children?.some((child) => child.id === currentScreen) ?? false;
 
+    const content = <>
+      <Icon size={17} />
+      <span className="v2-nav-item-label">{item.label}</span>
+      {item.externalUrl && <ExternalLink className="v2-nav-item-label" size={13} aria-hidden="true" />}
+      {item.comingSoon && <span className="v2-nav-item-soon">Soon</span>}
+    </>;
+
     return (
       <div key={item.label} className="v2-nav-group">
-        <button
+        {item.externalUrl ? <a
+          href={item.externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="v2-nav-item"
+          title={`${item.label} — opens in a new tab`}
+        >{content}</a> : <button
           onClick={() => {
             if (item.comingSoon || item.id === null) return;
             onScreenChange(item.id);
@@ -41,10 +55,8 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
           data-disabled={item.comingSoon}
           title={item.comingSoon ? `${item.label} — coming soon` : item.label}
         >
-          <Icon size={17} />
-          <span className="v2-nav-item-label">{item.label}</span>
-          {item.comingSoon && <span className="v2-nav-item-soon">Soon</span>}
-        </button>
+          {content}
+        </button>}
         {(isActive || branchActive) && item.children && !collapsed && <div className="v2-nav-children">
           {item.children.map((child) => {
             const ChildIcon = child.icon;

@@ -3,7 +3,7 @@ import { fetchCampaignCostsFromApi } from '@/services/campaignCostsApi';
 import type { Brand, CampaignCost } from '@/types/index';
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Flag, Target } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/contexts/EntityContext';
@@ -28,6 +28,10 @@ import { fetchGoogleAdsPerformance, type GoogleAdsResponse } from '@/services/go
 import { fetchAcumaticaSummary, type AcumaticaSummary } from '@/services/acumaticaApi';
 import { getAcumaticaMissingDataHeadline, getAcumaticaMissingDataLabel } from '@/utils/acumaticaAvailability';
 import { BRAND_LABEL } from '@/utils/brandColors';
+import { fetchMarketingPlans, fetchMarketingStrategy } from '@/services/marketingPlanApi';
+import type { MarketingPlan, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
+import { filterStrategyForEntity, getMarketingPlanWeekFocus, getQuarterStrategyRows, selectHomeMarketingPlan } from '@/utils/marketingPlanFocus';
+import { getStrategyHealthFindings } from '@/utils/marketingPlanProgress';
 
 interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
@@ -76,6 +80,33 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const { isEditor } = useAuth();
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
+
+  const [marketingPlan, setMarketingPlan] = useState<MarketingPlan | null>(null);
+  const [marketingStrategy, setMarketingStrategy] = useState<MarketingPlanStrategyObjective[]>([]);
+  const [marketingFocusLoading, setMarketingFocusLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMarketingFocusLoading(true);
+    fetchMarketingPlans()
+      .then(async (plans) => {
+        const selected = selectHomeMarketingPlan(plans);
+        if (!selected) return { selected: null, rows: [] as MarketingPlanStrategyObjective[] };
+        return { selected, rows: await fetchMarketingStrategy(selected.id) };
+      })
+      .then(({ selected, rows }) => {
+        if (cancelled) return;
+        setMarketingPlan(selected);
+        setMarketingStrategy(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMarketingPlan(null);
+        setMarketingStrategy([]);
+      })
+      .finally(() => { if (!cancelled) setMarketingFocusLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     syncFundingRecordsFromApi();
@@ -235,6 +266,26 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       previousRange && previousInfo.status === 'available' ? previousInfo.spend! : null
     );
   }, [googleAds, previousGoogleAds, previousRange, isGroupView, selectedEntity]);
+
+  // ---- Marketing Focus ----------------------------------------------------
+  // This is derived only from saved Marketing Plan records. Empty or failed
+  // reads stay visibly unavailable; no plan, objective or count is invented.
+  const entityStrategy = useMemo(
+    () => filterStrategyForEntity(marketingStrategy, isGroupView ? 'all' : selectedEntity),
+    [marketingStrategy, isGroupView, selectedEntity]
+  );
+  const quarterFocus = useMemo(
+    () => marketingPlan ? getQuarterStrategyRows(marketingPlan, entityStrategy) : null,
+    [marketingPlan, entityStrategy]
+  );
+  const weekFocus = useMemo(
+    () => marketingPlan ? getMarketingPlanWeekFocus(marketingPlan, entityStrategy) : null,
+    [marketingPlan, entityStrategy]
+  );
+  const strategyAttention = useMemo(
+    () => getStrategyHealthFindings(entityStrategy, {}).slice(0, 3),
+    [entityStrategy]
+  );
 
   // ---- Needs Your Attention -----------------------------------------------
   // Genuine, rule-based conditions only, grouped into the categories a
@@ -417,9 +468,40 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </div>
         </div>
 
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="v2-section-title mb-1">Marketing Focus</h2>
+            <p className="text-sm text-text-secondary">The current quarter, this week and factual gaps from the saved Marketing Plan.</p>
+          </div>
+          <button type="button" className="text-sm font-semibold text-violet-700 hover:underline" onClick={() => onNavigate?.('marketing-plan')}>Open Marketing Plan <ArrowRight size={14} className="inline" /></button>
+        </div>
+        <div className="grid grid-cols-1 gap-4 mb-8 lg:grid-cols-3">
+          <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
+            <div className="h-1.5 bg-violet-500" />
+            <div className="p-5">
+              <div className="flex items-center gap-2 text-violet-700"><Target size={18}/><h3 className="font-bold">This Quarter</h3></div>
+              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No Marketing Plan has been created yet.</p> : !quarterFocus?.rows.length ? <p className="mt-4 text-sm text-text-secondary">No objectives are assigned to Q{quarterFocus?.quarter} {marketingPlan.periodYear} for this entity.</p> : <div className="mt-4 grid gap-2">{quarterFocus.rows.slice(0, 3).map((row) => <button key={row.objective.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-violet-50 p-3 text-left hover:bg-violet-100"><strong className="block text-sm text-text-primary">{row.objective.title}</strong><span className="mt-1 block text-xs text-text-secondary">{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</span></button>)}</div>}
+            </div>
+          </section>
+          <section className="overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-sm">
+            <div className="h-1.5 bg-cyan-500" />
+            <div className="p-5">
+              <div className="flex items-center gap-2 text-cyan-700"><CalendarDays size={18}/><h3 className="font-bold">This Week</h3></div>
+              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">Create the Marketing Plan to set this week’s focus.</p> : !weekFocus?.items.length ? <p className="mt-4 text-sm text-text-secondary">Nothing in the plan needs attention this week.</p> : <div className="mt-4 grid gap-2">{weekFocus.items.slice(0, 3).map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className={`rounded-xl p-3 text-left ${item.overdue ? 'bg-red-50 hover:bg-red-100' : 'bg-cyan-50 hover:bg-cyan-100'}`}><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{item.kind} · {item.detail}</span></button>)}</div>}
+            </div>
+          </section>
+          <section className="overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm">
+            <div className="h-1.5 bg-amber-500" />
+            <div className="p-5">
+              <div className="flex items-center gap-2 text-amber-700"><Flag size={18}/><h3 className="font-bold">Needs Attention</h3></div>
+              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Checking saved plan…</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No saved plan is available to check.</p> : !strategyAttention.length ? <div className="mt-4 flex items-center gap-2 text-sm text-text-primary"><CheckCircle2 size={16} className="text-emerald-600"/>No factual gaps found for this entity.</div> : <div className="mt-4 grid gap-2">{strategyAttention.map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-amber-50 p-3 text-left hover:bg-amber-100"><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</span></button>)}</div>}
+            </div>
+          </section>
+        </div>
+
         <div className="mb-3">
-          <h2 className="v2-section-title mb-1">Your priorities</h2>
-          <p className="text-sm text-text-secondary">What needs a decision and what is coming up next.</p>
+          <h2 className="v2-section-title mb-1">Operational activity</h2>
+          <p className="text-sm text-text-secondary">Campaign, funding, data and internal Marketing Hub items that need action.</p>
         </div>
         {/* Needs Your Attention + Coming Up */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">

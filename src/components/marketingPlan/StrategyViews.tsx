@@ -3,6 +3,7 @@ import { CalendarDays, ChevronDown, ChevronRight, CircleAlert, Flag, Target } fr
 import type { Campaign } from '@/types';
 import type { MarketingPlan, MarketingPlanKpiDefinition, MarketingPlanMilestone, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
 import { BRAND_LABEL } from '@/utils/brandColors';
+import { getMarketingPlanWeekFocus } from '@/utils/marketingPlanFocus';
 
 export type MarketingPlanView = 'strategy-map' | 'quarter' | 'month' | 'week' | 'progress' | 'health' | 'reviews' | 'objectives';
 
@@ -96,30 +97,9 @@ function MonthView({ plan, rows, campaigns, onOpenObjective, onOpenCampaign }: O
   </div>;
 }
 
-type FocusItem = { id: string; kind: string; title: string; detail: string; overdue: boolean; sortDate: string | null; objectiveId?: string };
-
 function WeekView({ plan, rows, onOpenObjective }: Omit<Props, 'view' | 'registry' | 'campaigns' | 'onOpenCampaign' | 'onOpenKpi'>) {
-  const range = useMemo(() => { const now = new Date(); now.setHours(0, 0, 0, 0); const start = new Date(now); const day = (now.getDay() + 6) % 7; start.setDate(now.getDate() - day); const end = new Date(start); end.setDate(start.getDate() + 6); return { now, start, end }; }, []);
-  const items: FocusItem[] = [];
-  for (const row of rows) {
-    for (const milestone of row.milestones) {
-      if (milestone.status === 'complete') continue;
-      const due = milestone.dueDate ? localDate(milestone.dueDate) : null;
-      const starts = milestone.startDate ? localDate(milestone.startDate) : null;
-      const relevant = milestone.level === 'current-focus' || milestone.attentionType !== null || (due !== null && due <= range.end) || (starts !== null && starts >= range.start && starts <= range.end);
-      if (!relevant) continue;
-      items.push({ id: milestone.id, kind: milestone.attentionType ? titleCase(milestone.attentionType) : milestone.level === 'current-focus' ? 'Current focus' : 'Milestone', title: milestone.title, detail: `${row.objective.title}${milestone.dueDate ? ` · Due ${formatDate(milestone.dueDate)}` : ''}`, overdue: due !== null && due < range.start, sortDate: milestone.dueDate ?? milestone.startDate, objectiveId: row.objective.id });
-    }
-    if (row.objective.nextReviewDate) {
-      const review = localDate(row.objective.nextReviewDate);
-      if (review <= range.end) items.push({ id: `objective-${row.objective.id}`, kind: 'Review required', title: row.objective.title, detail: `Objective review · ${formatDate(row.objective.nextReviewDate)}`, overdue: review < range.start, sortDate: row.objective.nextReviewDate, objectiveId: row.objective.id });
-    }
-  }
-  if (plan.nextReviewDate) {
-    const review = localDate(plan.nextReviewDate);
-    if (review <= range.end) items.push({ id: `plan-${plan.id}`, kind: 'Review required', title: plan.title, detail: `Plan review · ${formatDate(plan.nextReviewDate)}`, overdue: review < range.start, sortDate: plan.nextReviewDate });
-  }
-  items.sort((a, b) => Number(b.overdue) - Number(a.overdue) || (a.sortDate ?? '9999-12-31').localeCompare(b.sortDate ?? '9999-12-31') || a.title.localeCompare(b.title));
+  const range = useMemo(() => getMarketingPlanWeekFocus(plan, rows), [plan, rows]);
+  const { items } = range;
   const dateRange = `${range.start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}–${range.end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
   return <div className="grid gap-4"><section className="card p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="v2-section-title">This week</p><p className="mt-1 text-sm text-text-secondary">Derived from current focus, milestone dates, attention flags and review dates. Nothing is maintained here separately.</p></div><span className="rounded-full bg-violet-100 px-3 py-1.5 text-sm font-semibold text-violet-800">{dateRange}</span></div></section>{!items.length ? <EmptyView title="Nothing needs strategic attention this week" detail="This view will populate from saved milestone, attention and review dates."/> : <section className="card p-5"><div className="grid gap-3">{items.map((item) => <button key={item.id} disabled={!item.objectiveId} onClick={() => item.objectiveId && onOpenObjective(item.objectiveId)} className={`flex items-start gap-3 rounded-xl border p-4 text-left ${item.overdue ? 'border-red-200 bg-red-50' : 'border-amber-100 bg-amber-50/50'} disabled:cursor-default`}><div className={`mt-0.5 rounded-lg p-2 ${item.overdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{item.kind.includes('Review') ? <CalendarDays size={17}/> : item.kind.toLowerCase().includes('required') ? <CircleAlert size={17}/> : <Flag size={17}/>}</div><div><div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-text-primary">{item.title}</strong>{item.overdue && <span className="text-xs font-bold uppercase text-red-700">Overdue</span>}</div><p className="mt-1 text-xs font-semibold text-text-secondary">{item.kind} · {item.detail}</p></div></button>)}</div></section>}</div>;
 }

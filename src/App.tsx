@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import {
   LayoutDashboard,
-  CheckSquare,
+  ListTodo,
   FolderOpen,
   Calendar,
   BarChart3,
@@ -75,7 +75,7 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { id: 'tasks' as Screen, icon: CheckSquare, label: 'My Tasks' },
+  { id: null, icon: ListTodo, label: 'Microsoft To Do', externalUrl: 'https://to-do.office.com/tasks/' },
   { id: null, icon: Upload, label: 'Uploads', comingSoon: true },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
   { id: 'mtech-hq' as Screen, icon: Building2, label: 'MTech HQ' },
