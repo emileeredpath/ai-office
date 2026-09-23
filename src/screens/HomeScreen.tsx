@@ -3,14 +3,16 @@ import { fetchCampaignCostsFromApi } from '@/services/campaignCostsApi';
 import type { Brand, CampaignCost } from '@/types/index';
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Flag, Target } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Flag, Sparkles, Target } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/contexts/EntityContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
-import { KpiCard } from '@/components/common/KpiCard';
-import { BrandBadge } from '@/components/common/BrandBadge';
+import { HomeEmptyState } from '@/components/home/HomeEmptyState';
+import { HomeMetric } from '@/components/home/HomeMetric';
+import { HomePanel } from '@/components/home/HomePanel';
+import { HomeSection } from '@/components/home/HomeSection';
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
@@ -448,331 +450,177 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   };
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="v2-page-header">
+    <div className="v2-page home-page">
+      <div className="home-page-inner">
+        <header className="home-hero">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">
-              {getGreeting()}, {userName}
-            </h1>
-            <p className="text-text-secondary">
-              {dayName} {dateStr} · Here's what needs attention across MTech marketing.
-            </p>
+            <div className="home-eyebrow">Marketing control centre</div>
+            <h1>{getGreeting()}, {userName}</h1>
+            <p>{dayName} {dateStr} · Focus, performance and action across MTech marketing.</p>
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="home-period-control">
             <PeriodSelector />
             {currentRange && (
-              <div className="text-xs text-text-secondary" style={{ textAlign: 'right' }}>
+              <div className="home-period-label">
                 <span>{formatDateRangeLabel(currentRange)}</span>
-                {previousRange && <span> · vs {formatDateRangeLabel(previousRange)}</span>}
+                {previousRange && <span> · compared with {formatDateRangeLabel(previousRange)}</span>}
               </div>
             )}
           </div>
-        </div>
+        </header>
 
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="v2-section-title mb-1">Marketing Focus</h2>
-            <p className="text-sm text-text-secondary">The current quarter, this week and factual gaps from the saved Marketing Plan.</p>
-          </div>
-          <button type="button" className="text-sm font-semibold text-violet-700 hover:underline" onClick={() => onNavigate?.('marketing-plan')}>Open Marketing Plan <ArrowRight size={14} className="inline" /></button>
-        </div>
-        <div className="grid grid-cols-1 gap-4 mb-8 lg:grid-cols-3">
-          <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
-            <div className="h-1.5 bg-violet-500" />
-            <div className="p-5">
-              <div className="flex items-center gap-2 text-violet-700"><Target size={18}/><h3 className="font-bold">This Quarter</h3></div>
-              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : marketingFocusUnavailable ? <p className="mt-4 text-sm text-amber-700">Marketing Plan data is unavailable right now.</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No Marketing Plan has been created yet.</p> : !quarterFocus?.rows.length ? <p className="mt-4 text-sm text-text-secondary">No objectives are assigned to Q{quarterFocus?.quarter} {marketingPlan.periodYear} for this entity.</p> : <div className="mt-4 grid gap-2">{quarterFocus.rows.slice(0, 3).map((row) => <button key={row.objective.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-violet-50 p-3 text-left hover:bg-violet-100"><strong className="block text-sm text-text-primary">{row.objective.title}</strong><span className="mt-1 block text-xs text-text-secondary">{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</span></button>)}</div>}
-            </div>
-          </section>
-          <section className="overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-sm">
-            <div className="h-1.5 bg-cyan-500" />
-            <div className="p-5">
-              <div className="flex items-center gap-2 text-cyan-700"><CalendarDays size={18}/><h3 className="font-bold">This Week</h3></div>
-              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : marketingFocusUnavailable ? <p className="mt-4 text-sm text-amber-700">Weekly focus is unavailable until the plan can be loaded.</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">Create the Marketing Plan to set this week’s focus.</p> : !weekFocus?.items.length ? <p className="mt-4 text-sm text-text-secondary">Nothing in the plan needs attention this week.</p> : <div className="mt-4 grid gap-2">{weekFocus.items.slice(0, 3).map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className={`rounded-xl p-3 text-left ${item.overdue ? 'bg-red-50 hover:bg-red-100' : 'bg-cyan-50 hover:bg-cyan-100'}`}><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{item.kind} · {item.detail}</span></button>)}</div>}
-            </div>
-          </section>
-          <section className="overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm">
-            <div className="h-1.5 bg-amber-500" />
-            <div className="p-5">
-              <div className="flex items-center gap-2 text-amber-700"><Flag size={18}/><h3 className="font-bold">Needs Attention</h3></div>
-              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Checking saved plan…</p> : marketingFocusUnavailable ? <p className="mt-4 text-sm text-amber-700">Attention checks are unavailable until the plan can be loaded.</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No saved plan is available to check.</p> : !strategyAttention.length ? <div className="mt-4 flex items-center gap-2 text-sm text-text-primary"><CheckCircle2 size={16} className="text-emerald-600"/>No factual gaps found for this entity.</div> : <div className="mt-4 grid gap-2">{strategyAttention.map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-amber-50 p-3 text-left hover:bg-amber-100"><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</span></button>)}</div>}
-            </div>
-          </section>
-        </div>
-
-        <div className="mb-3">
-          <h2 className="v2-section-title mb-1">Operational activity</h2>
-          <p className="text-sm text-text-secondary">Campaign, funding, data and internal Marketing Hub items that need action.</p>
-        </div>
-        {/* Needs Your Attention + Coming Up */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
-              <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Needs Your Attention</h2>
-              {attentionTotal > 0 && (
-                <p className="text-sm text-text-secondary" style={{ marginTop: 2 }}>{attentionTotal} thing{attentionTotal === 1 ? '' : 's'} need{attentionTotal === 1 ? 's' : ''} your attention</p>
-              )}
-            </div>
-            <div style={{ padding: '0 1.25rem 1.25rem' }}>
-              {attentionCategories.length > 0 ? (
-                <div className="space-y-3">
-                  {attentionCategories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={cat.items[0]?.onClick}
-                      className="v2-attention-item w-full flex items-start gap-2 text-left px-3 py-2 rounded"
-                      data-severity={cat.severity}
-                    >
-                      <AlertTriangle size={14} color={cat.severity === 'red' ? 'var(--v2-red)' : 'var(--v2-orange)'} style={{ marginTop: 2, flexShrink: 0 }} />
-                      <span style={{ flex: 1 }}>
-                        <span className="text-sm font-semibold text-text-primary block">
-                          {cat.items.length} {cat.label(cat.items.length)}
-                        </span>
-                        {cat.items[0] && (
-                          <span className="text-xs text-text-secondary">
-                            {cat.items[0].title} — {cat.items[0].detail}
-                          </span>
-                        )}
-                      </span>
+        <HomeSection
+          eyebrow="Direction"
+          title="Marketing Focus"
+          description="Current priorities from the saved Marketing Plan. No placeholder objectives or tasks are added here."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('marketing-plan')}>Open Marketing Plan <ArrowRight size={14} /></button>}
+        >
+          <div className="home-focus-grid">
+            <HomePanel title="Current quarter" eyebrow={marketingPlan && quarterFocus ? `Q${quarterFocus.quarter} ${marketingPlan.periodYear}` : undefined} variant="accent">
+              {marketingFocusLoading ? <HomeEmptyState>Loading the saved plan…</HomeEmptyState>
+                : marketingFocusUnavailable ? <HomeEmptyState>Marketing Plan data is unavailable right now.</HomeEmptyState>
+                : !marketingPlan ? <HomeEmptyState>No Marketing Plan has been created yet.</HomeEmptyState>
+                : !quarterFocus?.rows.length ? <HomeEmptyState>No objectives are assigned to Q{quarterFocus?.quarter} {marketingPlan.periodYear} for this entity.</HomeEmptyState>
+                : <div className="home-focus-list">{quarterFocus.rows.slice(0, 3).map((row) => (
+                    <button key={row.objective.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item">
+                      <Target size={16} />
+                      <span><strong>{row.objective.title}</strong><small>{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</small></span>
                     </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} color="var(--v2-green)" />
-                  <span className="text-sm font-medium text-text-primary">Nothing urgent right now</span>
-                </div>
-              )}
-            </div>
-          </div>
+                  ))}</div>}
+            </HomePanel>
 
-          <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
-              <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Coming Up</h2>
-              <p className="text-sm text-text-secondary" style={{ marginTop: 2 }}>Next {COMING_UP_DAYS} days</p>
-            </div>
-            <div style={{ padding: '0 1.25rem 1.25rem' }}>
-              {comingUp.length > 0 ? (
-                <div className="space-y-2">
-                  {comingUp.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={item.onClick}
-                      className="w-full text-left"
-                      style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.4rem', background: 'none', border: 'none', cursor: item.onClick ? 'pointer' : 'default' }}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="v2-coming-up-kind" data-kind={item.kind === 'email' ? 'task' : item.kind}>
-                          {comingUpKindLabel[item.kind] ?? 'Event'}
-                        </span>
-                        <span className="text-xs text-text-secondary">{formatDateShort(item.due)}</span>
-                      </div>
-                      <div className="text-sm font-medium text-text-primary">{item.title}</div>
-                      {item.context && <div className="text-xs text-text-secondary">{item.context}</div>}
+            <HomePanel title="This week">
+              {marketingFocusLoading ? <HomeEmptyState>Loading the saved plan…</HomeEmptyState>
+                : marketingFocusUnavailable ? <HomeEmptyState>Weekly focus is unavailable until the plan can be loaded.</HomeEmptyState>
+                : !marketingPlan ? <HomeEmptyState>Create the Marketing Plan to set this week’s focus.</HomeEmptyState>
+                : !weekFocus?.items.length ? <HomeEmptyState>Nothing in the plan needs attention this week.</HomeEmptyState>
+                : <div className="home-focus-list">{weekFocus.items.slice(0, 3).map((item) => (
+                    <button key={item.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item" data-overdue={item.overdue}>
+                      <CalendarDays size={16} />
+                      <span><strong>{item.title}</strong><small>{item.kind} · {item.detail}</small></span>
                     </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-text-secondary text-sm">Nothing scheduled in the next {COMING_UP_DAYS} days</p>
-              )}
-              <button
-                onClick={() => onNavigate?.('calendar')}
-                className="text-xs font-medium flex items-center gap-1"
-                style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.75rem' }}
-              >
-                Content & Calendar <ArrowRight size={12} />
-              </button>
-            </div>
-          </div>
-        </div>
+                  ))}</div>}
+            </HomePanel>
 
-        {/* Decision-first snapshot. Existing source definitions and period semantics are unchanged. */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between gap-3 mb-2"><h2 className="v2-section-title mb-0">At a glance</h2><button type="button" className="text-sm font-medium text-violet-700 hover:underline" onClick={() => onNavigate?.('dashboard')}>Full performance <ArrowRight size={14} className="inline" /></button></div>
-          <p className="text-sm text-text-secondary mb-3">Independent measures for the selected view. Won Revenue is from the latest Acumatica export, not the selected period.</p>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            <KpiCard
-              title="Website Enquiries"
-              value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined}
-              status={ga4EnquiriesInfo.status}
-              subtitle={ga4EnquiriesInfo.subtitle}
-              comparison={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesComparison : undefined}
-            />
-            <KpiCard
-              title="Calls"
-              value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
-              status={callPerformance.status}
-              subtitle={callPerformance.subtitle}
-              onClick={() => onNavigate?.('infinity')}
-            />
-            <KpiCard
-              title="Google Ads Spend"
-              value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined}
-              status={googleAds.status}
-              subtitle={googleAds.subtitle}
-              comparison={googleAds.status === 'available' ? googleAdsSpendComparison : undefined}
-              onClick={() => onNavigate?.('ppc')}
-            />
-            <KpiCard
-              title="Won Revenue"
+            <HomePanel title="Plan attention" variant="attention">
+              {marketingFocusLoading ? <HomeEmptyState>Checking the saved plan…</HomeEmptyState>
+                : marketingFocusUnavailable ? <HomeEmptyState>Attention checks are unavailable until the plan can be loaded.</HomeEmptyState>
+                : !marketingPlan ? <HomeEmptyState>No saved plan is available to check.</HomeEmptyState>
+                : !strategyAttention.length ? <div className="home-positive-state"><CheckCircle2 size={17} />No factual gaps found for this entity.</div>
+                : <div className="home-focus-list">{strategyAttention.map((item) => (
+                    <button key={item.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item" data-attention="true">
+                      <Flag size={16} />
+                      <span><strong>{item.title}</strong><small>{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</small></span>
+                    </button>
+                  ))}</div>}
+            </HomePanel>
+          </div>
+        </HomeSection>
+
+        <HomeSection
+          eyebrow="Selected reporting view"
+          title="Headline Performance"
+          description="A restrained view of independent measures. Won Revenue reflects the latest Acumatica export because no trustworthy Won Date is available."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('dashboard')}>Full performance <ArrowRight size={14} /></button>}
+        >
+          <div className="home-metric-grid">
+            <HomeMetric label="Website enquiries" value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined} status={ga4EnquiriesInfo.status} detail={ga4EnquiriesInfo.subtitle} onClick={() => onNavigate?.('website')} />
+            <HomeMetric label="Calls" value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined} status={callPerformance.status} detail={callPerformance.subtitle} onClick={() => onNavigate?.('infinity')} />
+            <HomeMetric label="Google Ads spend" value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined} status={googleAds.status} detail={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} />
+            <HomeMetric
+              label="Won revenue"
               value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
               status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
-              notConnectedLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
-              subtitle={
-                acumaticaNotAvailable
-                  ? `Not available — ${acumaticaSummary?.notAvailableReason}`
-                  : acumaticaSummary?.hasImportedData
-                    ? 'Latest Acumatica export — no reliable Won Date to scope by period'
-                    : acumaticaMissingLabel
-              }
+              unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
+              detail={acumaticaNotAvailable ? `Not available — ${acumaticaSummary?.notAvailableReason}` : acumaticaSummary?.hasImportedData ? 'Latest Acumatica export · not period scoped' : acumaticaMissingLabel}
               onClick={() => onNavigate?.('leads')}
             />
           </div>
-        </div>
+        </HomeSection>
 
-        {/* Campaign actions first; the full campaign table remains available below. */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="v2-section-title" style={{ marginBottom: 0 }}>Campaigns to review</h2>
-            <button
-              onClick={() => onNavigate?.('campaigns')}
-              className="text-sm font-medium flex items-center gap-1"
-              style={{ color: 'var(--v2-purple)', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              View all campaigns <ArrowRight size={14} />
-            </button>
-          </div>
-          <p className="text-sm text-text-secondary" style={{ marginBottom: '0.75rem' }}>
-            Active campaigns with a status issue or overdue linked task.{allCampaignsNeedingAction.length > 3 ? ` Showing 3 of ${allCampaignsNeedingAction.length}.` : ''}
-          </p>
-          {campaignsNeedingAction.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-              {campaignsNeedingAction.map(({ campaign, nextAction }) => (
-                <button key={campaign.id} type="button" onClick={() => selectCampaign(campaign.id)} className="card text-left">
-                  <span className="text-sm font-semibold text-text-primary block mb-1">{campaign.name}</span>
-                  <span className="text-sm text-text-secondary">{nextAction}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="card text-sm text-text-secondary mb-3">
-              {activeCampaigns.length === 0 ? `No active campaigns${isGroupView ? '' : ' for this entity'}.` : 'No active campaigns are flagged for a status review or overdue linked task.'}
-            </p>
-          )}
+        <HomeSection
+          eyebrow="Live activity"
+          title="Active Campaigns"
+          description="Genuine campaign records, their canonical entity membership and lifetime known campaign spend."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('campaigns')}>View all campaigns <ArrowRight size={14} /></button>}
+        >
           {activeCampaigns.length > 0 ? (
-            <details className="card" style={{ padding: '0.75rem 1rem' }}>
-              <summary className="text-sm font-medium text-text-primary cursor-pointer">Explore all active campaigns ({activeCampaigns.length})</summary>
-              <div style={{ overflowX: 'auto', marginTop: '0.75rem' }}>
-              <table className="table" style={{ width: '100%', minWidth: 640 }}>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem 1rem' }}>Campaign</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Response (this period)</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Known Campaign Spend</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Next Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeCampaigns.map(({ campaign: c, progress, response, nextAction, spendInfo }) => (
-                    <tr key={c.id} onClick={() => selectCampaign(c.id)} style={{ cursor: 'pointer' }}>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <div className="font-medium text-text-primary text-sm">{c.name}</div>
-                        <BrandBadge brand={c.brand} />
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        {progress.statusInconsistent ? (
-                          <span className="badge" style={{ background: 'var(--v2-orange)', color: 'white', fontSize: '10px' }}>{progress.label}</span>
-                        ) : (
-                          <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[c.status], fontSize: '10px' }}>{CAMPAIGN_STATUS_LABEL[c.status]}</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        {response ? <span className="text-sm">{response.label}</span> : <span className="v2-not-connected-text">— / Not linked</span>}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                        {spendInfo ? (
-                          <>
-                            <div className="text-sm">£{Math.round(spendInfo.knownCampaignSpend).toLocaleString()}</div>
-                            <div className="text-xs text-text-secondary">Lifetime fixed costs + available mapped media</div>
-                            {spendInfo.isLegacyFallback && <div className="text-xs text-text-secondary">{LEGACY_COST_LABEL}</div>}
-                            {spendInfo.mediaSpendStatus !== 'available' && <div className="text-xs text-text-secondary">Media: {spendInfo.mediaSpendStatus === 'unmapped' ? 'Unmapped' : 'Not connected'}</div>}
-                          </>
-                        ) : <span className="v2-not-connected-text">Costs unavailable</span>}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        {nextAction ? <span className="text-sm" style={{ color: progress.statusInconsistent ? 'var(--v2-orange)' : undefined }}>{nextAction}</span> : <span className="v2-not-connected-text">—</span>}
-                      </td>
+            <HomePanel className="home-campaign-panel">
+              <div className="home-campaign-table-wrap">
+                <table className="home-campaign-table">
+                  <thead><tr><th>Campaign</th><th>Entity</th><th>Status</th><th>Timing</th><th>Known spend</th></tr></thead>
+                  <tbody>{activeCampaigns.slice(0, 6).map(({ campaign: c, progress, spendInfo }) => (
+                    <tr
+                      key={c.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectCampaign(c.id)}
+                      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCampaign(c.id); } }}
+                    >
+                      <td><strong>{c.name}</strong>{progress.statusInconsistent && <small className="home-campaign-warning">Review status</small>}</td>
+                      <td><div className="home-entity-list">{getCampaignEntities(c).map((entity) => <span key={entity}>{BRAND_LABEL[entity]}</span>)}</div></td>
+                      <td><span className="home-status-pill" style={CAMPAIGN_STATUS_BADGE_STYLE[c.status]}>{CAMPAIGN_STATUS_LABEL[c.status]}</span></td>
+                      <td><span>{formatDateShort(c.startDate)} – {formatDateShort(c.endDate)}</span></td>
+                      <td>{spendInfo ? <><strong>£{Math.round(spendInfo.knownCampaignSpend).toLocaleString()}</strong>{spendInfo.isLegacyFallback && <small>{LEGACY_COST_LABEL}</small>}{spendInfo.mediaSpendStatus !== 'available' && <small>Media {spendInfo.mediaSpendStatus === 'unmapped' ? 'unmapped' : 'not connected'}</small>}</> : <span className="home-unavailable">Costs unavailable</span>}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  ))}</tbody>
+                </table>
               </div>
-            </details>
-          ) : null}
-        </div>
+              {activeCampaigns.length > 6 && <div className="home-table-note">Showing 6 of {activeCampaigns.length} active campaigns.</div>}
+            </HomePanel>
+          ) : <HomeEmptyState>No active campaigns{isGroupView ? '' : ' for this entity'}.</HomeEmptyState>}
+        </HomeSection>
 
-        {/* Channel detail remains available without repeating six cards in the main view. */}
-        <details className="card mb-4">
-          <summary className="text-sm font-medium text-text-primary cursor-pointer">Explore channel metrics</summary>
-          <p className="text-sm text-text-secondary mt-3 mb-3">Key metrics from connected channels for the selected period.</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            <KpiCard
-              title="Website"
-              value={websiteUsers.status === 'available' ? websiteUsers.sessions : undefined}
-              status={websiteUsers.status}
-              subtitle={
-                websiteUsers.status === 'available'
-                  ? ga4EnquiriesInfo.status === 'available' ? `${ga4EnquiriesInfo.total} enquiries` : 'Enquiries unavailable'
-                  : websiteUsers.subtitle
-              }
-              size="compact"
-              onClick={() => onNavigate?.('website')}
-            />
-            <KpiCard
-              title="Email"
-              value={emailHeadline.status === 'available' ? emailHeadline.recipients : undefined}
-              status={emailHeadline.status}
-              subtitle={emailHeadline.status === 'available' ? `${emailHeadline.clicks} clicks` : emailHeadline.subtitle}
-              size="compact"
-              onClick={() => onNavigate?.('email')}
-            />
-            <KpiCard
-              title="PPC"
-              value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined}
-              status={googleAds.status}
-              subtitle={googleAds.status === 'available' ? `${googleAds.clicks} clicks` : googleAds.subtitle}
-              size="compact"
-              onClick={() => onNavigate?.('ppc')}
-            />
-            <KpiCard
-              title="Calls"
-              value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined}
-              status={callPerformance.status}
-              subtitle={callPerformance.status === 'available' ? `${callPerformance.answeredCalls} answered` : callPerformance.subtitle}
-              size="compact"
-              onClick={() => onNavigate?.('infinity')}
-            />
-            <KpiCard
-              title="SEO"
-              value={searchConsole.status === 'available' ? searchConsole.clicks : undefined}
-              status={searchConsole.status}
-              subtitle={searchConsole.status === 'available' ? `${searchConsole.impressions} impressions` : searchConsole.subtitle}
-              size="compact"
-              onClick={() => onNavigate?.('website')}
-            />
-            <KpiCard
-              title="Social"
-              value={socialTraffic.status === 'available' ? socialTraffic.sessions : undefined}
-              status={socialTraffic.status}
-              subtitle={socialTraffic.status === 'available' ? `${socialTraffic.users} users` : socialTraffic.subtitle}
-              size="compact"
-              onClick={() => onNavigate?.('social')}
-            />
+        <HomeSection
+          eyebrow="Commercial context"
+          title="Commercial Performance"
+          description="Marketing response and commercial outcomes are related views, not deterministic campaign attribution."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('leads')}>Open CRM <ArrowRight size={14} /></button>}
+        >
+          <HomePanel variant="commercial">
+            <div className="home-commercial-context">
+              <div><span>Marketing response</span><strong>{ga4EnquiriesInfo.status === 'available' ? `${ga4EnquiriesInfo.total} website enquiries` : 'Website enquiries unavailable'} · {callPerformance.status === 'available' ? `${callPerformance.totalCalls} calls` : 'calls unavailable'}</strong><small>Selected reporting period</small></div>
+              <ArrowRight size={18} aria-hidden="true" />
+              <div><span>Overall CRM outcomes</span><strong>Latest Acumatica manual export</strong><small>Not attributed to marketing and not period scoped</small></div>
+            </div>
+            <div className="home-commercial-metrics">
+              <HomeMetric label="Opportunities" value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined} status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'Latest Acumatica export' : acumaticaNotAvailable ? acumaticaSummary?.notAvailableReason ?? undefined : acumaticaMissingLabel} />
+              <HomeMetric label="Open pipeline" value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined} status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail="Status Open + Status New" />
+              <HomeMetric label="Won revenue" value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined} status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail="Latest export · no trustworthy Won Date" />
+            </div>
+          </HomePanel>
+        </HomeSection>
+
+        <HomeSection eyebrow="Action" title="Needs Attention & Upcoming" description="Campaign, calendar, funding, data and Marketing Plan items derived from genuine records.">
+          <div className="home-action-grid">
+            <HomePanel title="Needs attention" eyebrow={attentionTotal > 0 ? `${attentionTotal} item${attentionTotal === 1 ? '' : 's'}` : undefined} variant="attention">
+              {attentionCategories.length > 0 ? <div className="home-action-list">{attentionCategories.map((category) => (
+                <button key={category.id} type="button" onClick={category.items[0]?.onClick} data-severity={category.severity}>
+                  <AlertTriangle size={16} />
+                  <span><strong>{category.items.length} {category.label(category.items.length)}</strong>{category.items[0] && <small>{category.items[0].title} — {category.items[0].detail}</small>}</span>
+                  <ArrowRight size={14} />
+                </button>
+              ))}</div> : <div className="home-positive-state"><CheckCircle2 size={17} />Nothing urgent right now.</div>}
+            </HomePanel>
+
+            <HomePanel title="Upcoming" eyebrow={`Next ${COMING_UP_DAYS} days`}>
+              {comingUp.length > 0 ? <div className="home-action-list">{comingUp.map((item) => (
+                <button key={item.id} type="button" onClick={item.onClick}>
+                  <CalendarDays size={16} />
+                  <span><strong>{item.title}</strong><small>{comingUpKindLabel[item.kind] ?? 'Event'} · {formatDateShort(item.due)}{item.context ? ` · ${item.context}` : ''}</small></span>
+                  <ArrowRight size={14} />
+                </button>
+              ))}</div> : <HomeEmptyState>Nothing scheduled in the next {COMING_UP_DAYS} days.</HomeEmptyState>}
+              <button type="button" className="home-text-action home-panel-link" onClick={() => onNavigate?.('calendar')}>Open Calendar <ArrowRight size={14} /></button>
+            </HomePanel>
           </div>
-        </details>
+        </HomeSection>
+
+        <aside className="home-ai-reserve" aria-label="Future Ask AI Office area">
+          <Sparkles size={18} />
+          <div><strong>Ask AI Office</strong><span>Reserved for a future conversational layer. It is not connected yet.</span></div>
+          <span className="home-ai-status">Future</span>
+        </aside>
       </div>
     </div>
   );
