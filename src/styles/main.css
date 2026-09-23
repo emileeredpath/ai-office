@@ -2142,3 +2142,194 @@ h3 {
 .v2-perf-coverage .v2-freshness-item {
   line-height: 1.6;
 }
+
+/* ============================================================
+   MTech workspace shell — approved Home redesign phase
+   ============================================================ */
+
+.v2-app-shell,
+.v2-main-column {
+  background: var(--workspace-canvas);
+}
+
+.v2-sidebar,
+.v2-topbar {
+  background: var(--workspace-surface);
+  color: var(--workspace-text-muted);
+}
+
+.v2-sidebar {
+  width: 232px;
+  border-right: 1px solid var(--workspace-border-subtle);
+}
+
+.v2-sidebar-brand,
+.v2-topbar,
+.v2-sidebar-collapse {
+  border-color: var(--workspace-border-subtle);
+}
+
+.v2-sidebar-brand-mark {
+  background: var(--workspace-accent);
+  color: var(--workspace-canvas);
+}
+
+.v2-sidebar-brand-title,
+.v2-topbar-user {
+  color: var(--workspace-text);
+}
+
+.v2-sidebar-brand-subtitle,
+.v2-topbar-user-role,
+.v2-sidebar-section-label {
+  color: var(--workspace-text-subtle);
+}
+
+.v2-sidebar-section-label {
+  padding-top: 20px;
+}
+
+.v2-nav-item {
+  color: var(--workspace-text-muted);
+  min-height: 40px;
+}
+
+.v2-nav-item:hover:not([data-disabled='true']) {
+  background: rgba(240, 244, 248, 0.06);
+  color: var(--workspace-text);
+}
+
+.v2-nav-item[data-active='true'] {
+  background: var(--workspace-accent-soft);
+  color: var(--workspace-text);
+  box-shadow: inset 3px 0 0 var(--workspace-accent);
+}
+
+.v2-nav-item[data-branch-active='true'] {
+  background: rgba(240, 244, 248, 0.08);
+  color: var(--workspace-text);
+}
+
+.v2-nav-children {
+  border-left-color: var(--workspace-border-subtle);
+}
+
+.v2-topbar {
+  min-height: 64px;
+  padding: 11px 28px;
+}
+
+.v2-topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.v2-topbar-avatar {
+  background: var(--workspace-accent-soft);
+  color: var(--workspace-accent);
+  border: 1px solid rgba(249, 112, 31, 0.35);
+}
+
+.v2-entity-pill {
+  color: var(--workspace-text-muted);
+  border-color: var(--workspace-border-subtle);
+}
+
+.v2-entity-pill:hover {
+  color: var(--workspace-text);
+  border-color: var(--workspace-text-subtle);
+}
+
+.v2-entity-pill[data-active='true'] {
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+  color: var(--workspace-canvas);
+}
+
+.v2-mobile-nav-toggle,
+.v2-sidebar-scrim {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .v2-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(320px, calc(100vw - 52px));
+    z-index: 50;
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    box-shadow: 18px 0 50px rgba(0, 0, 0, 0.32);
+  }
+
+  .v2-sidebar[data-mobile-open='true'] {
+    transform: translateX(0);
+  }
+
+  .v2-sidebar[data-collapsed='true'] {
+    width: min(320px, calc(100vw - 52px));
+  }
+
+  .v2-sidebar-brand-text,
+  .v2-nav-item-label,
+  .v2-nav-item-soon,
+  .v2-sidebar-section-label {
+    display: block;
+  }
+
+  .v2-sidebar-collapse {
+    display: none;
+  }
+
+  .v2-sidebar-scrim {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    border: 0;
+    background: rgba(4, 9, 15, 0.72);
+    color: transparent;
+    cursor: default;
+  }
+
+  .v2-mobile-nav-toggle {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--workspace-border-subtle);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--workspace-text);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .v2-topbar {
+    flex-wrap: nowrap;
+    padding: 10px 16px;
+  }
+
+  .v2-entity-selector {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .v2-entity-selector::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .v2-topbar-user > div:last-child {
+    display: none;
+  }
+
+  .v2-entity-pill {
+    padding-inline: 10px;
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LucideIcon, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 
 export interface NavItem {
@@ -8,6 +8,7 @@ export interface NavItem {
   comingSoon?: boolean;
   externalUrl?: string;
   children?: NavItem[];
+  section?: string;
 }
 
 interface SidebarProps {
@@ -15,14 +16,25 @@ interface SidebarProps {
   secondaryItems: NavItem[];
   currentScreen: string;
   onScreenChange: (screen: any) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 // V2 dark navy shell sidebar. Visually reflects the long-term MTech
 // Marketing Hub information architecture; items without a built screen yet
 // (comingSoon) are shown but disabled rather than removed or faked. Every
 // existing screen remains reachable — see NAV item mapping in App.tsx.
-export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenChange }: SidebarProps) {
+export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenChange, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onMobileClose?.();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [mobileOpen, onMobileClose]);
 
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
@@ -48,6 +60,7 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
           onClick={() => {
             if (item.comingSoon || item.id === null) return;
             onScreenChange(item.id);
+            onMobileClose?.();
           }}
           className="v2-nav-item"
           data-active={isActive}
@@ -69,8 +82,10 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
     );
   };
 
+  let previousSection = '';
+
   return (
-    <div className="v2-sidebar" data-collapsed={collapsed}>
+    <aside className="v2-sidebar" data-collapsed={collapsed} data-mobile-open={mobileOpen} aria-label="Main navigation">
       <div className="v2-sidebar-brand">
         <div className="v2-sidebar-brand-mark">MT</div>
         <div className="v2-sidebar-brand-text">
@@ -81,8 +96,14 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
 
       <nav className="v2-sidebar-nav">
         {primaryItems.map(renderItem)}
-        <div className="v2-sidebar-section-label">More</div>
-        {secondaryItems.map(renderItem)}
+        {secondaryItems.map((item) => {
+          const heading = item.section && item.section !== previousSection ? item.section : null;
+          previousSection = item.section ?? previousSection;
+          return <div key={item.label} className="v2-sidebar-section">
+            {heading && <div className="v2-sidebar-section-label">{heading}</div>}
+            {renderItem(item)}
+          </div>;
+        })}
       </nav>
 
       <div className="v2-sidebar-collapse">
@@ -91,6 +112,6 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
           <span className="v2-nav-item-label">Collapse</span>
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

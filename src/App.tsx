@@ -1,6 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import {
-  LayoutDashboard,
+  House,
   ListTodo,
   FolderOpen,
   Calendar,
@@ -17,6 +17,7 @@ import {
   Mail,
   Building2,
   Waypoints,
+  X,
 } from 'lucide-react';
 import { isWebglAvailable, isLikelyMobileViewport } from '@/utils/webgl';
 import { Sidebar, type NavItem } from '@/components/layout/Sidebar';
@@ -51,34 +52,34 @@ const MTechHQScreen = lazy(() => import('@/screens/MTechHQScreen'));
 
 type Screen = 'home' | 'tasks' | 'marketing-plan' | 'campaigns' | 'calendar' | 'dashboard' | 'leads' | 'ppc' | 'ppc-improvement' | 'infinity' | 'social' | 'website' | 'website-improvement' | 'email' | 'funding' | 'metrics' | 'settings' | 'mtech-hq';
 
-// Sidebar labels map to real screens. Website and PPC each reveal an
-// Improvement subcategory when selected. Uploads remains disabled until it
-// has a real screen. Reports keeps its existing 'metrics' route id.
+// The primary workspace is deliberately concise. Every existing supporting
+// screen remains reachable in the grouped secondary navigation; route ids and
+// screen behaviour are unchanged.
 const PRIMARY_NAV: NavItem[] = [
-  { id: 'home' as Screen, icon: LayoutDashboard, label: 'Overview' },
+  { id: 'home' as Screen, icon: House, label: 'Home' },
   { id: 'marketing-plan' as Screen, icon: Waypoints, label: 'Marketing Plan' },
   { id: 'campaigns' as Screen, icon: FolderOpen, label: 'Campaigns' },
-  { id: 'calendar' as Screen, icon: Calendar, label: 'Content & Calendar' },
   { id: 'dashboard' as Screen, icon: BarChart3, label: 'Performance' },
-  { id: 'leads' as Screen, icon: Users, label: 'Leads & CRM' },
-  { id: 'ppc' as Screen, icon: TrendingUp, label: 'PPC', children: [
-    { id: 'ppc-improvement' as Screen, icon: TrendingUp, label: 'PPC Improvement' },
-  ] },
-  { id: 'infinity' as Screen, icon: Phone, label: 'Call Tracking' },
-  { id: 'social' as Screen, icon: Share2, label: 'Social' },
-  { id: 'website' as Screen, icon: Globe, label: 'Website', children: [
-    { id: 'website-improvement' as Screen, icon: TrendingUp, label: 'Website Improvement' },
-  ] },
-  { id: 'email' as Screen, icon: Mail, label: 'Email' },
-  { id: 'funding' as Screen, icon: Landmark, label: 'Funding' },
-  { id: 'metrics' as Screen, icon: FileBarChart, label: 'Reports' },
+  { id: 'leads' as Screen, icon: Users, label: 'CRM' },
+  { id: 'calendar' as Screen, icon: Calendar, label: 'Calendar' },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { id: null, icon: ListTodo, label: 'Microsoft To Do', externalUrl: 'https://to-do.office.com/tasks/' },
-  { id: null, icon: Upload, label: 'Uploads', comingSoon: true },
-  { id: 'settings' as Screen, icon: Settings, label: 'Settings' },
-  { id: 'mtech-hq' as Screen, icon: Building2, label: 'MTech HQ' },
+  { id: 'website' as Screen, icon: Globe, label: 'Website', section: 'Channels', children: [
+    { id: 'website-improvement' as Screen, icon: TrendingUp, label: 'Website Improvement' },
+  ] },
+  { id: 'ppc' as Screen, icon: TrendingUp, label: 'PPC', section: 'Channels', children: [
+    { id: 'ppc-improvement' as Screen, icon: TrendingUp, label: 'PPC Improvement' },
+  ] },
+  { id: 'email' as Screen, icon: Mail, label: 'Email', section: 'Channels' },
+  { id: 'social' as Screen, icon: Share2, label: 'Social', section: 'Channels' },
+  { id: 'infinity' as Screen, icon: Phone, label: 'Call Tracking', section: 'Channels' },
+  { id: 'funding' as Screen, icon: Landmark, label: 'Funding', section: 'Operations' },
+  { id: 'metrics' as Screen, icon: FileBarChart, label: 'Reports', section: 'Operations' },
+  { id: null, icon: ListTodo, label: 'Microsoft To Do', section: 'Tools', externalUrl: 'https://to-do.office.com/tasks/' },
+  { id: null, icon: Upload, label: 'Uploads', section: 'Tools', comingSoon: true },
+  { id: 'settings' as Screen, icon: Settings, label: 'Settings', section: 'Tools' },
+  { id: 'mtech-hq' as Screen, icon: Building2, label: 'MTech HQ', section: 'Tools' },
 ];
 
 // Gate in front of the lazy-loaded MTechHQScreen: checks WebGL support and
@@ -133,6 +134,7 @@ function MTechHQGate({ onNavigate }: { onNavigate: (screen: string) => void }) {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const selectedTaskId = useAppStore((s) => s.selectedTaskId);
   const selectedCampaignId = useAppStore((s) => s.selectedCampaignId);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
@@ -194,9 +196,16 @@ export default function App() {
         secondaryItems={SECONDARY_NAV}
         currentScreen={currentScreen}
         onScreenChange={setCurrentScreen}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
       />
+      {mobileNavOpen && (
+        <button className="v2-sidebar-scrim" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation">
+          <X size={24} />
+        </button>
+      )}
       <div className="v2-main-column">
-        <TopBar />
+        <TopBar onOpenNavigation={() => setMobileNavOpen(true)} navigationOpen={mobileNavOpen} />
         <main className="flex-1 overflow-hidden flex">
           <div className="flex-1 overflow-y-auto">
             {selectedCampaignId ? (
