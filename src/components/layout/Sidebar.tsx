@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { LucideIcon, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { LucideIcon, ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react';
 
 export interface NavItem {
   id: string | null;
@@ -26,9 +26,11 @@ interface SidebarProps {
 // existing screen remains reachable — see NAV item mapping in App.tsx.
 export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenChange, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const mobileCloseRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!mobileOpen) return;
+    mobileCloseRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onMobileClose?.();
     };
@@ -56,6 +58,7 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
           rel="noopener noreferrer"
           className="v2-nav-item"
           title={`${item.label} — opens in a new tab`}
+          onClick={onMobileClose}
         >{content}</a> : <button
           onClick={() => {
             if (item.comingSoon || item.id === null) return;
@@ -66,6 +69,7 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
           data-active={isActive}
           data-branch-active={branchActive}
           data-disabled={item.comingSoon}
+          aria-current={isActive ? 'page' : undefined}
           title={item.comingSoon ? `${item.label} — coming soon` : item.label}
         >
           {content}
@@ -73,7 +77,7 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
         {(isActive || branchActive) && item.children && !collapsed && <div className="v2-nav-children">
           {item.children.map((child) => {
             const ChildIcon = child.icon;
-            return <button key={child.id} className="v2-nav-item v2-nav-child" data-active={child.id === currentScreen} onClick={() => child.id && onScreenChange(child.id)} title={child.label}>
+            return <button key={child.id} className="v2-nav-item v2-nav-child" data-active={child.id === currentScreen} aria-current={child.id === currentScreen ? 'page' : undefined} onClick={() => { if (child.id) onScreenChange(child.id); onMobileClose?.(); }} title={child.label}>
               <ChildIcon size={15} /><span className="v2-nav-item-label">{child.label}</span>
             </button>;
           })}
@@ -85,13 +89,16 @@ export function Sidebar({ primaryItems, secondaryItems, currentScreen, onScreenC
   let previousSection = '';
 
   return (
-    <aside className="v2-sidebar" data-collapsed={collapsed} data-mobile-open={mobileOpen} aria-label="Main navigation">
+    <aside id="main-navigation" className="v2-sidebar" data-collapsed={collapsed} data-mobile-open={mobileOpen} aria-label="Main navigation">
       <div className="v2-sidebar-brand">
         <div className="v2-sidebar-brand-mark">MT</div>
         <div className="v2-sidebar-brand-text">
           <div className="v2-sidebar-brand-title">MTech</div>
           <div className="v2-sidebar-brand-subtitle">Marketing Hub</div>
         </div>
+        <button ref={mobileCloseRef} type="button" className="v2-mobile-nav-close" onClick={onMobileClose} aria-label="Close navigation">
+          <X size={20} />
+        </button>
       </div>
 
       <nav className="v2-sidebar-nav">

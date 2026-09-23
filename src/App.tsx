@@ -76,7 +76,7 @@ const SECONDARY_NAV: NavItem[] = [
   { id: 'infinity' as Screen, icon: Phone, label: 'Call Tracking', section: 'Channels' },
   { id: 'funding' as Screen, icon: Landmark, label: 'Funding', section: 'Operations' },
   { id: 'metrics' as Screen, icon: FileBarChart, label: 'Reports', section: 'Operations' },
-  { id: null, icon: ListTodo, label: 'Microsoft To Do', section: 'Tools', externalUrl: 'https://to-do.office.com/tasks/' },
+  { id: null, icon: ListTodo, label: 'Microsoft To Do', externalUrl: 'https://to-do.office.com/tasks/', section: 'Tools' },
   { id: null, icon: Upload, label: 'Uploads', section: 'Tools', comingSoon: true },
   { id: 'settings' as Screen, icon: Settings, label: 'Settings', section: 'Tools' },
   { id: 'mtech-hq' as Screen, icon: Building2, label: 'MTech HQ', section: 'Tools' },

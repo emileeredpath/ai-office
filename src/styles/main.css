@@ -2249,8 +2249,22 @@ h3 {
 }
 
 .v2-mobile-nav-toggle,
+.v2-mobile-nav-close,
 .v2-sidebar-scrim {
   display: none;
+}
+
+.v2-nav-item:focus-visible,
+.v2-mobile-nav-toggle:focus-visible,
+.v2-mobile-nav-close:focus-visible,
+.v2-entity-pill:focus-visible,
+.home-text-action:focus-visible,
+.home-focus-item:focus-visible,
+.home-action-list button:focus-visible,
+.home-metric-interactive:focus-visible,
+.home-campaign-table tbody tr:focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 900px) {
@@ -2281,6 +2295,21 @@ h3 {
 
   .v2-sidebar-collapse {
     display: none;
+  }
+
+  .v2-mobile-nav-close {
+    display: inline-flex;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    border: 1px solid var(--workspace-border-subtle);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--workspace-text);
+    cursor: pointer;
+    flex-shrink: 0;
   }
 
   .v2-sidebar-scrim {
@@ -2545,6 +2574,15 @@ h3 {
 
   .home-metric:last-child {
     border-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-sidebar,
+  .v2-nav-item,
+  .home-metric-interactive,
+  .home-campaign-table tbody tr {
+    transition: none;
   }
 }
 

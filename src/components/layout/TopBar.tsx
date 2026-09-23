@@ -18,6 +18,7 @@ export function TopBar({ onOpenNavigation, navigationOpen }: { onOpenNavigation:
           onClick={onOpenNavigation}
           aria-label="Open navigation"
           aria-expanded={navigationOpen}
+          aria-controls="main-navigation"
         >
           <Menu size={20} />
         </button>
