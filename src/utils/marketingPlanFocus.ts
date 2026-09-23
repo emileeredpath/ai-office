@@ -27,7 +27,7 @@ export function getCurrentQuarter(today = new Date()) {
   return Math.floor(today.getMonth() / 3) + 1;
 }
 
-export function selectHomeMarketingPlan(plans: MarketingPlan[], today = new Date()) {
+export function selectMarketingPlanForCurrentPeriod(plans: MarketingPlan[], today = new Date()) {
   return plans.find((plan) => plan.periodYear === today.getFullYear()) ?? plans[0] ?? null;
 }
 

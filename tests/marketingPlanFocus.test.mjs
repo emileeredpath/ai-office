@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { build } from 'esbuild';
 
 const bundled = await build({ entryPoints: ['src/utils/marketingPlanFocus.ts'], bundle: true, platform: 'node', format: 'esm', write: false });
-const { filterStrategyForEntity, getMarketingPlanWeekFocus, getQuarterStrategyRows, selectHomeMarketingPlan } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+const { filterStrategyForEntity, getMarketingPlanWeekFocus, getQuarterStrategyRows, selectMarketingPlanForCurrentPeriod } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 
 const plan = { id: 'plan-1', title: '2027 plan', periodYear: 2027, nextReviewDate: null };
 const objective = { id: 'objective-1', title: 'Grow relevant demand', periodYear: 2027, quarter: 2, entities: ['brentwood'], nextReviewDate: null };
@@ -20,8 +20,8 @@ const row = {
 };
 
 test('home selects the current-year plan without fabricating one', () => {
-  assert.equal(selectHomeMarketingPlan([{ ...plan, periodYear: 2026 }, plan], new Date('2027-04-12')).id, 'plan-1');
-  assert.equal(selectHomeMarketingPlan([], new Date('2027-04-12')), null);
+  assert.equal(selectMarketingPlanForCurrentPeriod([{ ...plan, periodYear: 2026 }, plan], new Date('2027-04-12')).id, 'plan-1');
+  assert.equal(selectMarketingPlanForCurrentPeriod([], new Date('2027-04-12')), null);
 });
 
 test('home focus honours objective entity scope and exact quarter', () => {
@@ -48,4 +48,15 @@ test('sidebar links directly to Microsoft To Do and does not present internal ta
   assert.doesNotMatch(app, /label: 'My Tasks'/);
   assert.match(sidebar, /target="_blank"/);
   assert.match(sidebar, /rel="noopener noreferrer"/);
+});
+
+test('Marketing Plan distinguishes failed reads and exposes an accessible tab relationship', () => {
+  const home = readFileSync('src/screens/HomeScreen.tsx', 'utf8');
+  const screen = readFileSync('src/screens/MarketingPlanScreen.tsx', 'utf8');
+  assert.match(home, /Marketing Plan data is unavailable right now/);
+  assert.match(screen, /Marketing Plan unavailable/);
+  assert.match(screen, /role="tablist"/);
+  assert.match(screen, /aria-controls={`marketing-plan-panel-\$\{value}`}/);
+  assert.match(screen, /role="tabpanel"/);
+  assert.match(screen, /event\.key === 'ArrowRight'/);
 });

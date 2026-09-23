@@ -30,7 +30,7 @@ import { getAcumaticaMissingDataHeadline, getAcumaticaMissingDataLabel } from '@
 import { BRAND_LABEL } from '@/utils/brandColors';
 import { fetchMarketingPlans, fetchMarketingStrategy } from '@/services/marketingPlanApi';
 import type { MarketingPlan, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
-import { filterStrategyForEntity, getMarketingPlanWeekFocus, getQuarterStrategyRows, selectHomeMarketingPlan } from '@/utils/marketingPlanFocus';
+import { filterStrategyForEntity, getMarketingPlanWeekFocus, getQuarterStrategyRows, selectMarketingPlanForCurrentPeriod } from '@/utils/marketingPlanFocus';
 import { getStrategyHealthFindings } from '@/utils/marketingPlanProgress';
 
 interface HomeScreenProps {
@@ -84,13 +84,15 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const [marketingPlan, setMarketingPlan] = useState<MarketingPlan | null>(null);
   const [marketingStrategy, setMarketingStrategy] = useState<MarketingPlanStrategyObjective[]>([]);
   const [marketingFocusLoading, setMarketingFocusLoading] = useState(true);
+  const [marketingFocusUnavailable, setMarketingFocusUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setMarketingFocusLoading(true);
+    setMarketingFocusUnavailable(false);
     fetchMarketingPlans()
       .then(async (plans) => {
-        const selected = selectHomeMarketingPlan(plans);
+        const selected = selectMarketingPlanForCurrentPeriod(plans);
         if (!selected) return { selected: null, rows: [] as MarketingPlanStrategyObjective[] };
         return { selected, rows: await fetchMarketingStrategy(selected.id) };
       })
@@ -103,6 +105,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         if (cancelled) return;
         setMarketingPlan(null);
         setMarketingStrategy([]);
+        setMarketingFocusUnavailable(true);
       })
       .finally(() => { if (!cancelled) setMarketingFocusLoading(false); });
     return () => { cancelled = true; };
@@ -480,21 +483,21 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             <div className="h-1.5 bg-violet-500" />
             <div className="p-5">
               <div className="flex items-center gap-2 text-violet-700"><Target size={18}/><h3 className="font-bold">This Quarter</h3></div>
-              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No Marketing Plan has been created yet.</p> : !quarterFocus?.rows.length ? <p className="mt-4 text-sm text-text-secondary">No objectives are assigned to Q{quarterFocus?.quarter} {marketingPlan.periodYear} for this entity.</p> : <div className="mt-4 grid gap-2">{quarterFocus.rows.slice(0, 3).map((row) => <button key={row.objective.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-violet-50 p-3 text-left hover:bg-violet-100"><strong className="block text-sm text-text-primary">{row.objective.title}</strong><span className="mt-1 block text-xs text-text-secondary">{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</span></button>)}</div>}
+              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : marketingFocusUnavailable ? <p className="mt-4 text-sm text-amber-700">Marketing Plan data is unavailable right now.</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No Marketing Plan has been created yet.</p> : !quarterFocus?.rows.length ? <p className="mt-4 text-sm text-text-secondary">No objectives are assigned to Q{quarterFocus?.quarter} {marketingPlan.periodYear} for this entity.</p> : <div className="mt-4 grid gap-2">{quarterFocus.rows.slice(0, 3).map((row) => <button key={row.objective.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-violet-50 p-3 text-left hover:bg-violet-100"><strong className="block text-sm text-text-primary">{row.objective.title}</strong><span className="mt-1 block text-xs text-text-secondary">{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</span></button>)}</div>}
             </div>
           </section>
           <section className="overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-sm">
             <div className="h-1.5 bg-cyan-500" />
             <div className="p-5">
               <div className="flex items-center gap-2 text-cyan-700"><CalendarDays size={18}/><h3 className="font-bold">This Week</h3></div>
-              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">Create the Marketing Plan to set this week’s focus.</p> : !weekFocus?.items.length ? <p className="mt-4 text-sm text-text-secondary">Nothing in the plan needs attention this week.</p> : <div className="mt-4 grid gap-2">{weekFocus.items.slice(0, 3).map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className={`rounded-xl p-3 text-left ${item.overdue ? 'bg-red-50 hover:bg-red-100' : 'bg-cyan-50 hover:bg-cyan-100'}`}><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{item.kind} · {item.detail}</span></button>)}</div>}
+              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Loading saved plan…</p> : marketingFocusUnavailable ? <p className="mt-4 text-sm text-amber-700">Weekly focus is unavailable until the plan can be loaded.</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">Create the Marketing Plan to set this week’s focus.</p> : !weekFocus?.items.length ? <p className="mt-4 text-sm text-text-secondary">Nothing in the plan needs attention this week.</p> : <div className="mt-4 grid gap-2">{weekFocus.items.slice(0, 3).map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className={`rounded-xl p-3 text-left ${item.overdue ? 'bg-red-50 hover:bg-red-100' : 'bg-cyan-50 hover:bg-cyan-100'}`}><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{item.kind} · {item.detail}</span></button>)}</div>}
             </div>
           </section>
           <section className="overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm">
             <div className="h-1.5 bg-amber-500" />
             <div className="p-5">
               <div className="flex items-center gap-2 text-amber-700"><Flag size={18}/><h3 className="font-bold">Needs Attention</h3></div>
-              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Checking saved plan…</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No saved plan is available to check.</p> : !strategyAttention.length ? <div className="mt-4 flex items-center gap-2 text-sm text-text-primary"><CheckCircle2 size={16} className="text-emerald-600"/>No factual gaps found for this entity.</div> : <div className="mt-4 grid gap-2">{strategyAttention.map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-amber-50 p-3 text-left hover:bg-amber-100"><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</span></button>)}</div>}
+              {marketingFocusLoading ? <p className="mt-4 text-sm text-text-secondary">Checking saved plan…</p> : marketingFocusUnavailable ? <p className="mt-4 text-sm text-amber-700">Attention checks are unavailable until the plan can be loaded.</p> : !marketingPlan ? <p className="mt-4 text-sm text-text-secondary">No saved plan is available to check.</p> : !strategyAttention.length ? <div className="mt-4 flex items-center gap-2 text-sm text-text-primary"><CheckCircle2 size={16} className="text-emerald-600"/>No factual gaps found for this entity.</div> : <div className="mt-4 grid gap-2">{strategyAttention.map((item) => <button key={item.id} onClick={() => onNavigate?.('marketing-plan')} className="rounded-xl bg-amber-50 p-3 text-left hover:bg-amber-100"><strong className="block text-sm text-text-primary">{item.title}</strong><span className="mt-1 block text-xs text-text-secondary">{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</span></button>)}</div>}
             </div>
           </section>
         </div>
