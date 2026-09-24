@@ -7,6 +7,7 @@ import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getGoogleAdsForCampaign } from '@/utils/campaignAttribution';
 import { getKnownCampaignSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import type { GoogleAdsResponse } from '@/services/googleAdsApi';
 
 interface CampaignsTableProps {
@@ -43,36 +44,24 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
   }
 
   return (
-    <div className="card p-0" style={{ overflow: 'visible' }}>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="table v2-campaigns-table" style={{ width: '100%', minWidth: 900 }}>
+    <div className="campaigns-table-shell">
+      <div className="campaigns-table-scroll">
+        <table className="v2-campaigns-table campaigns-management-table">
           <thead>
             <tr>
               <th>Campaign</th>
               <th>Entity</th>
-              <th>Status</th>
+              <th>Status &amp; timing</th>
               <th>Progress</th>
-              <th style={{ textAlign: 'right' }}>
-                Marketing Leads
-                <div className="text-xs font-normal" style={{ textTransform: 'none', color: 'var(--color-text-secondary)' }}>
-                  Manual, not CRM-linked
-                </div>
-              </th>
-              <th style={{ textAlign: 'right' }}>Open Pipeline</th>
-              <th style={{ textAlign: 'right' }}>Budget</th>
-              <th style={{ textAlign: 'right' }} title="Fixed costs + connected media spend">
-                Spend
-                <div className="text-xs font-normal" style={{ textTransform: 'none', color: 'var(--color-text-secondary)' }}>
-                  Fixed costs + connected media spend
-                </div>
-              </th>
-              <th style={{ textAlign: 'right' }}>ROI</th>
+              <th>Marketing response</th>
+              <th>Budget &amp; spend</th>
+              <th>Logged ROI</th>
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
           <tbody>
             {campaigns.map((campaign) => {
-              const entities = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
+              const entities = getCampaignEntities(campaign);
               const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
               const roiValue =
                 campaign.valueGenerated != null && campaign.spend > 0
@@ -94,6 +83,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                     >
                       {campaign.name}
                     </button>
+                    <span className="campaigns-row-dates">{formatDateShort(campaign.startDate)} – {formatDateShort(campaign.endDate)}</span>
                   </td>
                   <td>
                     <div className="flex gap-1 flex-wrap">
@@ -106,6 +96,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                     <span className="badge" style={{ ...CAMPAIGN_STATUS_BADGE_STYLE[campaign.status], fontSize: '11px' }}>
                       {CAMPAIGN_STATUS_LABEL[campaign.status]}
                     </span>
+                    {progress.statusInconsistent && <span className="campaigns-status-warning">Review status</span>}
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
@@ -124,20 +115,21 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                       </span>
                     </div>
                   </td>
-                  <td style={{ textAlign: 'right' }}>{campaign.leads}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <span className="v2-not-connected-text">Not connected</span>
+                  <td>
+                    <strong className="campaigns-cell-value">{campaign.leads.toLocaleString('en-GB')} leads</strong>
+                    <span className="campaigns-cell-note">Manual, not CRM-linked</span>
+                    <span className="campaigns-cell-note">Open pipeline: not connected</span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>{formatCurrency(campaign.budget)}</td>
-                  <td style={{ textAlign: 'right' }} title={spendInfo.isLegacyFallback ? LEGACY_COST_LABEL : 'Fixed costs + connected media spend'}>
-                    {formatCurrency(spendInfo.knownCampaignSpend)}
+                  <td title={spendInfo.isLegacyFallback ? LEGACY_COST_LABEL : 'Fixed costs + connected media spend'}>
+                    <strong className="campaigns-cell-value">{formatCurrency(spendInfo.knownCampaignSpend)} known spend</strong>
+                    <span className="campaigns-cell-note">Budget {formatCurrency(campaign.budget)}</span>
                     {spendInfo.isLegacyFallback && (
-                      <div className="text-xs" style={{ color: 'var(--v2-orange)', whiteSpace: 'nowrap' }}>
+                      <span className="campaigns-spend-warning">
                         Needs classification
-                      </div>
+                      </span>
                     )}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td>
                     {roiValue !== null ? (
                       <span style={{ fontWeight: 600, color: roiValue >= 0 ? 'var(--v2-green)' : 'var(--v2-red)' }}>
                         {roiValue >= 0 ? '+' : ''}

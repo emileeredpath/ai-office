@@ -1,6 +1,6 @@
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, ExternalLink } from 'lucide-react';
+import { Plus, ExternalLink, Search } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { Brand, Campaign, CampaignResults, CampaignStatus } from '@/types/index';
 import { AddCampaignModal } from '@/components/campaigns/AddCampaignModal';
@@ -151,93 +151,70 @@ export function CampaignsScreen() {
   };
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="v2-page-header">
+    <div className="v2-page campaigns-page">
+      <div className="campaigns-page-inner">
+        <header className="campaigns-overview-header">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">Campaigns</h1>
-            <p className="text-text-secondary text-sm mt-1">
-              {isGroupView ? 'Across all entities' : `Showing ${ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity}`}
-            </p>
+            <div className="campaigns-eyebrow">{isGroupView ? 'MTech Group' : ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity}</div>
+            <h1>Campaigns</h1>
+            <p>Plan, monitor and review campaign activity across the selected reporting view.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="campaigns-header-actions">
             <PeriodSelector />
             {isEditor && (
-              <button onClick={() => setShowAddModal(true)} className="btn btn-primary flex items-center gap-2">
+              <button onClick={() => setShowAddModal(true)} className="btn btn-primary campaigns-primary-action">
                 <Plus size={18} />
                 New campaign
               </button>
             )}
           </div>
-        </div>
+        </header>
 
-        {/* Roll-up metrics */}
         {campaigns.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-            <div className="card" style={{ minWidth: 0 }}>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Total Campaigns</p>
-              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{metrics.total}</p>
-            </div>
-            <div className="card" style={{ minWidth: 0 }}>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Active</p>
-              <p className="text-xl md:text-2xl font-bold text-text-primary truncate" style={{ color: 'var(--v2-green)' }}>{metrics.active}</p>
-            </div>
-            <div className="card" style={{ minWidth: 0 }}>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Planned</p>
-              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{metrics.planned}</p>
-            </div>
-            <div className="card" style={{ minWidth: 0 }}>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Completed</p>
-              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{metrics.completed}</p>
-            </div>
-            <div className="card" style={{ minWidth: 0 }}>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Total Budget</p>
-              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{formatCurrency(metrics.budget)}</p>
-            </div>
-            <div className="card" style={{ minWidth: 0 }}>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Total Spend</p>
-              <p className="text-xl md:text-2xl font-bold text-text-primary truncate">{formatCurrency(metrics.spend)}</p>
-              <p className="text-xs text-text-secondary mt-1">{metrics.budget > 0 ? Math.round((metrics.spend / metrics.budget) * 100) : 0}% of budget</p>
-            </div>
+          <div className="campaigns-summary-strip" aria-label="Campaign summary">
+            <div><span>Total campaigns</span><strong>{metrics.total}</strong><small>In this view</small></div>
+            <div><span>Active</span><strong>{metrics.active}</strong><small>Operational status</small></div>
+            <div><span>Planning</span><strong>{metrics.planned}</strong><small>Not yet active</small></div>
+            <div><span>Completed</span><strong>{metrics.completed}</strong><small>Recorded status</small></div>
+            <div><span>Total budget</span><strong>{formatCurrency(metrics.budget)}</strong><small>Campaign records</small></div>
+            <div><span>Known spend</span><strong>{formatCurrency(metrics.spend)}</strong><small>{metrics.budget > 0 ? `${Math.round((metrics.spend / metrics.budget) * 100)}% of recorded budget` : 'No budget recorded'}</small></div>
           </div>
         )}
 
-        {/* Filters */}
         {campaigns.length > 0 && (
-          <div className="flex gap-3 flex-wrap mb-6">
-            <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as CampaignStatus | 'all'); setDisplayedCount(PAGE_SIZE); }} className="input" style={{ maxWidth: 150 }}>
+          <div className="campaigns-toolbar">
+            <label className="campaigns-search">
+              <Search size={17} aria-hidden="true" />
+              <span className="sr-only">Search campaigns</span>
+              <input type="search" placeholder="Search campaigns" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setDisplayedCount(PAGE_SIZE); }} />
+            </label>
+            <div className="campaigns-filter-group">
+            <select aria-label="Filter campaigns by status" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as CampaignStatus | 'all'); setDisplayedCount(PAGE_SIZE); }}>
               <option value="all">All Statuses</option>
               <option value="planning">Planning</option>
               <option value="active">Active</option>
               <option value="on-hold">On Hold</option>
               <option value="completed">Completed</option>
             </select>
-            <select value={filterIndustry} onChange={(e) => { setFilterIndustry(e.target.value); setDisplayedCount(PAGE_SIZE); }} className="input" style={{ maxWidth: 150 }}>
+            <select aria-label="Filter campaigns by industry" value={filterIndustry} onChange={(e) => { setFilterIndustry(e.target.value); setDisplayedCount(PAGE_SIZE); }}>
               <option value="all">All Industries</option>
               {getUniqueIndustries().map((ind) => (
                 <option key={ind} value={ind}>{ind}</option>
               ))}
             </select>
-            <select value={filterVendor} onChange={(e) => { setFilterVendor(e.target.value); setDisplayedCount(PAGE_SIZE); }} className="input" style={{ maxWidth: 150 }}>
+            <select aria-label="Filter campaigns by vendor" value={filterVendor} onChange={(e) => { setFilterVendor(e.target.value); setDisplayedCount(PAGE_SIZE); }}>
               <option value="all">All Vendors</option>
               {getUniqueVendors().map((v) => (
                 <option key={v} value={v}>{getVendorLabel(v)}</option>
               ))}
             </select>
-            <input
-              type="text"
-              placeholder="Search campaigns..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setDisplayedCount(PAGE_SIZE); }}
-              className="input flex-1"
-              style={{ minWidth: 150 }}
-            />
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="input" style={{ maxWidth: 150 }}>
+            <select aria-label="Sort campaigns" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)}>
               <option value="date">Sort by date</option>
               <option value="name">Sort by name</option>
               <option value="spend">Sort by spend</option>
             </select>
+            </div>
+            <span className="campaigns-result-count">{sortedCampaigns.length} campaign{sortedCampaigns.length === 1 ? '' : 's'}</span>
           </div>
         )}
 
@@ -266,21 +243,7 @@ export function CampaignsScreen() {
           <p className="text-text-secondary text-center py-12">No campaigns yet. Create one to get started.</p>
         )}
 
-        {/* Acumatica */}
-        <div
-          className="mt-10"
-          style={{
-            background: 'var(--color-bg)',
-            border: '0.5px solid var(--color-border)',
-            borderRadius: 12,
-            padding: '1.25rem',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '1rem',
-            flexWrap: 'wrap',
-          }}
-        >
+        <aside className="campaigns-acumatica">
           <div>
             <p className="font-semibold text-text-primary" style={{ margin: '0 0 4px' }}>Acumatica integration</p>
             <p className="text-sm text-text-secondary" style={{ margin: 0 }}>
@@ -296,7 +259,7 @@ export function CampaignsScreen() {
           >
             Open Acumatica <ExternalLink size={14} />
           </a>
-        </div>
+        </aside>
       </div>
 
       {showAddModal && <AddCampaignModal onClose={() => setShowAddModal(false)} />}
