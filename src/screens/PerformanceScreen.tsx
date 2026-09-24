@@ -409,23 +409,25 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
   }`;
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
-        <div className="v2-page-header">
+    <div className="v2-page performance-page">
+      <div className="performance-page-inner">
+        <header className="performance-overview-header">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Performance</h1>
-            <p className="text-text-secondary">
-              {isGroupView ? 'Cross-channel, cross-entity reporting across MTech Group' : `Showing ${entityLabel}`}
-            </p>
+            <div className="performance-eyebrow">{isGroupView ? 'MTech Group' : entityLabel}</div>
+            <h1>Performance</h1>
+            <p>A management view of marketing activity, response and separate commercial outcomes.</p>
           </div>
           <PeriodSelector />
-        </div>
+        </header>
 
         {/* Separate measures show the available journey signals without
             implying a linked funnel or a calculable drop-off rate. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Marketing activity and response</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <section className="v2-perf-section performance-summary-section">
+          <div className="performance-section-heading">
+            <div><span>Marketing view</span><h2>Activity and response</h2></div>
+            <p>Independent signals for the selected entity and reporting period.</p>
+          </div>
+          <div className="performance-kpi-strip">
             <KpiCard
               title="Website Users"
               value={websiteUsers.status === 'available' ? websiteUsers.activeUsers : undefined}
@@ -452,15 +454,15 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               onClick={() => onNavigate?.('campaigns')}
             />
           </div>
-          <p className="v2-perf-section-subtitle" style={{ marginTop: 12 }}>
+          <p className="performance-caveat">
             These are separate measures, not linked steps. Known Campaign Spend combines lifetime fixed costs for selected campaigns with available mapped media in the reporting period; it is not spend incurred in that period. Unavailable media is excluded and period spend comparisons are unavailable.
           </p>
-          <div className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="performance-journey-link">
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-1">Where visitors go</h3>
               <p className="text-sm text-text-secondary">Explore entry, viewed and enquiry pages where GA4 reports are available. The reports do not establish a linked visitor path or a drop-off rate.</p>
             </div>
-            <button type="button" className="text-sm font-medium flex items-center gap-1 shrink-0" style={{ color: 'var(--v2-purple)' }} onClick={() => onNavigate?.('website')}>
+            <button type="button" onClick={() => onNavigate?.('website')}>
               Open page journey <ArrowRight size={14} />
             </button>
           </div>
@@ -469,10 +471,13 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
         {/* Overall Commercial Performance — visually distinct from
             Marketing Response: these are real Acumatica opportunities,
             never implied to be caused by a campaign or channel. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Overall Commercial Performance</h2>
+        <section className="v2-perf-section performance-commercial-section">
+          <div className="performance-section-heading">
+            <div><span>Overall CRM</span><h2>Commercial outcomes</h2></div>
+            <p>Acumatica totals are shown as business context and are not attributed to marketing.</p>
+          </div>
           <div className="v2-commercial-panel">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="performance-commercial-strip">
               <KpiCard
                 title="Opportunities"
                 value={acumaticaHasData ? acumaticaSummary!.opportunities : undefined}
@@ -514,7 +519,7 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
                 }
               />
             </div>
-            <p className="v2-perf-section-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
+            <p className="performance-caveat performance-commercial-caveat">
               Acumatica totals are overall commercial results, not attributed to Marketing unless explicitly linked. For a selected period, Won Revenue includes opportunities created in that period whose current Status is Won; it is not revenue won in that period.
             </p>
           </div>
@@ -522,17 +527,20 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
 
         {/* Full entity, campaign and channel breakdowns remain available
             after the headline measures and commercial context. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Explore the detail</h2>
+        <section className="v2-perf-section performance-detail-section">
+          <div className="performance-section-heading">
+            <div><span>Investigate</span><h2>Performance detail</h2></div>
+            <p>Compare entities, channels and campaigns without changing their underlying scope.</p>
+          </div>
           {isGroupView && (
-            <details className="card mb-3">
-              <summary className="text-sm font-medium text-text-primary cursor-pointer">Performance by entity</summary>
-              <div className="mt-3"><PerformanceByBrandTable rows={brandPerformanceRows} /></div>
+            <details className="performance-disclosure" open>
+              <summary>Performance by entity</summary>
+              <div className="performance-disclosure-body"><PerformanceByBrandTable rows={brandPerformanceRows} /></div>
             </details>
           )}
-          <details className="card mb-3">
-            <summary className="text-sm font-medium text-text-primary cursor-pointer">Campaign performance ({periodCampaigns.length})</summary>
-            <div className="mt-3">
+          <details className="performance-disclosure">
+            <summary>Campaign performance ({periodCampaigns.length})</summary>
+            <div className="performance-disclosure-body">
               <CampaignPerformanceTable
                 campaigns={periodCampaigns}
                 wave1Performance={wave1Performance}
@@ -543,9 +551,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
               />
             </div>
           </details>
-          <details className="card mb-3">
-            <summary className="text-sm font-medium text-text-primary cursor-pointer">Channel performance</summary>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mt-3">
+          <details className="performance-disclosure" open>
+            <summary>Channel performance</summary>
+            <div className="performance-channel-grid performance-disclosure-body">
               <KpiCard
                 title="Website"
                 value={websiteUsers.status === 'available' ? `${websiteUsers.activeUsers} users` : undefined}
@@ -609,9 +617,9 @@ export function PerformanceScreen({ onNavigate }: PerformanceScreenProps) {
             </div>
           </details>
 
-          <details className="card v2-perf-coverage">
-            <summary className="text-sm font-medium text-text-primary cursor-pointer">Coverage and data quality</summary>
-            <div className="mt-3"><DataFreshnessBar entries={freshnessEntries} /></div>
+          <details className="performance-disclosure v2-perf-coverage">
+            <summary>Coverage and data quality</summary>
+            <div className="performance-disclosure-body"><DataFreshnessBar entries={freshnessEntries} /></div>
           </details>
         </section>
       </div>
