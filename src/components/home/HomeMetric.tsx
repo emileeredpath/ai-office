@@ -7,6 +7,8 @@ interface HomeMetricProps {
   status?: 'available' | 'not-connected';
   unavailableLabel?: string;
   accent?: string;
+  comparison?: string;
+  comparisonTone?: 'positive' | 'negative' | 'neutral';
   onClick?: () => void;
 }
 
@@ -17,6 +19,8 @@ export function HomeMetric({
   status = 'available',
   unavailableLabel = 'Not connected',
   accent = 'var(--workspace-accent)',
+  comparison,
+  comparisonTone = 'neutral',
   onClick,
 }: HomeMetricProps) {
   const content = (
@@ -26,6 +30,7 @@ export function HomeMetric({
       <strong className={status === 'available' ? 'home-metric-value' : 'home-metric-value home-metric-unavailable'}>
         {status === 'available' ? value : unavailableLabel}
       </strong>
+      {comparison && <span className="home-metric-comparison" data-tone={comparisonTone}>{comparison}</span>}
       {detail && <span className="home-metric-detail">{detail}</span>}
     </>
   );

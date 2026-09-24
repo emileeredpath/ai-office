@@ -1,25 +1,23 @@
-import { getCampaignKnownSpend, LEGACY_COST_LABEL } from '@/utils/campaignCosts';
+import { getCampaignKnownSpend, LEGACY_COST_LABEL, sumKnownCampaignSpend } from '@/utils/campaignCosts';
 import { fetchCampaignCostsFromApi } from '@/services/campaignCostsApi';
 import type { Brand, CampaignCost } from '@/types/index';
 import { getCampaignEntities } from '@/utils/campaignEntities';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Flag, Sparkles, Target } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Flag, Target } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
-import { useAuth } from '@/contexts/AuthContext';
 import { useEntity } from '@/contexts/EntityContext';
-import { usePeriod } from '@/contexts/PeriodContext';
+import { periodStartDate, usePeriod } from '@/contexts/PeriodContext';
 import { PeriodSelector } from '@/components/common/PeriodSelector';
 import { HomeEmptyState } from '@/components/home/HomeEmptyState';
 import { HomeMetric } from '@/components/home/HomeMetric';
-import { HomePanel } from '@/components/home/HomePanel';
 import { HomeSection } from '@/components/home/HomeSection';
-import { formatDate, formatDateShort } from '@/utils/dateUtils';
+import { formatDateShort } from '@/utils/dateUtils';
 import { getCampaignProgressInfo } from '@/utils/campaignProgress';
 import { CAMPAIGN_STATUS_BADGE_STYLE, CAMPAIGN_STATUS_LABEL } from '@/utils/campaignStatus';
 import { getMarketingEvents } from '@/utils/marketingEvents';
 import { resolveGa4DateRange, getWebsiteUsers, getSocialTraffic } from '@/utils/ga4Traffic';
-import { getEnquiries } from '@/utils/ga4Enquiries';
-import { resolveGoogleAdsDateRange, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
+import { getEnquiries, getEnquiriesByChannel } from '@/utils/ga4Enquiries';
+import { resolveGoogleAdsDateRange, getCostPerGa4Enquiry, getGoogleAdsSummary } from '@/utils/googleAdsPerformance';
 import { resolveEmailDateRange, getEmailHeadlineMetrics, getEmailPerformanceForCampaign } from '@/utils/emailPerformance';
 import { resolveCallDateRange, getCallPerformance } from '@/utils/callPerformance';
 import { resolveSearchConsoleDateRange, getSearchConsoleSummary } from '@/utils/searchConsole';
@@ -34,6 +32,7 @@ import { fetchMarketingPlans, fetchMarketingStrategy } from '@/services/marketin
 import type { MarketingPlan, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
 import { filterStrategyForEntity, getMarketingPlanWeekFocus, getQuarterStrategyRows, selectMarketingPlanForCurrentPeriod } from '@/utils/marketingPlanFocus';
 import { getStrategyHealthFindings } from '@/utils/marketingPlanProgress';
+import { filterCampaignsByDateRange, filterCampaignsByPeriod, MARKETING_LEADS_CAVEAT, sumLeads } from '@/utils/campaignMetrics';
 
 interface HomeScreenProps {
   onNavigate?: (screen: string) => void;
@@ -58,6 +57,18 @@ function formatDateRangeLabel(range: { startDate: string; endDate: string }): st
   return `${start.getDate()} ${monthShort(start)} – ${end.getDate()} ${monthShort(end)} ${end.getFullYear()}`;
 }
 
+function formatComparison(comparison: ReturnType<typeof compareToPrevious>): string | undefined {
+  if (!comparison || comparison.previous === null || comparison.absoluteChange === null) return undefined;
+  const sign = comparison.absoluteChange > 0 ? '+' : '';
+  const percent = comparison.percentChange === null ? '' : ` (${comparison.percentChange > 0 ? '+' : ''}${comparison.percentChange}%)`;
+  return `${sign}${comparison.absoluteChange.toLocaleString('en-GB')}${percent} vs previous period`;
+}
+
+function comparisonTone(comparison: ReturnType<typeof compareToPrevious>): 'positive' | 'negative' | 'neutral' {
+  if (!comparison || comparison.absoluteChange === null || comparison.absoluteChange === 0) return 'neutral';
+  return comparison.absoluteChange > 0 ? 'positive' : 'negative';
+}
+
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const tasks = useAppStore((s) => s.tasks);
   const campaigns = useAppStore((s) => s.campaigns);
@@ -79,7 +90,6 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const syncSearchConsolePerformance = useAppStore((s) => s.syncSearchConsolePerformance);
   const selectTask = useAppStore((s) => s.selectTask);
   const selectCampaign = useAppStore((s) => s.selectCampaign);
-  const { isEditor } = useAuth();
   const { selectedEntity, isGroupView, matchesSelectedEntity } = useEntity();
   const { period } = usePeriod();
 
@@ -182,6 +192,12 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     () => fundingRecords.filter((r) => matchesSelectedEntity(r.brand)),
     [fundingRecords, selectedEntity] // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const periodStart = useMemo(() => periodStartDate(period), [period]);
+  const periodCampaigns = useMemo(
+    () => filterCampaignsByPeriod(entityCampaigns, periodStart),
+    [entityCampaigns, periodStart]
+  );
+  const marketingLeads = useMemo(() => sumLeads(periodCampaigns), [periodCampaigns]);
   // Campaign rows use lifetime costs and the existing all-time media range.
   // Keep these reads separate from the period-scoped Google Ads headline.
   const [homeCampaignCosts, setHomeCampaignCosts] = useState<CampaignCost[] | null>(null);
@@ -197,6 +213,10 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       .catch(() => { if (!cancelled) setCampaignSpendAds(null); });
     return () => { cancelled = true; };
   }, []);
+  const marketingSpendInfo = useMemo(
+    () => homeCampaignCosts === null ? null : sumKnownCampaignSpend(periodCampaigns, homeCampaignCosts, googleAdsPerformance),
+    [periodCampaigns, homeCampaignCosts, googleAdsPerformance]
+  );
 
   // ---- Marketing Performance KPIs ----------------------------------------
   const ga4EnquiriesInfo = useMemo(
@@ -226,6 +246,14 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const socialTraffic = useMemo(
     () => getSocialTraffic(ga4SocialTraffic, isGroupView, selectedEntity),
     [ga4SocialTraffic, isGroupView, selectedEntity]
+  );
+  const enquiryChannels = useMemo(
+    () => getEnquiriesByChannel(ga4Enquiries, isGroupView, selectedEntity),
+    [ga4Enquiries, isGroupView, selectedEntity]
+  );
+  const costPerGa4Enquiry = useMemo(
+    () => getCostPerGa4Enquiry(googleAdsPerformance, ga4Enquiries, isGroupView, selectedEntity),
+    [googleAdsPerformance, ga4Enquiries, isGroupView, selectedEntity]
   );
 
   // ---- Previous-period comparisons ---------------------------------------
@@ -271,6 +299,15 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
       previousRange && previousInfo.status === 'available' ? previousInfo.spend! : null
     );
   }, [googleAds, previousGoogleAds, previousRange, isGroupView, selectedEntity]);
+
+  const previousPeriodCampaigns = useMemo(() => {
+    if (!previousRange) return [];
+    return filterCampaignsByDateRange(entityCampaigns, new Date(previousRange.startDate), new Date(previousRange.endDate));
+  }, [entityCampaigns, previousRange]);
+  const marketingLeadsComparison = useMemo(
+    () => compareToPrevious(marketingLeads, previousRange ? sumLeads(previousPeriodCampaigns) : null),
+    [marketingLeads, previousPeriodCampaigns, previousRange]
+  );
 
   // ---- Marketing Focus ----------------------------------------------------
   // This is derived only from saved Marketing Plan records. Empty or failed
@@ -438,189 +475,184 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
   const allCampaignsNeedingAction = activeCampaigns.filter(({ nextAction }) => nextAction);
   const campaignsNeedingAction = allCampaignsNeedingAction.slice(0, 3);
 
-  const today = new Date();
-  const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
-  const dateStr = formatDate(today);
-  const userName = isEditor ? 'Emilee' : 'John';
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
+  const entityLabel = isGroupView || selectedEntity === 'all' ? 'MTech Group' : BRAND_LABEL[selectedEntity as Brand];
+  const acquisitionMax = enquiryChannels.status === 'available'
+    ? Math.max(1, ...enquiryChannels.buckets.map((bucket) => bucket.count))
+    : 1;
+  const enquiryTrendMax = Math.max(
+    1,
+    ga4EnquiriesComparison?.current ?? 0,
+    ga4EnquiriesComparison?.previous ?? 0
+  );
+  const crmAvailable = acumaticaSummary?.hasImportedData && !acumaticaNotAvailable;
 
   return (
     <div className="v2-page home-page">
       <div className="home-page-inner">
-        <header className="home-hero">
+        <header className="home-overview-header">
           <div>
-            <div className="home-eyebrow">Marketing control centre</div>
-            <h1>{getGreeting()}, {userName}</h1>
-            <p>{dayName} {dateStr} · Focus, performance and action across MTech marketing.</p>
+            <div className="home-eyebrow">{entityLabel}</div>
+            <h1>Marketing Overview</h1>
+            <p>A clear view of performance, acquisition, campaigns and commercial outcomes.</p>
           </div>
-          <div className="home-period-control">
+          <div className="home-header-controls">
             <PeriodSelector />
-            {currentRange && (
-              <div className="home-period-label">
-                <span>{formatDateRangeLabel(currentRange)}</span>
-                {previousRange && <span> · compared with {formatDateRangeLabel(previousRange)}</span>}
-              </div>
-            )}
+            <div className="home-freshness">
+              <span className="home-freshness-dot" />
+              <span>Reporting data through {formatDateShort(ga4Range.endDate)}</span>
+            </div>
+            {currentRange && <small>{formatDateRangeLabel(currentRange)}{previousRange ? ` · compared with ${formatDateRangeLabel(previousRange)}` : ''}</small>}
           </div>
         </header>
 
         <HomeSection
-          eyebrow="Direction"
-          title="Marketing Focus"
-          description="Current priorities from the saved Marketing Plan. No placeholder objectives or tasks are added here."
-          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('marketing-plan')}>Open Marketing Plan <ArrowRight size={14} /></button>}
+          title="Headline performance"
+          description="The measures needed for a fast daily read. Each figure keeps its own source and scope."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('dashboard')}>View performance <ArrowRight size={14} /></button>}
         >
-          <div className="home-focus-grid">
-            <HomePanel title="Current quarter" eyebrow={marketingPlan && quarterFocus ? `Q${quarterFocus.quarter} ${marketingPlan.periodYear}` : undefined} variant="accent">
-              {marketingFocusLoading ? <HomeEmptyState>Loading the saved plan…</HomeEmptyState>
-                : marketingFocusUnavailable ? <HomeEmptyState>Marketing Plan data is unavailable right now.</HomeEmptyState>
-                : !marketingPlan ? <HomeEmptyState>No Marketing Plan has been created yet.</HomeEmptyState>
-                : !quarterFocus?.rows.length ? <HomeEmptyState>No objectives are assigned to Q{quarterFocus?.quarter} {marketingPlan.periodYear} for this entity.</HomeEmptyState>
-                : <div className="home-focus-list">{quarterFocus.rows.slice(0, 3).map((row) => (
-                    <button key={row.objective.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item">
-                      <Target size={16} />
-                      <span><strong>{row.objective.title}</strong><small>{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</small></span>
-                    </button>
-                  ))}</div>}
-            </HomePanel>
-
-            <HomePanel title="This week">
-              {marketingFocusLoading ? <HomeEmptyState>Loading the saved plan…</HomeEmptyState>
-                : marketingFocusUnavailable ? <HomeEmptyState>Weekly focus is unavailable until the plan can be loaded.</HomeEmptyState>
-                : !marketingPlan ? <HomeEmptyState>Create the Marketing Plan to set this week’s focus.</HomeEmptyState>
-                : !weekFocus?.items.length ? <HomeEmptyState>Nothing in the plan needs attention this week.</HomeEmptyState>
-                : <div className="home-focus-list">{weekFocus.items.slice(0, 3).map((item) => (
-                    <button key={item.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item" data-overdue={item.overdue}>
-                      <CalendarDays size={16} />
-                      <span><strong>{item.title}</strong><small>{item.kind} · {item.detail}</small></span>
-                    </button>
-                  ))}</div>}
-            </HomePanel>
-
-            <HomePanel title="Plan attention" variant="attention">
-              {marketingFocusLoading ? <HomeEmptyState>Checking the saved plan…</HomeEmptyState>
-                : marketingFocusUnavailable ? <HomeEmptyState>Attention checks are unavailable until the plan can be loaded.</HomeEmptyState>
-                : !marketingPlan ? <HomeEmptyState>No saved plan is available to check.</HomeEmptyState>
-                : !strategyAttention.length ? <div className="home-positive-state"><CheckCircle2 size={17} />No factual gaps found for this entity.</div>
-                : <div className="home-focus-list">{strategyAttention.map((item) => (
-                    <button key={item.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item" data-attention="true">
-                      <Flag size={16} />
-                      <span><strong>{item.title}</strong><small>{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</small></span>
-                    </button>
-                  ))}</div>}
-            </HomePanel>
-          </div>
-        </HomeSection>
-
-        <HomeSection
-          eyebrow="Selected reporting view"
-          title="Headline Performance"
-          description="A restrained view of independent measures. Won Revenue reflects the latest Acumatica export because no trustworthy Won Date is available."
-          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('dashboard')}>Full performance <ArrowRight size={14} /></button>}
-        >
-          <div className="home-metric-grid">
-            <HomeMetric label="Website enquiries" value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined} status={ga4EnquiriesInfo.status} detail={ga4EnquiriesInfo.subtitle} onClick={() => onNavigate?.('website')} />
+          <div className="home-kpi-strip">
+            <HomeMetric label="Marketing leads" value={marketingLeads} detail={MARKETING_LEADS_CAVEAT} comparison={formatComparison(marketingLeadsComparison)} comparisonTone={comparisonTone(marketingLeadsComparison)} onClick={() => onNavigate?.('leads')} />
+            <HomeMetric label="Website enquiries" value={ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : undefined} status={ga4EnquiriesInfo.status} detail={ga4EnquiriesInfo.subtitle} comparison={formatComparison(ga4EnquiriesComparison)} comparisonTone={comparisonTone(ga4EnquiriesComparison)} onClick={() => onNavigate?.('website')} />
             <HomeMetric label="Calls" value={callPerformance.status === 'available' ? callPerformance.totalCalls : undefined} status={callPerformance.status} detail={callPerformance.subtitle} onClick={() => onNavigate?.('infinity')} />
-            <HomeMetric label="Google Ads spend" value={googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : undefined} status={googleAds.status} detail={googleAds.subtitle} onClick={() => onNavigate?.('ppc')} />
-            <HomeMetric
-              label="Won revenue"
-              value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined}
-              status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'}
-              unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}
-              detail={acumaticaNotAvailable ? `Not available — ${acumaticaSummary?.notAvailableReason}` : acumaticaSummary?.hasImportedData ? 'Latest Acumatica export · not period scoped' : acumaticaMissingLabel}
-              onClick={() => onNavigate?.('leads')}
-            />
+            <HomeMetric label="Marketing spend" value={marketingSpendInfo ? `£${Math.round(marketingSpendInfo.total).toLocaleString()}` : undefined} status={marketingSpendInfo ? 'available' : 'not-connected'} unavailableLabel="Not available" detail={marketingSpendInfo ? `Known Campaign Spend · ${marketingSpendInfo.hasLegacyFallback ? 'includes legacy cost' : 'canonical costs'}` : 'Campaign costs unavailable'} onClick={() => onNavigate?.('campaigns')} />
+            <HomeMetric label="Opportunities" value={crmAvailable ? acumaticaSummary.opportunities : undefined} status={crmAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail={crmAvailable ? 'Overall CRM · latest export' : acumaticaMissingLabel} onClick={() => onNavigate?.('leads')} />
+            <HomeMetric label="Open pipeline" value={crmAvailable ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined} status={crmAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail="Overall CRM · Status Open + Status New" onClick={() => onNavigate?.('leads')} />
+            <HomeMetric label="Won revenue" value={crmAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined} status={crmAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail="Overall CRM · latest export · no trustworthy Won Date" onClick={() => onNavigate?.('leads')} />
+          </div>
+        </HomeSection>
+
+        <div className="home-primary-grid">
+          <HomeSection
+            title="Where people are coming from"
+            description="Website enquiries by GA4 session channel. No source is inferred or renamed."
+            action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('website')}>View acquisition <ArrowRight size={14} /></button>}
+            className="home-acquisition-section"
+          >
+            <div className="home-measure-label">Measure <strong>Website enquiries</strong></div>
+            {enquiryChannels.status === 'available' ? (
+              enquiryChannels.buckets.length > 0 ? <div className="home-acquisition-list">{enquiryChannels.buckets.slice(0, 8).map((bucket) => (
+                <div className="home-acquisition-row" key={bucket.channelGroup}>
+                  <span>{bucket.channelGroup}</span>
+                  <div className="home-acquisition-track"><span style={{ width: `${Math.max(3, (bucket.count / acquisitionMax) * 100)}%` }} /></div>
+                  <strong>{bucket.count.toLocaleString('en-GB')}</strong>
+                </div>
+              ))}</div> : <HomeEmptyState>0 website enquiries were recorded for this selection and period.</HomeEmptyState>
+            ) : <HomeEmptyState>{enquiryChannels.subtitle}</HomeEmptyState>}
+          </HomeSection>
+
+          <HomeSection
+            title="Performance trend"
+            description="Website enquiries for the selected period against the previous comparable period."
+            className="home-trend-section"
+          >
+            {ga4EnquiriesComparison && ga4EnquiriesComparison.previous !== null ? (
+              <div className="home-trend-chart" role="img" aria-label={`Website enquiries: ${ga4EnquiriesComparison.current} current period and ${ga4EnquiriesComparison.previous} previous period`}>
+                <div className="home-trend-summary">
+                  <strong>{formatComparison(ga4EnquiriesComparison)}</strong>
+                  <span>GA4 verified enquiry events</span>
+                </div>
+                <div className="home-trend-row"><span>Previous</span><div><i style={{ width: `${(ga4EnquiriesComparison.previous / enquiryTrendMax) * 100}%` }} /></div><strong>{ga4EnquiriesComparison.previous}</strong></div>
+                <div className="home-trend-row" data-current="true"><span>Current</span><div><i style={{ width: `${(ga4EnquiriesComparison.current / enquiryTrendMax) * 100}%` }} /></div><strong>{ga4EnquiriesComparison.current}</strong></div>
+              </div>
+            ) : <HomeEmptyState>{ga4EnquiriesInfo.status === 'available' ? 'Previous-period comparison is not available for this selection.' : ga4EnquiriesInfo.subtitle}</HomeEmptyState>}
+          </HomeSection>
+        </div>
+
+        <HomeSection title="Channel performance" description="A concise read of each major channel, with direct access to the specialist workspace.">
+          <div className="home-channel-grid">
+            <article className="home-channel-summary">
+              <div><span className="home-channel-kicker">PPC</span><h3>Paid search</h3></div>
+              <dl><div><dt>Spend</dt><dd>{googleAds.status === 'available' ? `£${Math.round(googleAds.spend!).toLocaleString()}` : 'Not connected'}</dd></div><div><dt>Clicks</dt><dd>{googleAds.status === 'available' ? googleAds.clicks!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>GA4 enquiries</dt><dd>{costPerGa4Enquiry.status === 'available' ? costPerGa4Enquiry.ga4Enquiries!.toLocaleString('en-GB') : 'Not available'}</dd></div><div><dt>Cost / enquiry</dt><dd>{costPerGa4Enquiry.status === 'available' && costPerGa4Enquiry.costPerEnquiry !== null ? `£${costPerGa4Enquiry.costPerEnquiry!.toLocaleString('en-GB')}` : 'Not available'}</dd></div></dl>
+              <p className="home-channel-note">{formatComparison(googleAdsSpendComparison) ?? googleAds.subtitle}</p>
+              <button type="button" onClick={() => onNavigate?.('ppc')}>View PPC <ArrowRight size={14} /></button>
+            </article>
+            <article className="home-channel-summary">
+              <div><span className="home-channel-kicker">SEO / ORGANIC</span><h3>Organic search</h3></div>
+              <dl><div><dt>Organic clicks</dt><dd>{searchConsole.status === 'available' ? searchConsole.clicks!.toLocaleString('en-GB') : 'Not connected'}</dd></div><div><dt>Impressions</dt><dd>{searchConsole.status === 'available' ? searchConsole.impressions!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>CTR</dt><dd>{searchConsole.status === 'available' && searchConsole.ctr !== null ? `${searchConsole.ctr}%` : 'Not available'}</dd></div><div><dt>Website users</dt><dd>{websiteUsers.status === 'available' ? websiteUsers.activeUsers!.toLocaleString('en-GB') : 'Not connected'}</dd></div></dl>
+              <button type="button" onClick={() => onNavigate?.('website')}>View Website &amp; SEO <ArrowRight size={14} /></button>
+            </article>
+            <article className="home-channel-summary">
+              <div><span className="home-channel-kicker">CALL TRACKING</span><h3>Calls</h3></div>
+              <dl><div><dt>Total calls</dt><dd>{callPerformance.status === 'available' ? callPerformance.totalCalls!.toLocaleString('en-GB') : 'Not connected'}</dd></div><div><dt>Answered</dt><dd>{callPerformance.status === 'available' ? callPerformance.answeredCalls!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>Missed</dt><dd>{callPerformance.status === 'available' ? callPerformance.missedCalls!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>Average duration</dt><dd>{callPerformance.status === 'available' ? callPerformance.avgDuration : 'Not available'}</dd></div></dl>
+              <button type="button" onClick={() => onNavigate?.('infinity')}>View Calls <ArrowRight size={14} /></button>
+            </article>
+            <article className="home-channel-summary">
+              <div><span className="home-channel-kicker">EMAIL</span><h3>Email performance</h3></div>
+              <dl><div><dt>Sends</dt><dd>{emailHeadline.status === 'available' ? emailHeadline.campaignsSent!.toLocaleString('en-GB') : 'Not connected'}</dd></div><div><dt>Recipients</dt><dd>{emailHeadline.status === 'available' ? emailHeadline.recipients!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>Clicks</dt><dd>{emailHeadline.status === 'available' ? emailHeadline.clicks!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>Click rate</dt><dd>{emailHeadline.status === 'available' && emailHeadline.clickRate !== null ? `${emailHeadline.clickRate}%` : 'Not available'}</dd></div></dl>
+              <button type="button" onClick={() => onNavigate?.('email')}>View Email <ArrowRight size={14} /></button>
+            </article>
+            <article className="home-channel-summary home-channel-summary-wide">
+              <div><span className="home-channel-kicker">SOCIAL</span><h3>Social website traffic</h3></div>
+              <dl><div><dt>Sessions</dt><dd>{socialTraffic.status === 'available' ? socialTraffic.sessions!.toLocaleString('en-GB') : 'Not connected'}</dd></div><div><dt>Users</dt><dd>{socialTraffic.status === 'available' ? socialTraffic.users!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>Organic sessions</dt><dd>{socialTraffic.status === 'available' ? socialTraffic.organicSessions!.toLocaleString('en-GB') : '—'}</dd></div><div><dt>Paid sessions</dt><dd>{socialTraffic.status === 'available' ? socialTraffic.paidSessions!.toLocaleString('en-GB') : '—'}</dd></div></dl>
+              <button type="button" onClick={() => onNavigate?.('social')}>View Social <ArrowRight size={14} /></button>
+            </article>
           </div>
         </HomeSection>
 
         <HomeSection
-          eyebrow="Live activity"
-          title="Active Campaigns"
-          description="Genuine campaign records, their canonical entity membership and lifetime known campaign spend."
+          title="Marketing to commercial journey"
+          description="Marketing response and manually logged leads are shown separately from overall Acumatica outcomes."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('leads')}>View CRM <ArrowRight size={14} /></button>}
+        >
+          <div className="home-journey">
+            <div className="home-journey-stage"><span>Marketing response</span><strong>{ga4EnquiriesInfo.status === 'available' ? ga4EnquiriesInfo.total : 'Not connected'}</strong><small>{callPerformance.status === 'available' ? `Plus ${callPerformance.totalCalls} tracked calls` : 'Calls not connected'}</small></div>
+            <ArrowRight aria-hidden="true" />
+            <div className="home-journey-stage"><span>Marketing leads</span><strong>{marketingLeads}</strong><small>{MARKETING_LEADS_CAVEAT}</small></div>
+            <div className="home-journey-boundary"><span>Overall CRM</span><small>Not attributed to marketing</small></div>
+            <div className="home-journey-stage"><span>Opportunities</span><strong>{crmAvailable ? acumaticaSummary.opportunities : acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}</strong><small>Latest Acumatica export</small></div>
+            <ArrowRight aria-hidden="true" />
+            <div className="home-journey-stage"><span>Open pipeline</span><strong>{crmAvailable ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}</strong><small>Status Open + Status New</small></div>
+            <ArrowRight aria-hidden="true" />
+            <div className="home-journey-stage"><span>Won revenue</span><strong>{crmAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline}</strong><small>No trustworthy Won Date</small></div>
+          </div>
+        </HomeSection>
+
+        <HomeSection
+          title="Campaign performance"
+          description="What is running, what it costs and which genuine response signals are linked."
           action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('campaigns')}>View all campaigns <ArrowRight size={14} /></button>}
         >
-          {activeCampaigns.length > 0 ? (
-            <HomePanel className="home-campaign-panel">
-              <div className="home-campaign-table-wrap">
-                <table className="home-campaign-table">
-                  <thead><tr><th>Campaign</th><th>Entity</th><th>Status</th><th>Timing</th><th>Known spend</th></tr></thead>
-                  <tbody>{activeCampaigns.slice(0, 6).map(({ campaign: c, progress, spendInfo }) => (
-                    <tr
-                      key={c.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => selectCampaign(c.id)}
-                      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCampaign(c.id); } }}
-                    >
-                      <td><strong>{c.name}</strong>{progress.statusInconsistent && <small className="home-campaign-warning">Review status</small>}</td>
-                      <td><div className="home-entity-list">{getCampaignEntities(c).map((entity) => <span key={entity}>{BRAND_LABEL[entity]}</span>)}</div></td>
-                      <td><span className="home-status-pill" style={CAMPAIGN_STATUS_BADGE_STYLE[c.status]}>{CAMPAIGN_STATUS_LABEL[c.status]}</span></td>
-                      <td><span>{formatDateShort(c.startDate)} – {formatDateShort(c.endDate)}</span></td>
-                      <td>{spendInfo ? <><strong>£{Math.round(spendInfo.knownCampaignSpend).toLocaleString()}</strong>{spendInfo.isLegacyFallback && <small>{LEGACY_COST_LABEL}</small>}{spendInfo.mediaSpendStatus !== 'available' && <small>Media {spendInfo.mediaSpendStatus === 'unmapped' ? 'unmapped' : 'not connected'}</small>}</> : <span className="home-unavailable">Costs unavailable</span>}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-              {activeCampaigns.length > 6 && <div className="home-table-note">Showing 6 of {activeCampaigns.length} active campaigns.</div>}
-            </HomePanel>
-          ) : <HomeEmptyState>No active campaigns{isGroupView ? '' : ' for this entity'}.</HomeEmptyState>}
+          {activeCampaigns.length > 0 ? <div className="home-campaign-table-shell"><div className="home-campaign-table-wrap"><table className="home-campaign-table">
+            <thead><tr><th>Campaign</th><th>Entity</th><th>Status</th><th>Spend</th><th>Response</th><th>Leads</th><th>Performance</th></tr></thead>
+            <tbody>{activeCampaigns.slice(0, 6).map(({ campaign: c, progress, spendInfo, response, nextAction }) => (
+              <tr key={c.id} role="button" tabIndex={0} onClick={() => selectCampaign(c.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCampaign(c.id); } }}>
+                <td><strong>{c.name}</strong><small>{formatDateShort(c.startDate)} – {formatDateShort(c.endDate)}</small></td>
+                <td><div className="home-entity-list">{getCampaignEntities(c).map((entity) => <span key={entity}>{BRAND_LABEL[entity]}</span>)}</div></td>
+                <td><span className="home-status-pill" style={CAMPAIGN_STATUS_BADGE_STYLE[c.status]}>{CAMPAIGN_STATUS_LABEL[c.status]}</span>{progress.statusInconsistent && <small className="home-campaign-warning">Review status</small>}</td>
+                <td>{spendInfo ? <><strong>£{Math.round(spendInfo.knownCampaignSpend).toLocaleString()}</strong>{spendInfo.isLegacyFallback && <small>{LEGACY_COST_LABEL}</small>}{spendInfo.mediaSpendStatus !== 'available' && <small>Media {spendInfo.mediaSpendStatus === 'unmapped' ? 'unmapped' : 'not connected'}</small>}</> : <span className="home-unavailable">Not available</span>}</td>
+                <td>{response ? <button type="button" className="home-inline-link" onClick={(event) => { event.stopPropagation(); response.onClick?.(); }}>{response.label}</button> : <span className="home-unavailable">Not available</span>}</td>
+                <td><strong>{(c.leads || 0).toLocaleString('en-GB')}</strong><small>Manually logged</small></td>
+                <td><span className="home-performance-state" data-attention={Boolean(nextAction)}>{nextAction ?? (response ? 'Response recorded' : 'Not available')}</span></td>
+              </tr>
+            ))}</tbody>
+          </table></div>{activeCampaigns.length > 6 && <div className="home-table-note">Showing 6 of {activeCampaigns.length} active campaigns.</div>}</div>
+          : <HomeEmptyState>No active campaigns{isGroupView ? '' : ' for this entity'}.</HomeEmptyState>}
         </HomeSection>
 
         <HomeSection
-          eyebrow="Commercial context"
-          title="Commercial Performance"
-          description="Marketing response and commercial outcomes are related views, not deterministic campaign attribution."
-          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('leads')}>Open CRM <ArrowRight size={14} /></button>}
+          title="Plan and priorities"
+          description="A compact view of the saved Marketing Plan. No objective or target is invented."
+          action={<button type="button" className="home-text-action" onClick={() => onNavigate?.('marketing-plan')}>Open Marketing Plan <ArrowRight size={14} /></button>}
         >
-          <HomePanel variant="commercial">
-            <div className="home-commercial-context">
-              <div><span>Marketing response</span><strong>{ga4EnquiriesInfo.status === 'available' ? `${ga4EnquiriesInfo.total} website enquiries` : 'Website enquiries unavailable'} · {callPerformance.status === 'available' ? `${callPerformance.totalCalls} calls` : 'calls unavailable'}</strong><small>Selected reporting period</small></div>
-              <ArrowRight size={18} aria-hidden="true" />
-              <div><span>Overall CRM outcomes</span><strong>Latest Acumatica manual export</strong><small>Not attributed to marketing and not period scoped</small></div>
-            </div>
-            <div className="home-commercial-metrics">
-              <HomeMetric label="Opportunities" value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? acumaticaSummary.opportunities : undefined} status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'Latest Acumatica export' : acumaticaNotAvailable ? acumaticaSummary?.notAvailableReason ?? undefined : acumaticaMissingLabel} />
-              <HomeMetric label="Open pipeline" value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.openPipelineValue).toLocaleString()}` : undefined} status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail="Status Open + Status New" />
-              <HomeMetric label="Won revenue" value={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? `£${Math.round(acumaticaSummary.wonRevenue).toLocaleString()}` : undefined} status={acumaticaSummary?.hasImportedData && !acumaticaNotAvailable ? 'available' : 'not-connected'} unavailableLabel={acumaticaNotAvailable ? 'Not available' : acumaticaMissingHeadline} detail="Latest export · no trustworthy Won Date" />
-            </div>
-          </HomePanel>
-        </HomeSection>
-
-        <HomeSection eyebrow="Action" title="Needs Attention & Upcoming" description="Campaign, calendar, funding, data and Marketing Plan items derived from genuine records.">
-          <div className="home-action-grid">
-            <HomePanel title="Needs attention" eyebrow={attentionTotal > 0 ? `${attentionTotal} item${attentionTotal === 1 ? '' : 's'}` : undefined} variant="attention">
-              {attentionCategories.length > 0 ? <div className="home-action-list">{attentionCategories.map((category) => (
-                <button key={category.id} type="button" onClick={category.items[0]?.onClick} data-severity={category.severity}>
-                  <AlertTriangle size={16} />
-                  <span><strong>{category.items.length} {category.label(category.items.length)}</strong>{category.items[0] && <small>{category.items[0].title} — {category.items[0].detail}</small>}</span>
-                  <ArrowRight size={14} />
-                </button>
-              ))}</div> : <div className="home-positive-state"><CheckCircle2 size={17} />Nothing urgent right now.</div>}
-            </HomePanel>
-
-            <HomePanel title="Upcoming" eyebrow={`Next ${COMING_UP_DAYS} days`}>
-              {comingUp.length > 0 ? <div className="home-action-list">{comingUp.map((item) => (
-                <button key={item.id} type="button" onClick={item.onClick}>
-                  <CalendarDays size={16} />
-                  <span><strong>{item.title}</strong><small>{comingUpKindLabel[item.kind] ?? 'Event'} · {formatDateShort(item.due)}{item.context ? ` · ${item.context}` : ''}</small></span>
-                  <ArrowRight size={14} />
-                </button>
-              ))}</div> : <HomeEmptyState>Nothing scheduled in the next {COMING_UP_DAYS} days.</HomeEmptyState>}
-              <button type="button" className="home-text-action home-panel-link" onClick={() => onNavigate?.('calendar')}>Open Calendar <ArrowRight size={14} /></button>
-            </HomePanel>
+          <div className="home-plan-layout">
+            <section><div className="home-list-heading"><h3>Current quarter</h3>{marketingPlan && quarterFocus && <span>Q{quarterFocus.quarter} {marketingPlan.periodYear}</span>}</div>
+              {marketingFocusLoading ? <HomeEmptyState>Loading the saved plan…</HomeEmptyState> : marketingFocusUnavailable ? <HomeEmptyState>Marketing Plan data is unavailable right now.</HomeEmptyState> : !marketingPlan ? <HomeEmptyState>No Marketing Plan has been created yet.</HomeEmptyState> : !quarterFocus?.rows.length ? <HomeEmptyState>No objectives are assigned for this entity.</HomeEmptyState> : <div className="home-focus-list">{quarterFocus.rows.slice(0, 4).map((row) => <button key={row.objective.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item"><Target size={16} /><span><strong>{row.objective.title}</strong><small>{row.priorities.length} priorit{row.priorities.length === 1 ? 'y' : 'ies'} · {row.campaignLinks.length} linked campaign{row.campaignLinks.length === 1 ? '' : 's'}</small></span></button>)}</div>}
+            </section>
+            <section><div className="home-list-heading"><h3>This week</h3></div>
+              {marketingFocusLoading ? <HomeEmptyState>Loading the saved plan…</HomeEmptyState> : !marketingPlan ? <HomeEmptyState>Create the Marketing Plan to set this week’s focus.</HomeEmptyState> : !weekFocus?.items.length ? <HomeEmptyState>Nothing in the plan needs attention this week.</HomeEmptyState> : <div className="home-focus-list">{weekFocus.items.slice(0, 3).map((item) => <button key={item.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item" data-overdue={item.overdue}><CalendarDays size={16} /><span><strong>{item.title}</strong><small>{item.kind} · {item.detail}</small></span></button>)}</div>}
+            </section>
+            <section><div className="home-list-heading"><h3>Plan attention</h3></div>
+              {marketingFocusLoading ? <HomeEmptyState>Checking the saved plan…</HomeEmptyState> : !marketingPlan ? <HomeEmptyState>No saved plan is available to check.</HomeEmptyState> : !strategyAttention.length ? <div className="home-positive-state"><CheckCircle2 size={17} />No factual gaps found for this entity.</div> : <div className="home-focus-list">{strategyAttention.map((item) => <button key={item.id} type="button" onClick={() => onNavigate?.('marketing-plan')} className="home-focus-item" data-attention="true"><Flag size={16} /><span><strong>{item.title}</strong><small>{entityStrategy.find((row) => row.objective.id === item.objectiveId)?.objective.title} · {item.detail}</small></span></button>)}</div>}
+            </section>
           </div>
         </HomeSection>
 
-        <aside className="home-ai-reserve" aria-label="Future Ask AI Office area">
-          <Sparkles size={18} />
-          <div><strong>Ask AI Office</strong><span>Reserved for a future conversational layer. It is not connected yet.</span></div>
-          <span className="home-ai-status">Future</span>
-        </aside>
+        <HomeSection title="Needs attention and coming up" description="Only genuine campaign, calendar, funding, data and plan items.">
+          <div className="home-action-grid">
+            <section className="home-action-section"><div className="home-list-heading"><h3>Needs attention</h3>{attentionTotal > 0 && <span>{attentionTotal} items</span>}</div>{attentionCategories.length > 0 ? <div className="home-action-list">{attentionCategories.map((category) => <button key={category.id} type="button" onClick={category.items[0]?.onClick} data-severity={category.severity}><AlertTriangle size={16} /><span><strong>{category.items.length} {category.label(category.items.length)}</strong>{category.items[0] && <small>{category.items[0].title} — {category.items[0].detail}</small>}</span><ArrowRight size={14} /></button>)}</div> : <div className="home-positive-state"><CheckCircle2 size={17} />Nothing urgent right now.</div>}</section>
+            <section className="home-action-section"><div className="home-list-heading"><h3>Coming up</h3><span>Next {COMING_UP_DAYS} days</span></div>{comingUp.length > 0 ? <div className="home-action-list">{comingUp.map((item) => <button key={item.id} type="button" onClick={item.onClick}><CalendarDays size={16} /><span><strong>{item.title}</strong><small>{comingUpKindLabel[item.kind] ?? 'Event'} · {formatDateShort(item.due)}{item.context ? ` · ${item.context}` : ''}</small></span><ArrowRight size={14} /></button>)}</div> : <HomeEmptyState>Nothing scheduled in the next {COMING_UP_DAYS} days.</HomeEmptyState>}<button type="button" className="home-text-action home-panel-link" onClick={() => onNavigate?.('calendar')}>Open Calendar <ArrowRight size={14} /></button></section>
+          </div>
+        </HomeSection>
       </div>
     </div>
   );
