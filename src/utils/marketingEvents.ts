@@ -6,7 +6,7 @@ import { Brand, Campaign, FundingRecord, Task } from '@/types/index';
 // single place that reads real tasks/campaign milestones/funding deadlines
 // consistently instead of three slightly-different copies of the same
 // merge-and-sort logic.
-export type MarketingEventKind = 'task' | 'email' | 'milestone' | 'funding' | 'campaign-start' | 'campaign-end';
+export type MarketingEventKind = 'task' | 'email' | 'milestone' | 'funding' | 'campaign-start' | 'campaign-end' | 'plan-milestone' | 'plan-review';
 
 export interface MarketingEvent {
   id: string;
@@ -18,6 +18,9 @@ export interface MarketingEvent {
   campaignName?: string;
   taskId?: string;
   fundingId?: string;
+  planId?: string;
+  objectiveId?: string;
+  milestoneId?: string;
   subtitle?: string;
   completed?: boolean;
   colour?: string; // campaign's own colour, for campaign-start/end markers

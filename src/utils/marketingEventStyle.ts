@@ -1,4 +1,4 @@
-import { CheckSquare, Mail, Flag, Landmark, Rocket, FlagOff, type LucideIcon } from 'lucide-react';
+import { CheckSquare, Mail, Flag, Landmark, Rocket, FlagOff, Target, CalendarCheck2, type LucideIcon } from 'lucide-react';
 import type { MarketingEventKind } from '@/utils/marketingEvents';
 
 // Restrained, consistent visual categories for the calendar — deliberately
@@ -10,6 +10,8 @@ export const EVENT_KIND_LABEL: Record<MarketingEventKind, string> = {
   funding: 'Funding',
   'campaign-start': 'Campaign start',
   'campaign-end': 'Campaign end',
+  'plan-milestone': 'Plan milestone',
+  'plan-review': 'Plan review',
 };
 
 export const EVENT_KIND_COLOR: Record<MarketingEventKind, string> = {
@@ -19,6 +21,8 @@ export const EVENT_KIND_COLOR: Record<MarketingEventKind, string> = {
   funding: 'var(--v2-orange)',
   'campaign-start': 'var(--v2-grey)',
   'campaign-end': 'var(--v2-grey)',
+  'plan-milestone': 'var(--v2-orange)',
+  'plan-review': '#536b8d',
 };
 
 export const EVENT_KIND_ICON: Record<MarketingEventKind, LucideIcon> = {
@@ -28,4 +32,6 @@ export const EVENT_KIND_ICON: Record<MarketingEventKind, LucideIcon> = {
   funding: Landmark,
   'campaign-start': Rocket,
   'campaign-end': FlagOff,
+  'plan-milestone': Target,
+  'plan-review': CalendarCheck2,
 };

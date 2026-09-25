@@ -1,6 +1,6 @@
 import { getCampaignEntities } from '@/utils/campaignEntities';
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { AddActivityModal } from '@/components/calendar/AddActivityModal';
@@ -9,6 +9,10 @@ import { CalendarWeekView } from '@/components/calendar/CalendarWeekView';
 import { CalendarListView } from '@/components/calendar/CalendarListView';
 import type { CalendarActivityItem } from '@/components/calendar/types';
 import { getMarketingEvents, type MarketingEvent } from '@/utils/marketingEvents';
+import { getMarketingPlanCalendarEvents } from '@/utils/marketingPlanCalendar';
+import { fetchMarketingPlans, fetchMarketingStrategy } from '@/services/marketingPlanApi';
+import { selectMarketingPlanForCurrentPeriod } from '@/utils/marketingPlanFocus';
+import type { MarketingPlan, MarketingPlanStrategyObjective } from '@/types/marketingPlan';
 import { getMonthName, formatDateShort } from '@/utils/dateUtils';
 
 type ViewMode = 'month' | 'week' | 'list';
@@ -64,11 +68,40 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalDate, setAddModalDate] = useState<Date | null>(null);
   const [campaignFilter, setCampaignFilter] = useState('');
+  const [marketingPlan, setMarketingPlan] = useState<MarketingPlan | null>(null);
+  const [marketingStrategy, setMarketingStrategy] = useState<MarketingPlanStrategyObjective[]>([]);
+  const [marketingPlanLoading, setMarketingPlanLoading] = useState(true);
+  const [marketingPlanUnavailable, setMarketingPlanUnavailable] = useState(false);
   // Set only via the overdue/upcoming strip below — switches List view to
   // an open-ended range (independent of currentDate) instead of the usual
   // current-month window, so overdue work from any past month is actually
   // reachable. Cleared by any manual view/nav interaction.
   const [listFocus, setListFocus] = useState<'overdue' | 'upcoming' | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMarketingPlanLoading(true);
+    setMarketingPlanUnavailable(false);
+    fetchMarketingPlans()
+      .then(async (plans) => {
+        const selected = selectMarketingPlanForCurrentPeriod(plans);
+        if (!selected) return { selected: null, rows: [] as MarketingPlanStrategyObjective[] };
+        return { selected, rows: await fetchMarketingStrategy(selected.id) };
+      })
+      .then(({ selected, rows }) => {
+        if (cancelled) return;
+        setMarketingPlan(selected);
+        setMarketingStrategy(rows);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMarketingPlan(null);
+        setMarketingStrategy([]);
+        setMarketingPlanUnavailable(true);
+      })
+      .finally(() => { if (!cancelled) setMarketingPlanLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const range = useMemo(() => {
     if (listFocus === 'overdue') {
@@ -93,7 +126,7 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
     return monthGridRange(currentDate);
   }, [viewMode, currentDate, listFocus]);
 
-  const rawEvents = useMemo(
+  const activityEvents = useMemo(
     () =>
       getMarketingEvents({
         tasks,
@@ -108,6 +141,22 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
     [tasks, campaigns, fundingRecords, matchesSelectedEntity, range]
   );
 
+  const marketingPlanEvents = useMemo(
+    () => getMarketingPlanCalendarEvents({
+      plan: marketingPlan,
+      strategy: marketingStrategy,
+      selectedEntity,
+      rangeStart: range.start,
+      rangeEnd: range.end,
+    }),
+    [marketingPlan, marketingStrategy, selectedEntity, range]
+  );
+
+  const rawEvents = useMemo(
+    () => [...activityEvents, ...marketingPlanEvents].sort((a, b) => a.date.getTime() - b.date.getTime() || a.title.localeCompare(b.title)),
+    [activityEvents, marketingPlanEvents]
+  );
+
   // Campaign-linked activity routes into that campaign's Calendar tab —
   // milestones and campaign-linked tasks/sends alike, so there's one
   // consistent destination for anything tied to a campaign, per the
@@ -115,6 +164,7 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
   // Task Detail drawer. A funding deadline goes to the Funding screen.
   // Campaign start/end markers land on that campaign's Overview.
   const getEventClickHandler = (e: MarketingEvent): (() => void) | undefined => {
+    if (e.kind === 'plan-milestone' || e.kind === 'plan-review') return () => onNavigate?.('marketing-plan');
     if (e.kind === 'funding') return () => onNavigate?.('funding');
     if (e.kind === 'campaign-start' || e.kind === 'campaign-end') {
       return e.campaignId ? () => selectCampaign(e.campaignId!) : undefined;
@@ -355,7 +405,27 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
         <section className="calendar-schedule-section">
           <div className="calendar-section-heading">
             <div><span>Schedule</span><h2>{listFocus === 'overdue' ? 'Overdue work' : listFocus === 'upcoming' ? 'Upcoming work' : navLabel}</h2></div>
-            <p>Only genuine campaign, task, email and funding dates are shown.</p>
+            <p>Genuine campaign, task, email, funding and dated Marketing Plan items.</p>
+          </div>
+          <div className="calendar-plan-connection" data-status={marketingPlanUnavailable ? 'unavailable' : marketingPlan ? 'connected' : 'empty'}>
+            <Target size={17} aria-hidden="true" />
+            <span>
+              <strong>{marketingPlanLoading ? 'Loading Marketing Plan dates…' : marketingPlanUnavailable ? 'Marketing Plan dates unavailable' : marketingPlan ? marketingPlan.title : 'No Marketing Plan created yet'}</strong>
+              <small>
+                {marketingPlanLoading
+                  ? 'Checking the saved plan.'
+                  : marketingPlanUnavailable
+                    ? 'The saved plan could not be loaded. Calendar activity remains available.'
+                    : marketingPlan
+                      ? campaignFilter
+                        ? 'Dated plan items are hidden while a campaign filter is selected.'
+                        : marketingPlanEvents.length > 0
+                          ? `${marketingPlanEvents.length} dated plan item${marketingPlanEvents.length === 1 ? '' : 's'} in this view.`
+                          : 'Connected — no dated plan items fall within this view.'
+                      : 'Create a plan to add dated milestones and review dates to Calendar.'}
+              </small>
+            </span>
+            <button type="button" onClick={() => onNavigate?.('marketing-plan')}>{marketingPlan ? 'Open plan' : 'Go to Marketing Plan'}</button>
           </div>
           <div className="calendar-board" data-view={viewMode}>
             {viewMode === 'month' && <CalendarMonthView currentDate={currentDate} items={items} onDayClick={(d) => { setAddModalDate(d); setShowAddModal(true); }} />}
