@@ -241,27 +241,28 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
       ? `No marketing activity scheduled for this ${viewMode === 'week' ? 'week' : 'month'}.`
       : `No marketing activity scheduled for ${ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity} this ${viewMode === 'week' ? 'week' : 'month'}.`;
 
+  const entityLabel = ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity;
+
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
-        <div className="v2-page-header">
+    <div className="v2-page calendar-page">
+      <div className="calendar-page-inner">
+        <header className="calendar-overview-header">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary">Content &amp; Calendar</h1>
-            <p className="text-text-secondary text-sm mt-1">
-              {isGroupView ? 'Marketing activity across all entities' : `Showing ${ENTITY_OPTIONS.find((o) => o.value === selectedEntity)?.label ?? selectedEntity}`}
-            </p>
+            <div className="calendar-eyebrow">{isGroupView ? 'MTech Group' : entityLabel}</div>
+            <h1>Marketing Calendar</h1>
+            <p>Campaign dates, tasks, email sends and funding deadlines in one working schedule.</p>
           </div>
           <button
             onClick={() => {
               setAddModalDate(new Date(currentDate));
               setShowAddModal(true);
             }}
-            className="btn btn-primary flex items-center gap-2"
+            className="btn btn-primary calendar-add-button flex items-center gap-2"
           >
             <Plus size={18} />
             Add Task
           </button>
-        </div>
+        </header>
 
         {/* Consolidated planning toolbar — nav, overdue/upcoming (kept
             independent of whichever month/week is displayed, so overdue
@@ -270,22 +271,22 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
             compact row. The separate campaign badge row was removed: the
             dropdown here now does that filtering job, so the badges were
             pure duplication. */}
-        <div className="v2-cal-toolbar">
-          <div className="v2-cal-toolbar-group">
+        <section className="calendar-control-surface" aria-label="Calendar controls">
+          <div className="calendar-control-primary">
             <div className="v2-cal-nav">
-              <button className="v2-cal-nav-btn" onClick={goPrev} title="Previous">
+              <button className="v2-cal-nav-btn" onClick={goPrev} title="Previous" aria-label="Previous period">
                 <ChevronLeft size={16} />
               </button>
               <span className="v2-cal-nav-label">{navLabel}</span>
-              <button className="v2-cal-nav-btn" onClick={goNext} title="Next">
+              <button className="v2-cal-nav-btn" onClick={goNext} title="Next" aria-label="Next period">
                 <ChevronRight size={16} />
               </button>
-              <button className="btn btn-secondary text-sm" onClick={goToday} style={{ marginLeft: 4 }}>
+              <button className="calendar-today-button" onClick={goToday}>
                 Today
               </button>
             </div>
 
-            <div className="v2-cal-summary-strip">
+            <div className="v2-cal-summary-strip" aria-label="Task timing summary">
               {overdueUpcomingCounts.overdue > 0 ? (
                 <button
                   className="v2-cal-summary-link"
@@ -300,7 +301,6 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
               ) : (
                 <span className="v2-cal-summary-static">0 overdue</span>
               )}
-              <span className="v2-cal-summary-dot">·</span>
               {overdueUpcomingCounts.upcoming > 0 ? (
                 <button
                   className="v2-cal-summary-link"
@@ -317,25 +317,29 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
             </div>
           </div>
 
-          <div className="v2-cal-toolbar-group">
-            <select
-              value={campaignFilter}
-              onChange={(e) => setCampaignFilter(e.target.value)}
-              className="input text-sm"
-              style={{ maxWidth: 200 }}
-            >
-              <option value="">All Campaigns</option>
-              {entityCampaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+          <div className="calendar-control-secondary">
+            <label className="calendar-filter-field">
+              <span>Campaign</span>
+              <select
+                value={campaignFilter}
+                onChange={(e) => setCampaignFilter(e.target.value)}
+                className="input text-sm"
+                aria-label="Filter by campaign"
+              >
+                <option value="">All Campaigns</option>
+                {entityCampaigns.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </label>
 
-            <div className="v2-cal-view-tabs">
+            <div className="v2-cal-view-tabs" aria-label="Calendar view">
               {(['month', 'week', 'list'] as ViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   className="v2-cal-view-tab"
                   data-active={viewMode === mode}
+                  aria-pressed={viewMode === mode}
                   onClick={() => {
                     setListFocus(null);
                     setViewMode(mode);
@@ -346,16 +350,22 @@ export function CalendarScreen({ onNavigate }: CalendarScreenProps) {
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="card" style={{ padding: viewMode === 'list' ? '1.5rem' : '1rem' }}>
-          {viewMode === 'month' && <CalendarMonthView currentDate={currentDate} items={items} onDayClick={(d) => { setAddModalDate(d); setShowAddModal(true); }} />}
-          {viewMode === 'week' && <CalendarWeekView weekStart={startOfWeek(currentDate)} items={items} />}
-          {viewMode === 'list' && <CalendarListView items={items} emptyLabel={emptyLabel} />}
-        </div>
+        <section className="calendar-schedule-section">
+          <div className="calendar-section-heading">
+            <div><span>Schedule</span><h2>{listFocus === 'overdue' ? 'Overdue work' : listFocus === 'upcoming' ? 'Upcoming work' : navLabel}</h2></div>
+            <p>Only genuine campaign, task, email and funding dates are shown.</p>
+          </div>
+          <div className="calendar-board" data-view={viewMode}>
+            {viewMode === 'month' && <CalendarMonthView currentDate={currentDate} items={items} onDayClick={(d) => { setAddModalDate(d); setShowAddModal(true); }} />}
+            {viewMode === 'week' && <CalendarWeekView weekStart={startOfWeek(currentDate)} items={items} />}
+            {viewMode === 'list' && <CalendarListView items={items} emptyLabel={emptyLabel} />}
+          </div>
+        </section>
 
         {sendsSummary && (
-          <p className="text-xs text-text-secondary mt-4">
+          <p className="calendar-sends-note">
             {sendsSummary.count} email send{sendsSummary.count === 1 ? '' : 's'} completed this month · {sendsSummary.recipients.toLocaleString()} recipients
             {sendsSummary.cost !== null && <> · £{sendsSummary.cost.toFixed(2)}</>}
           </p>
