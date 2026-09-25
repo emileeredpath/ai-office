@@ -324,28 +324,28 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
   ];
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
-        <div className="v2-page-header">
+    <div className="v2-page crm-page">
+      <div className="crm-page-inner">
+        <header className="crm-overview-header">
           <div>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Leads & CRM</h1>
-            <p className="text-text-secondary">
-              {isGroupView ? 'Marketing response and overall commercial performance across MTech Group' : `Showing ${entityLabel}`}
-            </p>
+            <div className="crm-eyebrow">{isGroupView ? 'MTech Group' : entityLabel}</div>
+            <h1>CRM</h1>
+            <p>Marketing response alongside separate, overall commercial outcomes from Acumatica.</p>
           </div>
           <PeriodSelector />
-        </div>
-
-        <DataFreshnessBar entries={freshnessEntries} />
+        </header>
 
         {/* A. Marketing Response — real, manually-logged + verified GA4
             signals. Marketing KPIs display for any entity that supports
             them (e.g. IRCL has a verified GA4 Enquiry definition) even
             when CRM/commercial data below is unavailable for that
             entity. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Marketing Response</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <section className="v2-perf-section crm-response-section">
+          <div className="crm-section-heading">
+            <div><span>Marketing view</span><h2>Response signals</h2></div>
+            <p>Real campaign and website measures. These are not yet linked to individual CRM opportunities.</p>
+          </div>
+          <div className="crm-response-strip">
             <KpiCard
               title="Marketing Leads"
               value={marketingLeads}
@@ -363,7 +363,7 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
             />
             <KpiCard title="Logged Enquiries" value={enquiriesTotal} subtitle="Manually entered campaign results" />
           </div>
-          <div className="card mt-4" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+          <div className="crm-measurement-boundary">
             <h3 className="text-sm font-semibold text-text-primary mb-1">Where the measured journey stops</h3>
             <p className="text-sm text-text-secondary">Campaign-to-opportunity matching is not available. Marketing responses and Acumatica opportunities are separate measures, so this page cannot show a reliable lead-to-sale drop-off or marketing-attributed revenue.</p>
           </div>
@@ -372,10 +372,13 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
         {/* B. CRM / Commercial Performance — visually distinct: these are
             real Acumatica opportunities, never implied to be caused by a
             campaign or channel. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">CRM / Commercial Performance</h2>
+        <section className="v2-perf-section crm-commercial-section">
+          <div className="crm-section-heading">
+            <div><span>Overall CRM</span><h2>Commercial outcomes</h2></div>
+            <p>Status-based Acumatica totals shown as business context, without implying marketing attribution.</p>
+          </div>
           <div className="v2-commercial-panel">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="crm-commercial-strip">
               <KpiCard
                 title="Opportunities"
                 value={acumaticaHasData ? acumaticaSummary!.opportunities : undefined}
@@ -443,15 +446,15 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
                 }
               />
             </div>
-            <p className="v2-perf-section-subtitle" style={{ marginTop: 12, marginBottom: 0 }}>
+            <p className="crm-caveat">
               Acumatica totals are overall commercial results, not attributed to Marketing unless explicitly linked. For a selected period, Won Revenue includes opportunities created in that period whose current Status is Won; it is not revenue won in that period.
             </p>
           </div>
 
           {isGroupView && (
-            <details className="card mt-4">
-              <summary className="text-sm font-semibold text-text-primary cursor-pointer">Commercial performance by entity</summary>
-              <div className="mt-3"><CommercialByEntityTable rows={entityCommercialRows} /></div>
+            <details className="crm-disclosure" open>
+              <summary>Commercial performance by entity</summary>
+              <div className="crm-disclosure-body"><CommercialByEntityTable rows={entityCommercialRows} /></div>
             </details>
           )}
         </section>
@@ -459,11 +462,14 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
         {/* C. Pipeline & Opportunity Analysis — same canonical scope as B.
             Stage is shown for genuine display only; it never changes
             commercial classification (Status alone decides that). */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Pipeline & Opportunity Analysis</h2>
-          <details className="card mb-4">
-            <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore pipeline and opportunity breakdowns</summary>
-            <div className="mt-4">
+        <section className="v2-perf-section crm-analysis-section">
+          <div className="crm-section-heading">
+            <div><span>Investigate</span><h2>Pipeline and data detail</h2></div>
+            <p>Explore recorded opportunity dimensions while keeping Status as the commercial classification.</p>
+          </div>
+          <details className="crm-disclosure">
+            <summary>Pipeline and opportunity breakdowns</summary>
+            <div className="crm-disclosure-body">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="card">
                   <h3 className="text-sm font-semibold text-text-primary mb-3">Pipeline by Stage</h3>
@@ -549,11 +555,10 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
             Office already has (Campaign Monitor sends, Infinity calls,
             campaign records). Distinct from CRM/Commercial Performance
             above: this never depends on Acumatica. */}
-        <section className="v2-perf-section">
-          <h2 className="v2-section-title">Unmatched Activity</h2>
-          <details className="card">
-            <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore unmatched activity and mapping actions</summary>
-            <div className="mt-4">
+        <section className="v2-perf-section crm-mapping-section">
+          <details className="crm-disclosure">
+            <summary>Unmatched activity and mapping actions</summary>
+            <div className="crm-disclosure-body">
               <p className="text-xs text-text-secondary mb-3">
                 Real activity that isn't confidently linked to an AI Office campaign — using only the existing,
                 deterministic links each integration already computes. Nothing here is a weak or inferred match; where
@@ -572,6 +577,13 @@ export function LeadsCrmScreen({ onNavigate }: LeadsCrmScreenProps) {
                 onMapGoogleAdsCampaign={handleMapGoogleAdsCampaign}
               />
             </div>
+          </details>
+        </section>
+
+        <section className="v2-perf-section crm-coverage-section">
+          <details className="crm-disclosure">
+            <summary>Coverage and data freshness</summary>
+            <div className="crm-disclosure-body"><DataFreshnessBar entries={freshnessEntries} /></div>
           </details>
         </section>
       </div>
