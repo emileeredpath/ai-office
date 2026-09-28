@@ -12,6 +12,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "node dist/scripts/seed.js",
+    "seed:marketing-plan-preview": "node dist/scripts/marketingPlan2026PreviewSeed.js",
     "verify": "node --loader ts-node/esm --no-warnings=ExperimentalWarning scripts/verify-integrations.ts"
   },
   "dependencies": {
