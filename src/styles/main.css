@@ -1361,6 +1361,55 @@ h3 {
   color: var(--color-text-primary);
 }
 
+/* Website is a reporting workspace, so use a light reading canvas while the
+   shared MTech navigation remains dark. Metrics and source states are left to
+   the existing canonical resolvers. */
+.website-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.website-page-inner {
+  padding-bottom: 28px;
+}
+
+.website-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.website-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.website-page .card,
+.website-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.website-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.website-page details > summary.card {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.website-page details > summary.card:hover {
+  border-color: rgba(249, 112, 31, 0.55);
+  background: #fffaf6;
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;

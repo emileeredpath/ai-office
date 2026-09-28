@@ -176,10 +176,11 @@ export function WebsiteScreen() {
   ];
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page website-page">
+      <div className="max-w-7xl mx-auto website-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="website-page-eyebrow">Website &amp; organic search</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Website</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Website pages and organic search across MTech Group' : `Showing ${entityLabel}`}
