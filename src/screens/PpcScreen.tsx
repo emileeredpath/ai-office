@@ -69,10 +69,11 @@ export function PpcScreen() {
   ];
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page ppc-page">
+      <div className="max-w-7xl mx-auto ppc-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="ppc-page-eyebrow">Paid search</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">PPC</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Real Google Ads performance across connected MTech Group entities' : `Showing ${entityLabel}`}
@@ -83,7 +84,7 @@ export function PpcScreen() {
 
         <DataFreshnessBar entries={freshnessEntries} />
 
-        <div className="card mb-8" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+        <div className="card ppc-attribution-boundary mb-8" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
           <h2 className="text-sm font-semibold text-text-primary mb-1">Where the paid journey stops</h2>
           <p className="text-sm text-text-secondary">
             Google Ads conversions are reported by Google Ads. GA4 Enquiries are separate website events and cannot currently be assigned to paid clicks or Acumatica revenue.

@@ -1410,6 +1410,59 @@ h3 {
   background: #fffaf6;
 }
 
+/* PPC follows the same reporting-workspace treatment as Website. The warm
+   boundary panel keeps the separation between paid activity, GA4 response and
+   CRM outcomes visible without changing any measurement or attribution rules. */
+.ppc-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.ppc-page-inner {
+  padding-bottom: 28px;
+}
+
+.ppc-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.ppc-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ppc-page .card,
+.ppc-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.ppc-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.ppc-page .ppc-attribution-boundary {
+  border-color: rgba(249, 112, 31, 0.28);
+  background: #fffaf6;
+}
+
+.ppc-page details > summary {
+  transition: color 0.15s ease;
+}
+
+.ppc-page details > summary:hover {
+  color: var(--workspace-accent-hover);
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;
