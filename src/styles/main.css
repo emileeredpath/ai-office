@@ -1353,6 +1353,14 @@ h3 {
   white-space: nowrap;
 }
 
+/* Marketing Plan remains a focused planning workspace inside the dark MTech
+   shell, with a calm light canvas for long-form reading and editing. */
+.marketing-plan-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;

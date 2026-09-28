@@ -194,9 +194,9 @@ export function MarketingPlanScreen({ onNavigate }: { onNavigate?: (screen: stri
     requestAnimationFrame(() => document.getElementById(`marketing-plan-tab-${view}`)?.focus());
   };
 
-  if (loading) return <div className="v2-page"><p className="text-text-secondary">Loading Marketing Plan…</p></div>;
+  if (loading) return <div className="v2-page marketing-plan-page"><p className="text-text-secondary">Loading Marketing Plan…</p></div>;
 
-  return <div className="v2-page">
+  return <div className="v2-page marketing-plan-page">
     <div className="v2-page-header">
       <div><p className="text-xs font-bold uppercase tracking-wider text-violet-700 mb-1">Strategy and delivery</p><h1 className="text-2xl font-bold text-text-primary">Marketing Plan</h1><p className="text-sm text-text-secondary mt-1">Connect business direction to objectives, meaningful milestones and measurable marketing activity.</p></div>
       {plan && isEditor && <button className="btn btn-primary flex items-center gap-2" onClick={() => { setActiveView('objectives'); setShowObjectiveForm(true); }}><Plus size={16}/> Add objective</button>}
