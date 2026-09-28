@@ -1,8 +1,8 @@
-// Google Ads integration — real campaign performance for the two accounts
-// currently connected (Brentwood, Radio Links). Capcom and Irish Radio
-// have no Google Ads account configured and are deliberately absent from
-// CUSTOMER_ID_ENV below — never guessed, never defaulted to any other
-// account's aggregate.
+// Google Ads integration — real campaign performance for separately
+// configured entity accounts. Brentwood and Radio Links are confirmed live;
+// IRCL is configurable now that account access has been confirmed, but stays
+// honestly not connected until its customer ID is supplied in the environment.
+// Capcom remains absent — never guessed or defaulted to another account.
 //
 // Auth: standard OAuth2 refresh-token exchange (grant_type=refresh_token)
 // plus a developer token — confirmed live against both real accounts (see
@@ -29,14 +29,13 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_ADS_API_VERSION = 'v25';
 const API_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
 
-// Which env var holds each brand's Google Ads customer ID. Only entities
-// with a confirmed, currently-connected account are listed — Capcom and
-// Irish Radio are deliberately absent, not set to an empty/placeholder
-// value, so they can never accidentally start returning data without an
-// explicit env var being added first.
+// Which env var holds each brand's Google Ads customer ID. Only entities with
+// confirmed account access are listed. A listed brand is still not connected
+// unless its own env var is populated, preserving unavailable-versus-zero.
 const CUSTOMER_ID_ENV: Partial<Record<Brand, string>> = {
   brentwood: 'GOOGLE_ADS_CUSTOMER_ID_BRENTWOOD',
   'radio-links': 'GOOGLE_ADS_CUSTOMER_ID_RADIO_LINKS',
+  ircl: 'GOOGLE_ADS_CUSTOMER_ID_IRCL',
 };
 
 // Which brands have a confirmed Google Ads account right now — static, not
@@ -153,7 +152,9 @@ interface RawCampaignRow {
 // silently excluded because it's paused/removed.
 //
 // Deliberately no login-customer-id header — confirmed live that Brentwood
-// and Radio Links are queried directly, and sending that header fails.
+// and Radio Links are queried directly, and sending that header fails. IRCL's
+// access path must be live-verified before its environment value is deployed;
+// a failed direct query is surfaced as an error and never converted to zero.
 async function runCampaignQuery(
   customerId: string,
   token: string,

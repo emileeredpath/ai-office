@@ -132,8 +132,8 @@ interface AppState {
   educationCampaignAttribution: Ga4EducationAttributionResponse | null;
   educationCampaignAttributionSyncing: boolean;
 
-  // Google Ads (Phase 1) — real campaign performance for Brentwood and
-  // Radio Links only, a fully separate integration from GA4/GA4
+  // Google Ads (Phase 1) — real campaign performance for separately
+  // configured entity accounts, a fully separate integration from GA4/GA4
   // Enquiries above. See src/utils/googleAdsPerformance.ts for how
   // pages derive figures from this, and backend/src/services/googleAds.ts
   // for the confirmed-live auth/query shape.

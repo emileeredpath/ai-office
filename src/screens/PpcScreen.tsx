@@ -10,11 +10,11 @@ import { resolveGoogleAdsDateRange, getGoogleAdsSummary, getGoogleAdsCampaigns, 
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { getEnquiries } from '@/utils/ga4Enquiries';
 
-// PPC — the primary Google Ads reporting page (Phase 1). Real campaign
-// performance for Brentwood and Radio Links only, confirmed live against
-// both real accounts (see backend/src/services/googleAds.ts's header
-// comment). Capcom and Irish Radio have no Google Ads account and stay
-// honestly "Not connected" — never a fabricated 0. GA4 Enquiries appears
+// PPC — the primary Google Ads reporting page (Phase 1). Brentwood and Radio
+// Links are confirmed live; IRCL is supported when its separately verified
+// account ID is configured (see backend/src/services/googleAds.ts). An entity
+// without configuration stays honestly "Not connected" — never a fabricated
+// 0. GA4 Enquiries appears
 // alongside Google Ads' own conversions metric as a deliberately separate
 // figure — the two are never the same population, and Cost per GA4
 // Enquiry combines real Google Ads spend with real GA4 Enquiries for the

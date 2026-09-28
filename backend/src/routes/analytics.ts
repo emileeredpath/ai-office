@@ -130,8 +130,8 @@ router.get('/ga4-campaign-names', async (req: Request, res: Response) => {
   res.json(result);
 });
 
-// Google Ads (Phase 1) — real campaign performance for Brentwood and Radio
-// Links only (see getGoogleAdsPerformance's own doc comment). A fully
+// Google Ads (Phase 1) — real campaign performance for separately configured
+// entity accounts (see getGoogleAdsPerformance). A fully
 // separate integration from GA4/GA4 Enquiries above — Google Ads
 // "conversions" is never presented as equivalent to GA4 Enquiries. Same
 // startDate/endDate contract as every other analytics route.

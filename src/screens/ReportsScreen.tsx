@@ -774,14 +774,14 @@ export function ReportsScreen() {
           )}
         </div>
 
-        {/* PPC / Google Ads — real campaign performance for Brentwood and
-            Radio Links only; Google Ads Conversions and GA4 Enquiries stay
+        {/* PPC / Google Ads — real campaign performance for separately
+            configured entities; Google Ads Conversions and GA4 Enquiries stay
             clearly separate, never merged into one figure. */}
         <div className="mb-8">
           <h2 className="v2-section-title">PPC / Google Ads</h2>
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Real Google Ads performance for Brentwood and Radio Links. Google Ads Conversions is Google Ads' own
-            metric — a different measurement from GA4 Enquiries, never assumed equivalent.
+            Real Google Ads performance for connected entities in the selected view. Google Ads Conversions is
+            Google Ads' own metric — a different measurement from GA4 Enquiries, never assumed equivalent.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <KpiCard

@@ -1,11 +1,9 @@
 import { apiFetch, ApiError } from './apiConfig';
 import type { Brand } from '@/types/index';
 
-// Google Ads (Phase 1) — real campaign performance for Brentwood and
-// Radio Links only, confirmed live against both real accounts. See
-// backend/src/services/googleAds.ts's header comment for the exact
-// auth/query shape confirmed (direct customer queries, no
-// login-customer-id, API version v25).
+// Google Ads (Phase 1) — real campaign performance for separately configured
+// entity accounts. See backend/src/services/googleAds.ts for the confirmed
+// auth/query shape and current account coverage.
 export interface GoogleAdsCampaignRow {
   campaignId: string;
   campaignName: string;

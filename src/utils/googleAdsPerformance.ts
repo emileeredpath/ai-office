@@ -6,11 +6,11 @@ import type { GoogleAdsResponse, GoogleAdsBrandPerformance, GoogleAdsCampaignRow
 import type { Ga4EnquiriesResponse } from '@/services/ga4Api';
 import { GROUP_AGGREGATE_BRANDS } from '@/utils/groupEntities';
 
-// Google Ads (Phase 1) — real campaign performance for Brentwood and Radio
-// Links only, confirmed live against both real accounts (see
-// backend/src/services/googleAds.ts's header comment). Capcom and Irish
-// Radio have no Google Ads account and stay honestly "Not connected"
-// here — never a fabricated 0, never silently dropped from a group total
+// Google Ads (Phase 1) — real campaign performance for each separately
+// configured account. Brentwood and Radio Links are confirmed live and IRCL
+// is supported once its account ID has been verified and configured (see
+// backend/src/services/googleAds.ts). Unconfigured entities stay honestly
+// "Not connected" here — never a fabricated 0 or silently dropped from a group total
 // without saying so. Google Ads' own conversions metric is a genuinely
 // different signal from GA4 Enquiries (src/utils/ga4Enquiries.ts) — the
 // two are combined only in getCostPerGa4Enquiry below, and even there
@@ -180,9 +180,9 @@ export interface CostPerGa4EnquiryInfo {
 //
 // Takes the raw GA4 Enquiries response (not an already-group-aggregated
 // EnquiriesInfo) deliberately: at MTech Group level, GA4 Enquiries is
-// confirmed for all four entities, but Google Ads is only connected for
-// two (Brentwood, Radio Links). Reusing a pre-aggregated "all 4 entities"
-// enquiries total here would silently divide Google-Ads-only spend by
+// available across more entities than Google Ads may cover. Reusing a
+// pre-aggregated group enquiries total here would silently divide
+// Google-Ads-only spend by
 // enquiries from entities with no Google Ads spend behind them at all —
 // this restricts the GA4 Enquiries side to exactly the same brands
 // Google Ads covers for the current selection, every time.
