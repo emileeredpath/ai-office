@@ -5,6 +5,8 @@
  * workbook remains untouched. Month-level timings stay month-level; only the
  * two actions with exact source dates receive calendar dates.
  */
+import { pathToFileURL } from 'node:url';
+
 export const PLAN_TITLE = 'MTech Marketing Plan 2026/27';
 
 const planEntities = ['mtech', 'brentwood', 'radio-links', 'capcom', 'ircl'] as const;
@@ -144,4 +146,6 @@ export async function runMarketingPlan2026PreviewSeed() {
   return { status: 'created' as const, planId: plan.id };
 }
 
-await runMarketingPlan2026PreviewSeed();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await runMarketingPlan2026PreviewSeed();
+}

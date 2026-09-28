@@ -28,12 +28,21 @@ import { syncCampaignMonitor } from './services/campaignMonitor.js';
 import { syncWave1Ga4, syncWave1Infinity } from './services/wave1Sync.js';
 import './scripts/seed.js';
 import { runPreviewSeed } from './scripts/previewSeed.js';
+import { runMarketingPlan2026PreviewSeed } from './scripts/marketingPlan2026PreviewSeed.js';
 import { runCampaignRestoration } from './scripts/campaignRestoration.js';
 
 // Preview-only sample data (dashboard-v2 Railway preview service). No-ops
 // unless both PREVIEW_SEED_ENABLED=true and DATABASE_PATH contains
 // "/preview/" — see scripts/previewSeed.ts. Never runs against production.
 runPreviewSeed();
+
+// The user-supplied 2026/27 plan is also preview-only. Its importer has the
+// same dual flag/path guard, is idempotent and does not overwrite an existing
+// plan. Keep it separate from fictional preview sample records so either can
+// already exist without preventing the other from reconciling.
+void runMarketingPlan2026PreviewSeed().catch((error) => {
+  console.error('[marketing-plan-preview-seed] Failed:', error);
+});
 
 // Preview-only Campaign Source of Truth restoration (Dashboard Completion
 // Phase 1). No-ops unless DATABASE_PATH contains "/preview/" — see
