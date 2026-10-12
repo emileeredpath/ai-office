@@ -77,10 +77,11 @@ export function SocialScreen() {
   ];
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page social-page">
+      <div className="max-w-7xl mx-auto social-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="social-page-eyebrow">Social media</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Social</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Website traffic from social across MTech Group' : `Showing ${entityLabel}`}
@@ -93,8 +94,8 @@ export function SocialScreen() {
 
         {/* Headline KPIs */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Social Traffic</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+          <h2 className="v2-section-title">Social traffic</h2>
+          <p className="text-sm text-text-secondary mb-4">
             Real GA4 website traffic attributed to Organic/Paid Social via GA4's own channel classification — sessions
             and users only. Impressions, reach, engagement, and followers are platform-side metrics GA4 can't see.
           </p>
@@ -131,9 +132,10 @@ export function SocialScreen() {
         </div>
 
         {/* Social Traffic by Source */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Social Traffic by Source</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+        <details className="card social-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore social traffic by source</summary>
+          <div className="social-supporting-content">
+          <p className="text-xs text-text-secondary mb-4">
             Raw GA4 sessionSource (referring domain) — GA4 doesn't provide a canonical platform name, so sources are
             shown exactly as reported, never relabelled or bucketed into "LinkedIn"/"Facebook"/"Instagram".
           </p>
@@ -169,12 +171,13 @@ export function SocialScreen() {
               <p className="text-sm text-text-secondary">{socialByNetwork.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {/* GA4 Enquiries from Social */}
         <div className="mb-8">
-          <h2 className="v2-section-title">GA4 Enquiries from Social</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+          <h2 className="v2-section-title">GA4 enquiries from social</h2>
+          <p className="text-sm text-text-secondary mb-4">
             Verified GA4 key events (see Reports → Website Enquiries) restricted to Organic/Paid Social sessions — a
             website action, not a qualified marketing lead.
           </p>
@@ -243,8 +246,9 @@ export function SocialScreen() {
         </div>
 
         {/* Top Landing Pages from Social */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Top Landing Pages from Social</h2>
+        <details className="card social-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore landing pages from social</summary>
+          <div className="social-supporting-content">
           {socialTopLandingPages.status === 'available' ? (
             socialTopLandingPages.rows.length > 0 ? (
               <div className="card p-0">
@@ -281,29 +285,18 @@ export function SocialScreen() {
               <p className="text-sm text-text-secondary">{socialTopLandingPages.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {/* Platform Performance — reserved for a future Hootsuite
             integration. Every figure here is genuinely unavailable today;
             none are fabricated as zero. */}
-        <div className="mb-4">
-          <h2 className="v2-section-title">Platform Performance</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Requires a real Hootsuite (or direct platform API) integration — not built yet. Nothing below is
-            estimated or guessed.
+        <div className="card social-platform-boundary mb-4">
+          <h2 className="text-sm font-semibold text-text-primary mb-1">Platform performance is not connected</h2>
+          <p className="text-sm text-text-secondary">
+            Impressions, reach, engagement, followers, follower growth, posts published and top posts require a real
+            Hootsuite or direct platform API connection. No values are estimated or shown as zero.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-            <KpiCard title="Impressions" status="not-connected" subtitle="Awaiting Hootsuite integration" size="compact" />
-            <KpiCard title="Reach" status="not-connected" subtitle="Awaiting Hootsuite integration" size="compact" />
-            <KpiCard title="Engagement" status="not-connected" subtitle="Awaiting Hootsuite integration" size="compact" />
-            <KpiCard title="Followers" status="not-connected" subtitle="Awaiting Hootsuite integration" size="compact" />
-            <KpiCard title="Follower Growth" status="not-connected" subtitle="Awaiting Hootsuite integration" size="compact" />
-            <KpiCard title="Posts Published" status="not-connected" subtitle="Awaiting Hootsuite integration" size="compact" />
-          </div>
-          <h3 className="text-sm font-semibold text-text-primary mb-2">Top Posts</h3>
-          <div className="card p-4">
-            <p className="text-sm text-text-secondary">Awaiting Hootsuite integration.</p>
-          </div>
         </div>
       </div>
     </div>

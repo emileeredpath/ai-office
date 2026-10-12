@@ -1522,6 +1522,64 @@ h3 {
   border-color: #d9dee5;
 }
 
+/* Social prioritises the GA4 evidence that exists and compresses unsupported
+   platform metrics into one honest connection boundary. */
+.social-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.social-page-inner {
+  padding-bottom: 28px;
+}
+
+.social-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.social-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.social-page .card,
+.social-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.social-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.social-page .social-supporting-section > summary {
+  transition: color 0.15s ease;
+}
+
+.social-page .social-supporting-section > summary:hover {
+  color: var(--workspace-accent-hover);
+}
+
+.social-page .social-supporting-content {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e8ebef;
+}
+
+.social-page .social-platform-boundary {
+  border-color: rgba(249, 112, 31, 0.28);
+  background: #fffaf6;
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;
