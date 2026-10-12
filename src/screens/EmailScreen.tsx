@@ -229,10 +229,11 @@ export function EmailScreen() {
   ];
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page email-page">
+      <div className="max-w-7xl mx-auto email-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="email-page-eyebrow">Email marketing</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Email</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Real Campaign Monitor email performance across MTech Group' : `Showing ${entityLabel}`}
@@ -274,27 +275,33 @@ export function EmailScreen() {
 
         {/* Headline metrics */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Email Performance</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <h2 className="v2-section-title">Email performance</h2>
+          <p className="text-sm text-text-secondary mb-4">The measures needed for a quick view of send volume and engagement.</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <KpiCard title="Emails Sent" value={headline.status === 'available' ? headline.campaignsSent : undefined} status={headline.status} subtitle={headline.subtitle} />
             <KpiCard title="Total Recipients" value={headline.status === 'available' ? headline.recipients?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} />
-            <KpiCard title="Delivered" value={headline.status === 'available' ? headline.delivered?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} />
-            <KpiCard title="Delivery Rate" value={headline.status === 'available' && headline.deliveryRate != null ? formatPercent(headline.deliveryRate) : undefined} status={headline.status === 'available' && headline.deliveryRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} />
-            <KpiCard title="Unique Opens" value={headline.status === 'available' ? headline.uniqueOpens?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-green)" />
             <KpiCard title="Unique Open Rate" value={headline.status === 'available' && headline.uniqueOpenRate != null ? formatPercent(headline.uniqueOpenRate) : undefined} status={headline.status === 'available' && headline.uniqueOpenRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-green)" />
-            {/* Campaign Monitor's summary Clicks field is documented as a
-                unique-clicking-subscriber count, but that's unconfirmed
-                against this live account (see backend/src/services/
-                campaignMonitor.ts's CmCampaignSummary comment) — shown as
-                a raw count/rate with that caveat, never as a clean
-                unique-basis KPI. */}
-            <KpiCard title="Clicks" value={headline.status === 'available' ? headline.clicks?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle="Campaign Monitor's Clicks field — documented as unique clicking subscribers, not yet confirmed against this live account" accent="var(--v2-green)" />
             <KpiCard title="Click Rate" value={headline.status === 'available' && headline.clickRate != null ? formatPercent(headline.clickRate) : undefined} status={headline.status === 'available' && headline.clickRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-green)" />
-            <KpiCard title="Bounces" value={headline.status === 'available' ? headline.bounces?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-orange)" />
-            <KpiCard title="Bounce Rate" value={headline.status === 'available' && headline.bounceRate != null ? formatPercent(headline.bounceRate) : undefined} status={headline.status === 'available' && headline.bounceRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-orange)" />
-            <KpiCard title="Unsubscribes" value={headline.status === 'available' ? headline.unsubscribes?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-red)" />
-            <KpiCard title="Unsubscribe Rate" value={headline.status === 'available' && headline.unsubscribeRate != null ? formatPercent(headline.unsubscribeRate) : undefined} status={headline.status === 'available' && headline.unsubscribeRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-red)" />
           </div>
+          <details className="card email-supporting-section">
+            <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore delivery and list health</summary>
+            <p className="text-xs text-text-secondary mt-3 mb-4">Supporting delivery, response and audience-loss measures from Campaign Monitor.</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <KpiCard title="Delivered" value={headline.status === 'available' ? headline.delivered?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} />
+              <KpiCard title="Delivery Rate" value={headline.status === 'available' && headline.deliveryRate != null ? formatPercent(headline.deliveryRate) : undefined} status={headline.status === 'available' && headline.deliveryRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} />
+              <KpiCard title="Unique Opens" value={headline.status === 'available' ? headline.uniqueOpens?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-green)" />
+              {/* Campaign Monitor's summary Clicks field is documented as a
+                  unique-clicking-subscriber count, but that's unconfirmed
+                  against this live account (see backend/src/services/
+                  campaignMonitor.ts's CmCampaignSummary comment) — shown as
+                  a raw count with that caveat, never as a clean unique-basis KPI. */}
+              <KpiCard title="Clicks" value={headline.status === 'available' ? headline.clicks?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle="Campaign Monitor's Clicks field — documented as unique clicking subscribers, not yet confirmed against this live account" accent="var(--v2-green)" />
+              <KpiCard title="Bounces" value={headline.status === 'available' ? headline.bounces?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-orange)" />
+              <KpiCard title="Bounce Rate" value={headline.status === 'available' && headline.bounceRate != null ? formatPercent(headline.bounceRate) : undefined} status={headline.status === 'available' && headline.bounceRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-orange)" />
+              <KpiCard title="Unsubscribes" value={headline.status === 'available' ? headline.unsubscribes?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} accent="var(--v2-red)" />
+              <KpiCard title="Unsubscribe Rate" value={headline.status === 'available' && headline.unsubscribeRate != null ? formatPercent(headline.unsubscribeRate) : undefined} status={headline.status === 'available' && headline.unsubscribeRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-red)" />
+            </div>
+          </details>
         </div>
 
         {/* Filters */}
@@ -399,9 +406,10 @@ export function EmailScreen() {
         </div>
 
         {/* Education 2026 roll-up */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Education 2026 Campaign</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+        <details className="card email-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore Education 2026 campaign performance</summary>
+          <div className="email-supporting-content">
+          <p className="text-xs text-text-secondary mb-4">
             {educationSummary.subtitle}
             {educationSummary.testSendCount > 0 &&
               ` (${educationSummary.testSendCount} real test-slice send${educationSummary.testSendCount === 1 ? '' : 's'} — "(first N)" — excluded from these totals, still visible in Individual Sends above).`}
@@ -440,12 +448,14 @@ export function EmailScreen() {
               <p className="text-sm text-text-secondary">{educationSummary.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {/* Downstream website attribution */}
-        <div className="mb-4">
-          <h2 className="v2-section-title">Website Activity from Education 2026 Emails</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+        <details className="card email-supporting-section mb-4">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore website activity from Education 2026 emails</summary>
+          <div className="email-supporting-content">
+          <p className="text-xs text-text-secondary mb-4">
             Real GA4 sessions and (where a verified GA4 Enquiry definition exists) enquiries identified by Campaign
             Monitor's own automatic link tagging — session source "Campaign Monitor Email", session medium "email",
             and a session campaign name containing "education" — a separate, independently measured source from the
@@ -478,7 +488,8 @@ export function EmailScreen() {
               </div>
             </div>
           )}
-        </div>
+          </div>
+        </details>
       </div>
 
       {selectedSend && (

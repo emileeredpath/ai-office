@@ -1463,6 +1463,65 @@ h3 {
   color: var(--workspace-accent-hover);
 }
 
+/* Email keeps the same calm reporting canvas while placing secondary
+   Campaign Monitor diagnostics and campaign-specific analysis behind clear
+   disclosures. The underlying send data and mapping rules are unchanged. */
+.email-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.email-page-inner {
+  padding-bottom: 28px;
+}
+
+.email-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.email-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.email-page .card,
+.email-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.email-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.email-page .email-supporting-section > summary {
+  transition: color 0.15s ease;
+}
+
+.email-page .email-supporting-section > summary:hover {
+  color: var(--workspace-accent-hover);
+}
+
+.email-page .email-supporting-content {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e8ebef;
+}
+
+.email-page .input {
+  background: #ffffff;
+  border-color: #d9dee5;
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;
