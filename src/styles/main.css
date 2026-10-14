@@ -1580,6 +1580,72 @@ h3 {
   background: #fffaf6;
 }
 
+/* Call Tracking keeps the management-level Infinity measures visible and
+   places diagnostic tables and future attribution detail behind disclosures.
+   Entity mapping, masking and call classification stay in the shared data
+   layer rather than presentation styling. */
+.calls-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.calls-page-inner {
+  padding-bottom: 28px;
+}
+
+.calls-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.calls-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.calls-page .card,
+.calls-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.calls-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.calls-page .calls-supporting-section > summary {
+  transition: color 0.15s ease;
+}
+
+.calls-page .calls-supporting-section > summary:hover {
+  color: var(--workspace-accent-hover);
+}
+
+.calls-page .calls-supporting-content {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e8ebef;
+}
+
+.calls-page .calls-log-content {
+  margin-right: -24px;
+  margin-bottom: -24px;
+  margin-left: -24px;
+}
+
+.calls-page .calls-commercial-boundary {
+  border-color: rgba(249, 112, 31, 0.28);
+  background: #fffaf6;
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;

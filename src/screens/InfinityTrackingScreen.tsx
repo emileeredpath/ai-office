@@ -73,10 +73,11 @@ export function InfinityTrackingScreen() {
     showRealTotals && callPerf.totalCalls! > 0 ? Math.round((callPerf.answeredCalls! / callPerf.totalCalls!) * 100) : null;
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page calls-page">
+      <div className="max-w-7xl mx-auto calls-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="calls-page-eyebrow">Infinity call tracking</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Call Tracking</h1>
             <p className="text-text-secondary">
               {isGroupView
@@ -89,66 +90,69 @@ export function InfinityTrackingScreen() {
 
         <DataFreshnessBar entries={freshnessEntries} />
 
-        {/* Headline KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <KpiCard
-            title="Total Calls"
-            value={showRealTotals ? callPerf.totalCalls : undefined}
-            status={showRealTotals ? 'available' : 'not-connected'}
-            subtitle={callPerf.subtitle}
-            accent="var(--v2-purple)"
-          />
-          <KpiCard
-            title="Answered"
-            value={showRealTotals ? callPerf.answeredCalls : undefined}
-            status={showRealTotals ? 'available' : 'not-connected'}
-            subtitle={callPerf.subtitle}
-            accent="var(--v2-green)"
-          />
-          <KpiCard
-            title="Missed"
-            value={showRealTotals ? callPerf.missedCalls : undefined}
-            status={showRealTotals ? 'available' : 'not-connected'}
-            subtitle={callPerf.subtitle}
-            accent="var(--v2-red)"
-          />
-          <KpiCard title="Qualified Calls" status="not-connected" subtitle="Qualification data not available" />
-          <KpiCard title="Marketing Leads" status="not-connected" subtitle="Requires Infinity + CRM attribution" />
-          <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" />
-          <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" />
-        </div>
-
-        {/* Call Quality */}
         <div className="mb-8">
-          <h2 className="v2-section-title">Call Quality</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <h2 className="v2-section-title">Call performance</h2>
+          <p className="text-sm text-text-secondary mb-4">
+            Real entity and period scoped Infinity calls. Answered and missed status uses Infinity's confirmed bridge
+            data and unavailable data is never converted to zero.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KpiCard
+              title="Total Calls"
+              value={showRealTotals ? callPerf.totalCalls : undefined}
+              status={showRealTotals ? 'available' : 'not-connected'}
+              subtitle={callPerf.subtitle}
+              accent="var(--v2-purple)"
+            />
+            <KpiCard
+              title="Answered"
+              value={showRealTotals ? callPerf.answeredCalls : undefined}
+              status={showRealTotals ? 'available' : 'not-connected'}
+              subtitle={callPerf.subtitle}
+              accent="var(--v2-green)"
+            />
+            <KpiCard
+              title="Missed"
+              value={showRealTotals ? callPerf.missedCalls : undefined}
+              status={showRealTotals ? 'available' : 'not-connected'}
+              subtitle={callPerf.subtitle}
+              accent="var(--v2-red)"
+            />
             <KpiCard
               title="Answer Rate"
               value={showRealTotals && answerRate !== null ? `${answerRate}%` : undefined}
               status={showRealTotals && answerRate !== null ? 'available' : 'not-connected'}
               subtitle={showRealTotals ? 'Answered ÷ Total Calls' : callPerf.subtitle}
-              size="compact"
-            />
-            <KpiCard
-              title="Average Call Duration"
-              value={showRealTotals ? callPerf.avgDuration : undefined}
-              status={showRealTotals ? 'available' : 'not-connected'}
-              subtitle={showRealTotals ? 'Across all connected calls' : callPerf.subtitle}
-              size="compact"
-            />
-            <KpiCard
-              title="PPC-Assisted Calls"
-              value={ppcAssisted.status === 'available' ? ppcAssisted.count : undefined}
-              status={ppcAssisted.status}
-              subtitle={ppcAssisted.status === 'available' ? ppcAssisted.subtitle : ppcAssisted.subtitle}
-              size="compact"
+              accent="var(--v2-orange)"
             />
           </div>
         </div>
 
-        {/* Call Source Breakdown */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Call Source Breakdown</h2>
+        <details className="card calls-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore call quality</summary>
+          <div className="calls-supporting-content">
+            <div className="grid grid-cols-2 gap-4">
+              <KpiCard
+                title="Average Call Duration"
+                value={showRealTotals ? callPerf.avgDuration : undefined}
+                status={showRealTotals ? 'available' : 'not-connected'}
+                subtitle={showRealTotals ? 'Across all connected calls' : callPerf.subtitle}
+                size="compact"
+              />
+              <KpiCard
+                title="PPC-Assisted Calls"
+                value={ppcAssisted.status === 'available' ? ppcAssisted.count : undefined}
+                status={ppcAssisted.status}
+                subtitle={ppcAssisted.subtitle}
+                size="compact"
+              />
+            </div>
+          </div>
+        </details>
+
+        <details className="card calls-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore call sources</summary>
+          <div className="calls-supporting-content">
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Based on Infinity's own chType field. Calls with no recognised source are shown as Unclassified — never
             assumed Direct.
@@ -189,11 +193,12 @@ export function InfinityTrackingScreen() {
               <p className="text-sm text-text-secondary">{sourceBreakdown.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
-        {/* Top Landing Pages */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Top Landing Pages</h2>
+        <details className="card calls-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore landing pages</summary>
+          <div className="calls-supporting-content">
           {topLandingPages.status === 'available' ? (
             topLandingPages.rows.length > 0 ? (
               <div className="card p-0">
@@ -238,31 +243,37 @@ export function InfinityTrackingScreen() {
               <p className="text-sm text-text-secondary">{topLandingPages.subtitle}</p>
             </div>
           )}
+          </div>
+        </details>
+
+        <div className="card calls-commercial-boundary mb-8">
+          <h2 className="text-sm font-semibold text-text-primary mb-1">Commercial outcomes are not connected</h2>
+          <p className="text-sm text-text-secondary">
+            Qualified calls, marketing leads, open pipeline and won revenue require a trustworthy Infinity to CRM
+            link. They remain unavailable and are not inferred from call activity.
+          </p>
         </div>
 
-        {/* Attribution journey */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Attribution Journey</h2>
-          <div className="card">
+        <details className="card calls-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Understand the attribution journey</summary>
+          <div className="calls-supporting-content">
             <CallAttributionJourney />
           </div>
-        </div>
+        </details>
 
-        {/* Call Performance Over Time */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Call Performance Over Time</h2>
-          <div className="card">
+        <details className="card calls-supporting-section mb-8">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore call performance over time</summary>
+          <div className="calls-supporting-content">
             <CallOverTimePanel />
           </div>
-        </div>
+        </details>
 
-        {/* Call Log */}
-        <div className="mb-4">
-          <h2 className="v2-section-title">Call Log</h2>
-          <div className="card" style={{ padding: 0 }}>
+        <details className="card calls-supporting-section mb-4">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore call records</summary>
+          <div className="calls-supporting-content calls-log-content">
             <CallLogTable calls={calls} infinityConfigured={infinityConfigured} showRealTotals={showRealTotals} />
           </div>
-        </div>
+        </details>
       </div>
     </div>
   );
