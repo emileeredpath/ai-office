@@ -1646,6 +1646,72 @@ h3 {
   background: #fffaf6;
 }
 
+/* Funding is a compact management register. Scheme mechanics remain in the
+   existing record modal while the page foregrounds totals, claim state and
+   deadlines. */
+.funding-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.funding-page-inner {
+  padding-bottom: 28px;
+}
+
+.funding-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.funding-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.funding-page .card,
+.funding-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.funding-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.funding-page .funding-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.funding-page .funding-filter {
+  width: min(240px, 100%);
+}
+
+.funding-page .funding-register {
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .funding-page .funding-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .funding-page .funding-filter {
+    width: 100%;
+  }
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;

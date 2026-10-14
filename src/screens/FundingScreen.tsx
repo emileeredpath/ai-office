@@ -61,10 +61,11 @@ export function FundingScreen() {
   const currency = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="v2-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page funding-page">
+      <div className="max-w-7xl mx-auto funding-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="funding-page-eyebrow">Supplier funding</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Funding</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Supplier funding, rebates & rewards across MTech Group' : `Showing ${entityLabel}`}
@@ -78,22 +79,30 @@ export function FundingScreen() {
           )}
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <KpiCard title="Total Earned" value={currency(summary.totalEarned)} subtitle="Manually logged funding records" />
-          <KpiCard title="Total Claimed" value={currency(summary.totalClaimed)} subtitle="Manually logged funding records" />
-          <KpiCard title="Balance to Claim" value={currency(summary.totalBalance)} subtitle="Manually logged funding records" />
-          <KpiCard
-            title="Pending Claims"
-            value={summary.pendingClaims}
-            subtitle="Eligible or submitted"
-            accent={summary.pendingClaims > 0 ? 'var(--v2-orange)' : 'var(--v2-purple)'}
-          />
+        <div className="mb-8">
+          <h2 className="v2-section-title">Funding position</h2>
+          <p className="text-sm text-text-secondary mb-4">
+            Manually logged supplier funding records for the selected entity and claim status.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KpiCard title="Total Earned" value={currency(summary.totalEarned)} subtitle="Manually logged funding records" />
+            <KpiCard title="Total Claimed" value={currency(summary.totalClaimed)} subtitle="Manually logged funding records" />
+            <KpiCard title="Balance to Claim" value={currency(summary.totalBalance)} subtitle="Manually logged funding records" />
+            <KpiCard
+              title="Pending Claims"
+              value={summary.pendingClaims}
+              subtitle="Eligible or submitted"
+              accent={summary.pendingClaims > 0 ? 'var(--v2-orange)' : 'var(--v2-purple)'}
+            />
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="card mb-6">
-          <div className="flex gap-3 flex-wrap">
+        <div className="card funding-toolbar mb-6">
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary">Funding records</h2>
+            <p className="text-xs text-text-secondary">Open a record to see rebate mechanics, purchases and target progress.</p>
+          </div>
+          <div className="funding-filter">
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as StatusFilter)} className="input flex-1 min-w-[150px]">
               <option value="all">All claim statuses</option>
               <option value="eligible">Eligible</option>
@@ -105,23 +114,18 @@ export function FundingScreen() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="card p-4" style={{ overflow: 'auto' }}>
+        <div className="card funding-register" style={{ overflow: 'auto' }}>
           {filteredRecords.length > 0 ? (
-            <table className="table" style={{ width: '100%', minWidth: '980px' }}>
+            <table className="table" style={{ width: '100%', minWidth: '760px' }}>
               <thead>
                 <tr>
                   <th>Vendor / Scheme</th>
-                  <th>Brand</th>
-                  <th>Rebate Type</th>
-                  <th style={{ textAlign: 'right' }}>Rebate %</th>
-                  <th style={{ textAlign: 'right' }}>Total Purchases</th>
+                  <th>Entity</th>
+                  <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Earned</th>
                   <th style={{ textAlign: 'right' }}>Claimed</th>
                   <th style={{ textAlign: 'right' }}>Balance</th>
-                  <th>Status</th>
                   <th>Deadline</th>
-                  <th style={{ textAlign: 'right' }}>% of Target</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,19 +136,15 @@ export function FundingScreen() {
                       <div className="text-xs text-text-secondary">{r.schemeName}</div>
                     </td>
                     <td className="text-sm text-text-secondary">{BRAND_LABEL[r.brand] || r.brand}</td>
-                    <td className="text-sm text-text-secondary" style={{ textTransform: 'capitalize' }}>{r.rebateType.replace('-', ' ')}</td>
-                    <td style={{ textAlign: 'right' }}>{r.rebatePercent !== null ? `${r.rebatePercent}%` : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{currency(r.totalPurchases)}</td>
-                    <td style={{ textAlign: 'right' }}>{currency(r.amountEarned)}</td>
-                    <td style={{ textAlign: 'right' }}>{currency(r.amountClaimed)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{currency(r.balanceToClaim)}</td>
                     <td>
                       <span className="badge" style={{ ...CLAIM_STATUS_STYLE[r.claimStatus], fontSize: '11px' }}>
                         {CLAIM_STATUS_LABEL[r.claimStatus]}
                       </span>
                     </td>
+                    <td style={{ textAlign: 'right' }}>{currency(r.amountEarned)}</td>
+                    <td style={{ textAlign: 'right' }}>{currency(r.amountClaimed)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{currency(r.balanceToClaim)}</td>
                     <td className="text-sm">{r.claimDeadline ? formatDateShort(r.claimDeadline) : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{r.percentOfTarget !== null ? `${r.percentOfTarget.toFixed(0)}%` : '—'}</td>
                   </tr>
                 ))}
               </tbody>
