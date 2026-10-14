@@ -72,8 +72,10 @@
   --workspace-text: #f0f4f8;
   --workspace-text-muted: #b4b6b9;
   --workspace-text-subtle: #8f9194;
+  --workspace-ink: #152338;
   --workspace-accent: #f9701f;
   --workspace-accent-hover: #e05e10;
+  --workspace-accent-strong: #e05e10;
   --workspace-accent-soft: rgba(249, 112, 31, 0.14);
   --workspace-positive: #16a34a;
   --workspace-warning: #f59e0b;
@@ -261,7 +263,7 @@
 
 .campaigns-management-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 820px;
   border-collapse: collapse;
 }
 
@@ -311,6 +313,66 @@
   color: #1b2b40;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.campaigns-progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Campaign Detail uses the same light management canvas as the campaign
+   index while retaining the existing data components and calculations. */
+.campaign-detail-page {
+  min-height: 100%;
+  padding: 0;
+  background: #f6f7f9;
+  color: var(--workspace-ink);
+}
+
+.campaign-detail-page-inner {
+  width: min(100%, 1440px);
+  padding: 30px clamp(16px, 3vw, 44px) 56px;
+}
+
+.campaign-detail-page .v2-detail-back:hover,
+.campaign-detail-page .v2-detail-tab[data-active='true'] {
+  color: var(--workspace-accent);
+}
+
+.campaign-detail-page .v2-detail-tab[data-active='true'] {
+  border-bottom-color: var(--workspace-accent);
+}
+
+.campaign-detail-page .v2-progress-fill,
+.campaign-detail-page .v2-progress-mini-fill {
+  background: var(--workspace-accent);
+}
+
+.campaign-detail-page .btn-primary {
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent);
+}
+
+.campaign-detail-page .btn-primary:hover {
+  border-color: var(--workspace-accent-hover);
+  background: var(--workspace-accent-hover);
+}
+
+.campaign-detail-page .card {
+  border-color: #dfe3e8;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 30, 49, 0.04);
+}
+
+.campaign-detail-page .v2-detail-header {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #dfe3e8;
+}
+
+.campaign-detail-page .v2-detail-tabs {
+  border-bottom-color: #dfe3e8;
 }
 
 .campaigns-acumatica {

@@ -51,11 +51,9 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
             <tr>
               <th>Campaign</th>
               <th>Entity</th>
-              <th>Status &amp; timing</th>
-              <th>Progress</th>
+              <th>Status &amp; progress</th>
               <th>Marketing response</th>
               <th>Budget &amp; spend</th>
-              <th>Logged ROI</th>
               <th style={{ width: 40 }}></th>
             </tr>
           </thead>
@@ -63,10 +61,6 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
             {campaigns.map((campaign) => {
               const entities = getCampaignEntities(campaign);
               const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
-              const roiValue =
-                campaign.valueGenerated != null && campaign.spend > 0
-                  ? Math.round(((campaign.valueGenerated - campaign.spend) / campaign.spend) * 100)
-                  : null;
               const ended = isCampaignEnded(campaign.endDate);
               const menuOpen = openMenuId === campaign.id;
               const spendInfo = getKnownCampaignSpend(campaignCosts, campaign.id, campaign.spend, getGoogleAdsForCampaign(googleAdsPerformance, campaign));
@@ -97,9 +91,7 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                       {CAMPAIGN_STATUS_LABEL[campaign.status]}
                     </span>
                     {progress.statusInconsistent && <span className="campaigns-status-warning">Review status</span>}
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2">
+                    <div className="campaigns-progress-inline">
                       <span className="v2-progress-mini-track" title={progress.statusInconsistent ? progress.label : undefined}>
                         <span
                           className="v2-progress-mini-fill"
@@ -127,16 +119,6 @@ export function CampaignsTable({ campaigns, isEditor, acumaticaUrl, campaignCost
                       <span className="campaigns-spend-warning">
                         Needs classification
                       </span>
-                    )}
-                  </td>
-                  <td>
-                    {roiValue !== null ? (
-                      <span style={{ fontWeight: 600, color: roiValue >= 0 ? 'var(--v2-green)' : 'var(--v2-red)' }}>
-                        {roiValue >= 0 ? '+' : ''}
-                        {roiValue}%
-                      </span>
-                    ) : (
-                      <span className="v2-not-connected-text">Not logged</span>
                     )}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>

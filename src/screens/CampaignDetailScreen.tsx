@@ -14,6 +14,7 @@ import { resolveEmailDateRange, getEmailPerformanceForCampaign } from '@/utils/e
 import { resolveCallDateRange } from '@/utils/callPerformance';
 import { resolveGa4DateRange } from '@/utils/ga4Traffic';
 import { getGoogleAdsForCampaign, getInfinityForCampaign } from '@/utils/campaignAttribution';
+import { getCampaignEntities } from '@/utils/campaignEntities';
 import { fetchCampaignGa4Attribution, type Ga4CampaignAttribution } from '@/services/ga4Api';
 import { CAMPAIGN_PLAN_MARKDOWN } from '@/data/campaignPlans';
 import type { Task } from '@/types/index';
@@ -146,7 +147,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   );
 
   const ga4CampaignNames = campaign?.ga4CampaignNames ?? [];
-  const ga4Brands = campaign?.entities && campaign.entities.length > 0 ? campaign.entities : campaign ? [campaign.brand] : [];
+  const ga4Brands = campaign ? getCampaignEntities(campaign) : [];
   const [ga4Attribution, setGa4Attribution] = useState<Ga4AttributionState>({ status: 'unmapped' });
   useEffect(() => {
     if (!campaign || ga4CampaignNames.length === 0) {
@@ -212,7 +213,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   const staticPlanMarkdown = CAMPAIGN_PLAN_MARKDOWN[campaign.id];
   const hasPlan = !!campaign.planDocument || !!staticPlanMarkdown;
 
-  const entities = campaign.entities && campaign.entities.length > 0 ? campaign.entities : [campaign.brand];
+  const entities = getCampaignEntities(campaign);
   const progress = getCampaignProgressInfo(campaign.status, campaign.startDate, campaign.endDate);
 
   // Secondary metadata row — only genuinely-populated fields, never an
@@ -225,8 +226,8 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
   if (campaign.theme) secondaryMeta.push({ label: 'Theme', value: campaign.theme });
 
   return (
-    <div className="v2-page">
-      <div className="v2-detail-container mx-auto">
+    <div className="v2-page campaign-detail-page">
+      <div className="v2-detail-container mx-auto campaign-detail-page-inner">
         <button onClick={onBack} className="v2-detail-back">
           <ArrowLeft size={15} /> Back to campaigns
         </button>
@@ -234,6 +235,7 @@ export function CampaignDetailScreen({ campaignId, onBack }: CampaignDetailScree
         {/* Header */}
         <div className="v2-detail-header">
           <div>
+            <div className="campaigns-eyebrow">Campaign workspace</div>
             <h1 className="text-2xl font-bold text-text-primary">{campaign.name}</h1>
             <div className="v2-detail-meta">
               {entities.map((entity) => (
