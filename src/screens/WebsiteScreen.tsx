@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { useEntity, ENTITY_OPTIONS } from '@/contexts/EntityContext';
 import { usePeriod } from '@/contexts/PeriodContext';
@@ -62,7 +62,7 @@ function JourneyPageList({ title, description, data, loading, isGroupView, accen
   );
 
   return (
-    <div className="card p-5" style={{ borderTop: `4px solid ${accent}` }}>
+    <div className="card p-5 website-journey-card" style={{ '--website-journey-accent': accent } as CSSProperties}>
       <h3 className="font-bold text-text-primary mb-1">{title}</h3>
       <p className="text-xs text-text-secondary mb-4">{description}</p>
       {loading ? <p className="text-sm text-text-secondary">Loading GA4 pages…</p> : data.status !== 'available' ? (
@@ -177,41 +177,65 @@ export function WebsiteScreen() {
 
   return (
     <div className="v2-page website-page">
-      <div className="max-w-7xl mx-auto website-page-inner">
-        <div className="v2-page-header">
+      <div className="website-page-inner">
+        <header className="website-overview-header">
           <div>
             <p className="website-page-eyebrow">Website &amp; organic search</p>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Website</h1>
+            <h1>Website</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Website pages and organic search across MTech Group' : `Showing ${entityLabel}`}
             </p>
           </div>
           <PeriodSelector />
-        </div>
+        </header>
 
-        <DataFreshnessBar entries={freshnessEntries} />
+        <div className="website-source-status"><DataFreshnessBar entries={freshnessEntries} /></div>
 
-        <div className="mb-8">
-          <h2 className="v2-section-title">Where people go</h2>
-          <p className="text-sm text-text-secondary mb-4" style={{ marginTop: -8 }}>
+        <section className="website-section website-journey-section">
+          <div className="website-section-heading">
+            <div><span>Journey</span><h2>Where people go</h2></div>
+            <p>
             GA4 shows where sessions start, which pages are viewed and where verified enquiry actions occur. These are separate totals, not a linked path or drop-off rate.
-          </p>
+            </p>
+          </div>
           {journeyError && <p className="text-sm text-text-secondary mb-3">GA4 page reporting could not load. Please try again.</p>}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <JourneyPageList title="Entry pages" description="First page of a GA4 session · sessions" data={entryPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--v2-blue)" />
+            <JourneyPageList title="Entry pages" description="First page of a GA4 session · sessions" data={entryPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--color-accent)" />
             <JourneyPageList title="Most viewed pages" description="Pages people looked at · page views" data={viewedPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--v2-purple)" />
             <JourneyPageList title="Enquiry pages" description="Page where a verified form, phone, email or live chat event fired · events" data={enquiryPages} loading={journeyLoading} isGroupView={isGroupView} accent="var(--v2-green)" />
           </div>
           <p className="text-xs text-text-secondary mt-3">
             Page links omit query strings. Enquiry events can occur on any page and are not CRM leads. Enquiry pages require confirmed event definitions.
           </p>
-        </div>
+        </section>
 
-        <div className="mb-8">
-          <h2 className="v2-section-title">Where engagement weakens</h2>
-          <p className="text-sm text-text-secondary mb-4" style={{ marginTop: -8 }}>
+        {/* GA4 Enquiries — deliberately separate source */}
+        <section className="website-section">
+          <div className="website-section-heading">
+            <div><span>Response</span><h2>Verified website actions</h2></div>
+            <p>GA4 enquiries are separate from Search Console clicks and are not confirmed CRM leads.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 website-response-strip">
+            <KpiCard
+              title="GA4 Enquiries"
+              value={enquiries.status === 'available' ? enquiries.total : undefined}
+              status={enquiries.status}
+              subtitle={enquiries.subtitle}
+              accent="var(--v2-green)"
+            />
+            <KpiCard title="Form" value={enquiries.form.status === 'available' ? enquiries.form.value : undefined} status={enquiries.form.status} subtitle={enquiries.form.subtitle} size="compact" />
+            <KpiCard title="Phone" value={enquiries.phone.status === 'available' ? enquiries.phone.value : undefined} status={enquiries.phone.status} subtitle={enquiries.phone.subtitle} size="compact" />
+            <KpiCard title="Email" value={enquiries.email.status === 'available' ? enquiries.email.value : undefined} status={enquiries.email.status} subtitle={enquiries.email.subtitle} size="compact" />
+          </div>
+        </section>
+
+        <section className="website-section">
+          <div className="website-section-heading">
+            <div><span>Engagement watch</span><h2>Where engagement weakens</h2></div>
+            <p>
             GA4 bounce rate highlights busy entry pages to review. It does not prove someone left that page or failed to enquire.
-          </p>
+            </p>
+          </div>
           <details className="text-xs text-text-secondary mb-3">
             <summary className="cursor-pointer">What counts as a bounce?</summary>
             <p className="mt-2">A session is counted as bounced when it lasts no longer than 10 seconds, has no key event and includes fewer than two page views.</p>
@@ -238,14 +262,16 @@ export function WebsiteScreen() {
             )}
           </div>
           <p className="text-xs text-text-secondary mt-3">Sorted by entry sessions, so a high rate on a very small page is not presented as the biggest issue. {entryEngagement.status === 'available' ? entryEngagement.subtitle : ''}</p>
-        </div>
+        </section>
 
         {/* Organic Search — Search Console */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Organic Search Performance</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
+        <section className="website-section">
+          <div className="website-section-heading">
+            <div><span>Discovery</span><h2>Organic search performance</h2></div>
+            <p>
             Google Search Console clicks do not imply GA4 enquiries. Recent search data can lag by 2–3 days; try a longer reporting period if activity looks sparse.
-          </p>
+            </p>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               title="Search Clicks"
@@ -272,7 +298,7 @@ export function WebsiteScreen() {
               subtitle={summary.status === 'available' ? 'Impression-weighted average ranking position' : summary.subtitle}
             />
           </div>
-        </div>
+        </section>
 
         <details className="mb-8">
           <summary className="card text-sm font-medium text-text-primary cursor-pointer">Explore search terms and landing pages</summary>
@@ -422,26 +448,6 @@ export function WebsiteScreen() {
         </div>
 
         </details>
-
-        {/* GA4 Enquiries — deliberately separate source */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">GA4 Enquiries</h2>
-          <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
-            Verified website actions from GA4, separate from Search Console clicks and not confirmed CRM leads.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard
-              title="GA4 Enquiries"
-              value={enquiries.status === 'available' ? enquiries.total : undefined}
-              status={enquiries.status}
-              subtitle={enquiries.subtitle}
-              accent="var(--v2-green)"
-            />
-            <KpiCard title="Form" value={enquiries.form.status === 'available' ? enquiries.form.value : undefined} status={enquiries.form.status} subtitle={enquiries.form.subtitle} size="compact" />
-            <KpiCard title="Phone" value={enquiries.phone.status === 'available' ? enquiries.phone.value : undefined} status={enquiries.phone.status} subtitle={enquiries.phone.subtitle} size="compact" />
-            <KpiCard title="Email" value={enquiries.email.status === 'available' ? enquiries.email.value : undefined} status={enquiries.email.status} subtitle={enquiries.email.subtitle} size="compact" />
-          </div>
-        </div>
 
         {/* Search Console coverage disclosure */}
         {isGroupView && (

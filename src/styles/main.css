@@ -1433,12 +1433,32 @@ h3 {
 }
 
 .website-page-inner {
-  padding-bottom: 28px;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 34px clamp(16px, 3vw, 44px) 56px;
 }
 
-.website-page .v2-page-header {
-  padding-bottom: 20px;
+.website-overview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 26px;
   border-bottom: 1px solid #e1e5ea;
+}
+
+.website-overview-header h1 {
+  margin: 0;
+  color: #152338;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.website-overview-header p:not(.website-page-eyebrow) {
+  margin: 7px 0 0;
+  color: #687385;
+  font-size: 0.96rem;
 }
 
 .website-page-eyebrow {
@@ -1458,6 +1478,66 @@ h3 {
   box-shadow: none;
 }
 
+.website-source-status {
+  margin: 18px 0 0;
+}
+
+.website-section {
+  margin-top: 34px;
+}
+
+.website-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 15px;
+}
+
+.website-section-heading span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--workspace-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.website-section-heading h2 {
+  margin: 0;
+  color: #1c2d43;
+  font-size: 1.25rem;
+  font-weight: 760;
+  letter-spacing: -0.025em;
+}
+
+.website-section-heading > p {
+  max-width: 650px;
+  margin: 0;
+  color: #6d7786;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.website-journey-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.website-journey-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--website-journey-accent);
+  content: '';
+}
+
+.website-response-strip .v2-kpi-card {
+  min-height: 132px;
+}
+
 .website-page .v2-section-title {
   color: #26384d;
   letter-spacing: 0.08em;
@@ -1470,6 +1550,22 @@ h3 {
 .website-page details > summary.card:hover {
   border-color: rgba(249, 112, 31, 0.55);
   background: #fffaf6;
+}
+
+@media (max-width: 760px) {
+  .website-overview-header,
+  .website-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .website-section-heading {
+    gap: 8px;
+  }
+
+  .website-section-heading > p {
+    text-align: left;
+  }
 }
 
 /* PPC follows the same reporting-workspace treatment as Website. The warm
