@@ -202,11 +202,12 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
     finally { setSaving(false); }
   };
 
-  return <div className="v2-page"><div className="max-w-7xl mx-auto space-y-6">
-    <div className="v2-page-header"><div>
-      <h1 className="text-3xl font-bold text-text-primary mb-2">{mode === 'ppc' ? 'PPC Improvement' : 'Website Improvement'}</h1>
+  return <div className="v2-page improvement-page"><div className="improvement-page-inner">
+    <header className="improvement-overview-header"><div>
+      <p className="improvement-eyebrow">{mode === 'ppc' ? 'Paid search improvement' : 'Website improvement'}</p>
+      <h1>{mode === 'ppc' ? 'PPC Improvement' : 'Website Improvement'}</h1>
       <p className="text-text-secondary">{mode === 'ppc' ? 'Track paid search changes, landing-page work and what to improve next.' : 'Track what we change, what improves and where the next lead opportunity is.'} <span className="font-semibold">Showing: {entityLabel}</span></p>
-    </div><PeriodSelector /></div>
+    </div><PeriodSelector /></header>
 
     {mode === 'website'
       ? loadError ? <section className="card p-5"><h2 className="v2-section-title mb-1">Where people go</h2><p className="text-sm text-text-secondary">Website list unavailable.</p></section> : <WebsiteSignals journey={journey} loading={journeyLoading || loading} sites={scopedSites} />
@@ -214,17 +215,17 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
 
     {mode === 'website' ? <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       <KpiCard title="GA4 Website Sessions" value={ga4Loading || loading ? 'Loading…' : allMeasured ? sessions.toLocaleString('en-GB') : undefined} status={ga4Loading || loading || allMeasured ? 'available' : 'not-connected'} notConnectedLabel={scopedSites.length ? 'Incomplete' : 'Unavailable'} subtitle={allMeasured ? `${range.startDate} to ${range.endDate}` : scopedSites.length ? `${measuredSites.length} of ${scopedSites.length} sites returned data; no total shown` : 'No website mapped to this entity'} accent="var(--v2-green)" />
-      <KpiCard title="Sites reporting" value={journeyLoading || loading ? 'Loading…' : journey?.configured && scopedSites.length ? `${journey.brands.filter((brand) => brand.entryPages !== null && scopedSites.some((site) => site.brand === brand.brand)).length} / ${scopedSites.length}` : undefined} status={journeyLoading || loading || Boolean(journey?.configured && scopedSites.length) ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="GA4 entry-page reports" accent="var(--v2-blue)" />
+      <KpiCard title="Sites reporting" value={journeyLoading || loading ? 'Loading…' : journey?.configured && scopedSites.length ? `${journey.brands.filter((brand) => brand.entryPages !== null && scopedSites.some((site) => site.brand === brand.brand)).length} / ${scopedSites.length}` : undefined} status={journeyLoading || loading || Boolean(journey?.configured && scopedSites.length) ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="GA4 entry-page reports" accent="var(--color-accent)" />
       <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError && scopedSites.length > 0 ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="From the audit backlog" accent="var(--v2-orange)" />
       <KpiCard title="Changes progressed" value={loading ? 'Loading…' : activeRows.length} status={loading || !loadError && scopedSites.length > 0 ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Beyond Suggested status" accent="var(--v2-purple)" />
     </div> : <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-      <KpiCard title="Google Ads Clicks" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.clicks!.toLocaleString('en-GB') : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--v2-blue)" />
+      <KpiCard title="Google Ads Clicks" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.clicks!.toLocaleString('en-GB') : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--color-accent)" />
       <KpiCard title="Google Ads Spend" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? `£${adsSummary.spend!.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle={adsSummary.subtitle} accent="var(--v2-orange)" />
       <KpiCard title="Google Ads Conversions" value={adsLoading ? 'Loading…' : adsSummary.status === 'available' ? adsSummary.conversions : undefined} status={adsLoading || adsSummary.status === 'available' ? 'available' : 'not-connected'} subtitle="Google Ads' own conversion metric; not verified leads" accent="var(--v2-purple)" />
       <KpiCard title="Suggested improvements" value={loading ? 'Loading…' : suggestedRows.length} status={loading || !loadError && scopedSites.length > 0 ? 'available' : 'not-connected'} notConnectedLabel="Unavailable" subtitle="Paid landing-page and PPC work" accent="var(--v2-green)" />
     </div>}
 
-    <details className="card p-4" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+    <details className="card p-4 improvement-boundary">
       <summary className="font-semibold text-text-primary cursor-pointer">{mode === 'website' ? 'Website leads and conversion rate: Not available' : 'Paid leads and landing-page conversion rate: Not available'} <span className="font-normal text-text-secondary">· Why?</span></summary>
       <p className="text-sm text-text-secondary mt-3">{mode === 'website' ? 'GA4 visits and verified enquiry actions are available as separate measures, but enquiries are not confirmed CRM leads. A lead conversion rate or drop-off calculation needs a reliable website-origin lead count for the same eligible sessions and dates.' : 'Google Ads clicks and its own conversions do not identify verified CRM leads on individual landing pages. Paid conversion needs matched paid sessions and leads for the same page and dates.'}</p>
       <div className="flex flex-wrap gap-2 mt-3 text-xs">
@@ -236,8 +237,8 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
       </div>
     </details>
 
-    {mode === 'website' ? <section className="card p-5"><h2 className="v2-section-title mb-1">Websites at a glance</h2>
-      <p className="text-xs text-text-secondary mb-4">GA4 website sessions for the selected period. A missing site report stays unavailable.</p>
+    {mode === 'website' ? <details className="card p-5 improvement-coverage"><summary><span><strong>Websites at a glance</strong><small>GA4 coverage and activity by website</small></span></summary>
+      <p className="text-xs text-text-secondary mb-4 mt-4">GA4 website sessions for the selected period. A missing site report stays unavailable.</p>
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
         {scopedSites.map((site) => { const entry = ga4?.brands.find((row) => row.brand === site.brand); const count = rows.filter((row) => row.site_id === site.id && !['Suggested', 'Reverted'].includes(row.status)).length; return <div key={site.id} className="rounded-lg bg-slate-50 p-3 min-w-0">
           <a className="font-semibold text-sm text-text-primary hover:underline" href={site.url} target="_blank" rel="noopener noreferrer">{site.name} ↗</a>
@@ -247,22 +248,22 @@ export function WebsiteImprovementScreen({ mode = 'website' }: { mode?: 'website
         </div>; })}
         {!loading && scopedSites.length === 0 && <p className="text-sm text-text-secondary">{loadError ? 'Website list unavailable.' : `No website is mapped to ${entityLabel}.`}</p>}
       </div>
-    </section> : <section className="card p-5"><h2 className="v2-section-title mb-1">Paid performance by entity</h2>
-      <p className="text-xs text-text-secondary mb-3">Google Ads account totals; these are not assigned to individual landing pages.</p>
+    </details> : <details className="card p-5 improvement-coverage"><summary><span><strong>Paid performance by entity</strong><small>Google Ads account coverage and totals</small></span></summary>
+      <p className="text-xs text-text-secondary mb-3 mt-4">Google Ads account totals; these are not assigned to individual landing pages.</p>
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b text-text-secondary"><th className="py-2">Entity</th><th>Clicks</th><th>Spend</th><th>Ads conversions</th></tr></thead><tbody>
         {scopedSites.map((site) => { const entry = googleAds?.brands.find((row) => row.brand === site.brand); return <tr key={site.id} className="border-b last:border-0"><td className="py-3 font-medium">{site.name}</td><td>{adsLoading ? 'Loading…' : entry ? entry.clicks.toLocaleString('en-GB') : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? `£${entry.spend.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not connected'}</td><td>{adsLoading ? 'Loading…' : entry ? entry.conversions.toLocaleString('en-GB') : 'Not connected'}</td></tr>; })}
         {!loading && scopedSites.length === 0 && <tr><td colSpan={4} className="py-3 text-text-secondary">{loadError ? 'Website list unavailable.' : `No website is mapped to ${entityLabel}.`}</td></tr>}
       </tbody></table></div>
-    </section>}
+    </details>}
 
     <section className="grid lg:grid-cols-2 gap-3">
-      <div className="card p-5" style={{ borderTop: '4px solid #F97316' }}>
+      <div className="card p-5 improvement-priority-panel" data-kind="review">
         <h2 className="v2-section-title mb-1">What to review next</h2><p className="text-xs text-text-secondary mb-3">Highest-priority suggestions from the audit. Priority is from the brief, not an automatic conversion score.</p>
         {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : scopedSites.length === 0 ? <p className="text-sm text-text-secondary">No website is mapped to {entityLabel}.</p> : suggestedRows.length === 0 ? <p className="text-sm text-text-secondary">No suggested improvements for this selection.</p> : <div className="space-y-2">{suggestedRows.slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-orange-50 hover:bg-orange-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}>
           <span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{scopedSites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-orange-800 whitespace-nowrap">{row.priority}</span>
         </button>)}</div>}
       </div>
-      <div className="card p-5" style={{ borderTop: '4px solid #8B5CF6' }}>
+      <div className="card p-5 improvement-priority-panel" data-kind="tracked">
         <h2 className="v2-section-title mb-1">Changes being tracked</h2><p className="text-xs text-text-secondary mb-3">Work moved beyond Suggested. Open a record to check dates and results.</p>
         {loading ? <p className="text-sm text-text-secondary">Loading…</p> : loadError ? <p className="text-sm text-text-secondary">Improvement log unavailable.</p> : scopedSites.length === 0 ? <p className="text-sm text-text-secondary">No website is mapped to {entityLabel}.</p> : activeRows.length === 0 ? <div className="rounded-lg bg-violet-50 p-4"><strong className="text-sm text-text-primary">No changes recorded yet</strong><p className="text-xs text-text-secondary mt-1">When a recommendation is approved or implemented, it will appear here.</p></div> : <div className="space-y-2">{[...activeRows].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 4).map((row) => <button key={row.id} className="w-full text-left rounded-lg bg-violet-50 hover:bg-violet-100 p-3 flex justify-between gap-3" onClick={() => selectRow(row)}><span className="min-w-0"><strong className="block text-sm text-text-primary">{row.title}</strong><span className="text-xs text-text-secondary">{scopedSites.find((site) => site.id === row.site_id)?.name ?? row.site_id} · {row.id}</span></span><span className="text-xs font-bold text-violet-800 whitespace-nowrap">{row.status}</span></button>)}</div>}
       </div>

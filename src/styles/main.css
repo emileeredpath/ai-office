@@ -1568,6 +1568,112 @@ h3 {
   }
 }
 
+/* Website and PPC improvement workspaces prioritise the action backlog while
+   keeping source coverage and measurement caveats available on demand. */
+.improvement-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--workspace-ink);
+}
+
+.improvement-page-inner {
+  display: grid;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 34px clamp(16px, 3vw, 44px) 56px;
+  gap: 24px;
+}
+
+.improvement-overview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid #dfe3e8;
+}
+
+.improvement-eyebrow {
+  margin: 0 0 7px;
+  color: var(--workspace-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.improvement-overview-header h1 {
+  margin: 0;
+  color: #152338;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.improvement-overview-header p:not(.improvement-eyebrow) {
+  margin: 7px 0 0;
+  color: #687385;
+  font-size: 0.94rem;
+}
+
+.improvement-page .card,
+.improvement-page .v2-kpi-card {
+  border-color: #dfe3e8;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 30, 49, 0.04);
+}
+
+.improvement-boundary {
+  border-left: 4px solid var(--workspace-accent) !important;
+}
+
+.improvement-coverage > summary {
+  cursor: pointer;
+  color: #1d2f45;
+}
+
+.improvement-coverage > summary > span {
+  display: inline-grid;
+  gap: 3px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.improvement-coverage > summary strong {
+  font-size: 0.9rem;
+}
+
+.improvement-coverage > summary small {
+  color: #738094;
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.improvement-priority-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.improvement-priority-panel::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--workspace-accent);
+  content: '';
+}
+
+.improvement-priority-panel[data-kind='tracked']::before {
+  background: var(--color-brand-capcom);
+}
+
+@media (max-width: 760px) {
+  .improvement-overview-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 /* PPC follows the same reporting-workspace treatment as Website. The warm
    boundary panel keeps the separation between paid activity, GA4 response and
    CRM outcomes visible without changing any measurement or attribution rules. */
