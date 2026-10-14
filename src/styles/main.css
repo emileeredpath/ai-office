@@ -1712,6 +1712,66 @@ h3 {
   }
 }
 
+/* Reports leads with the small management summary and keeps the complete
+   channel roll-up available as deliberate drill-down sections. Export data
+   and every shared reporting calculation remain unchanged. */
+.reports-page {
+  min-height: 100%;
+  background: #f6f7f9;
+  color: var(--color-text-primary);
+}
+
+.reports-page-inner {
+  padding-bottom: 28px;
+}
+
+.reports-page .v2-page-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.reports-page-eyebrow {
+  margin-bottom: 6px;
+  color: var(--workspace-accent-hover);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.reports-page .card,
+.reports-page .v2-kpi-card {
+  border-color: #e1e5ea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.reports-page .v2-section-title {
+  color: #26384d;
+  letter-spacing: 0.08em;
+}
+
+.reports-page .reports-supporting-section > summary {
+  transition: color 0.15s ease;
+}
+
+.reports-page .reports-supporting-section > summary:hover {
+  color: var(--workspace-accent-hover);
+}
+
+.reports-page .reports-supporting-content {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e8ebef;
+}
+
+.reports-page .reports-table-content {
+  margin-right: -24px;
+  margin-bottom: -24px;
+  margin-left: -24px;
+}
+
 .v2-kpi-card .v2-kpi-not-connected {
   font-size: 18px;
   font-weight: 600;

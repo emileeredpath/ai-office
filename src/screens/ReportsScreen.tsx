@@ -436,10 +436,11 @@ export function ReportsScreen() {
   };
 
   return (
-    <div className="v2-page v2-report-page">
-      <div className="max-w-7xl mx-auto">
+    <div className="v2-page v2-report-page reports-page">
+      <div className="max-w-7xl mx-auto reports-page-inner">
         <div className="v2-page-header">
           <div>
+            <p className="reports-page-eyebrow">Management reporting</p>
             <h1 className="text-3xl font-bold text-text-primary mb-2">Reports</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Marketing and commercial performance across MTech Group' : `Showing ${entityLabel}`} · {periodLabel}
@@ -474,8 +475,9 @@ export function ReportsScreen() {
         </div>
 
         {/* Funding Performance */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Funding Performance</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Funding performance</summary>
+          <div className="reports-supporting-content">
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Real, entity-filtered supplier funding data — not scoped by the Period selector, since funding records
             don't carry a comparable date field yet.
@@ -485,11 +487,13 @@ export function ReportsScreen() {
             <KpiCard title="Total Claimed" value={currency(fundingSummary.totalClaimed)} subtitle="Manually logged funding records" size="compact" />
             <KpiCard title="Balance to Claim" value={currency(fundingSummary.totalBalance)} subtitle="Manually logged funding records" size="compact" />
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Website */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Website</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Website performance</summary>
+          <div className="reports-supporting-content">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard
               title="Website Users"
@@ -506,13 +510,15 @@ export function ReportsScreen() {
               size="compact"
             />
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Social — compact summary only; the full breakdown (by source,
             top landing pages) lives on the dedicated Social page so
             Website and Social read as clearly separate channels here. */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Social</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Social performance</summary>
+          <div className="reports-supporting-content">
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Real GA4 website traffic attributed to Organic/Paid Social. See the Social page for the full breakdown by
             source and landing page.
@@ -547,13 +553,15 @@ export function ReportsScreen() {
               size="compact"
             />
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Website Enquiries — real, verified GA4 key events only. A
             website action, never a qualified marketing lead, CRM
             opportunity, or revenue figure. */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Website Enquiries</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Website enquiries</summary>
+          <div className="reports-supporting-content">
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Verified GA4 key events per entity — never a qualified marketing lead, CRM opportunity, or revenue figure.
             An enquiry type shows "Not connected" where this entity has no verified event definition for it, never a
@@ -666,11 +674,13 @@ export function ReportsScreen() {
               <p className="text-sm text-text-secondary">{enquiriesBySource.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {/* Email */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Email</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Email performance</summary>
+          <div className="reports-supporting-content">
           {emailPerf.status === 'available' && emailPerf.campaignsSent! > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
               <KpiCard title="Sends" value={emailPerf.campaignsSent} subtitle={emailPerf.subtitle} size="compact" />
@@ -685,11 +695,13 @@ export function ReportsScreen() {
               <p className="text-sm text-text-secondary">{emailPerf.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {/* Calls */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Calls</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Call performance</summary>
+          <div className="reports-supporting-content">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-4">
             <KpiCard
               title="Total Calls"
@@ -772,13 +784,15 @@ export function ReportsScreen() {
               <p className="text-sm text-text-secondary">{callSourceBreakdown.subtitle}</p>
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {/* PPC / Google Ads — real campaign performance for separately
             configured entities; Google Ads Conversions and GA4 Enquiries stay
             clearly separate, never merged into one figure. */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">PPC / Google Ads</h2>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">PPC / Google Ads performance</summary>
+          <div className="reports-supporting-content">
           <p className="text-xs text-text-secondary mb-3" style={{ marginTop: -8 }}>
             Real Google Ads performance for connected entities in the selected view. Google Ads Conversions is
             Google Ads' own metric — a different measurement from GA4 Enquiries, never assumed equivalent.
@@ -848,12 +862,13 @@ export function ReportsScreen() {
               size="compact"
             />
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Campaign Summary */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Campaign Summary</h2>
-          <div className="card" style={{ padding: 0 }}>
+        <details className="card reports-supporting-section mb-6">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Campaign summary</summary>
+          <div className="reports-supporting-content reports-table-content">
             <CampaignPerformanceTable
               campaigns={periodCampaigns}
               wave1Performance={wave1Performance}
@@ -863,17 +878,19 @@ export function ReportsScreen() {
               onSelectCampaign={(id) => selectCampaign(id, 'performance')}
             />
           </div>
-        </div>
+        </details>
 
         {/* Commercial */}
-        <div className="mb-4">
-          <h2 className="v2-section-title">Commercial</h2>
+        <details className="card reports-supporting-section mb-4">
+          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Commercial outcomes</summary>
+          <div className="reports-supporting-content">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCard title="Opportunities" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
             <KpiCard title="Open Pipeline" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
             <KpiCard title="Won Revenue" status="not-connected" subtitle="Awaiting Acumatica integration" size="compact" />
           </div>
-        </div>
+          </div>
+        </details>
       </div>
     </div>
   );
