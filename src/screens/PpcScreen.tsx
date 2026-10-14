@@ -70,21 +70,21 @@ export function PpcScreen() {
 
   return (
     <div className="v2-page ppc-page">
-      <div className="max-w-7xl mx-auto ppc-page-inner">
-        <div className="v2-page-header">
+      <div className="ppc-page-inner">
+        <header className="ppc-overview-header">
           <div>
             <p className="ppc-page-eyebrow">Paid search</p>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">PPC</h1>
+            <h1>PPC</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Real Google Ads performance across connected MTech Group entities' : `Showing ${entityLabel}`}
             </p>
           </div>
           <PeriodSelector />
-        </div>
+        </header>
 
-        <DataFreshnessBar entries={freshnessEntries} />
+        <div className="ppc-source-status"><DataFreshnessBar entries={freshnessEntries} /></div>
 
-        <div className="card ppc-attribution-boundary mb-8" style={{ borderLeft: '4px solid var(--v2-orange)' }}>
+        <div className="card ppc-attribution-boundary">
           <h2 className="text-sm font-semibold text-text-primary mb-1">Where the paid journey stops</h2>
           <p className="text-sm text-text-secondary">
             Google Ads conversions are reported by Google Ads. GA4 Enquiries are separate website events and cannot currently be assigned to paid clicks or Acumatica revenue.
@@ -92,8 +92,11 @@ export function PpcScreen() {
         </div>
 
         {/* The three paid-activity headlines stay visible; supporting measures are below. */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Paid activity</h2>
+        <section className="ppc-section">
+          <div className="ppc-section-heading">
+            <div><span>Google Ads</span><h2>Paid activity</h2></div>
+            <p>Spend, traffic and Google Ads’ own conversion reporting for the selected entity and period.</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KpiCard
               title="Spend"
@@ -115,12 +118,14 @@ export function PpcScreen() {
               subtitleWrap
             />
           </div>
-        </div>
+        </section>
 
-        <div className="mb-8">
-          <h2 className="v2-section-title">Website response</h2>
-          <p className="text-sm text-text-secondary mb-3">GA4 Enquiries include verified website actions from all channels in the selected view, not just paid traffic.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <section className="ppc-section">
+          <div className="ppc-section-heading">
+            <div><span>GA4</span><h2>Website response</h2></div>
+            <p>Verified website actions from all channels in the selected view. They are not assigned to paid clicks.</p>
+          </div>
+          <div className="ppc-response-grid">
             <KpiCard
               title="GA4 Enquiries"
               value={enquiries.status === 'available' ? enquiries.total : undefined}
@@ -129,10 +134,14 @@ export function PpcScreen() {
               subtitleWrap
               accent="var(--v2-green)"
             />
+            <div className="ppc-response-context">
+              <strong>Keep the measures separate</strong>
+              <p>Google Ads Conversions and GA4 Enquiries use different definitions. Neither is currently a confirmed CRM lead count.</p>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <details className="card mb-8">
+        <details className="card ppc-supporting-section">
           <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore reach and cost measures</summary>
           <p className="text-xs text-text-secondary mt-3 mb-4">Cost per GA4 Enquiry divides Google Ads spend by verified GA4 Enquiries for the selected scope and period. The card notes partial GA4 coverage. This does not prove the enquiries came from Google Ads.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -172,7 +181,7 @@ export function PpcScreen() {
         </details>
 
         {/* Campaign Performance */}
-        <details className="card mb-8">
+        <details className="card ppc-supporting-section">
           <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore Google Ads campaigns</summary>
           <p className="text-xs text-text-secondary mt-3 mb-3">
             Real Google Ads campaigns, shown exactly as returned — never matched to a dashboard campaign record.
@@ -183,7 +192,7 @@ export function PpcScreen() {
         </details>
 
         {/* Commercial — still pending verified paid-to-CRM attribution. */}
-        <details className="card mb-4">
+        <details className="card ppc-supporting-section">
           <summary className="text-sm font-semibold text-text-primary cursor-pointer">Why paid revenue is unavailable</summary>
           <p className="text-xs text-text-secondary mt-3 mb-4">These measures need a verified link from paid activity to CRM outcomes.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

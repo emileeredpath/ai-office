@@ -1684,12 +1684,32 @@ h3 {
 }
 
 .ppc-page-inner {
-  padding-bottom: 28px;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 34px clamp(16px, 3vw, 44px) 56px;
 }
 
-.ppc-page .v2-page-header {
-  padding-bottom: 20px;
+.ppc-overview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 26px;
   border-bottom: 1px solid #e1e5ea;
+}
+
+.ppc-overview-header h1 {
+  margin: 0;
+  color: #152338;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.ppc-overview-header p:not(.ppc-page-eyebrow) {
+  margin: 7px 0 0;
+  color: #687385;
+  font-size: 0.96rem;
 }
 
 .ppc-page-eyebrow {
@@ -1714,9 +1734,87 @@ h3 {
   letter-spacing: 0.08em;
 }
 
+.ppc-source-status {
+  margin-top: 18px;
+}
+
+.ppc-section {
+  margin-top: 34px;
+}
+
+.ppc-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 15px;
+}
+
+.ppc-section-heading span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--workspace-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.ppc-section-heading h2 {
+  margin: 0;
+  color: #1c2d43;
+  font-size: 1.25rem;
+  font-weight: 760;
+  letter-spacing: -0.025em;
+}
+
+.ppc-section-heading > p {
+  max-width: 610px;
+  margin: 0;
+  color: #6d7786;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
 .ppc-page .ppc-attribution-boundary {
+  margin-top: 22px;
   border-color: rgba(249, 112, 31, 0.28);
+  border-left: 4px solid var(--workspace-accent);
   background: #fffaf6;
+  box-shadow: none;
+}
+
+.ppc-response-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 2fr);
+  gap: 16px;
+}
+
+.ppc-response-context {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  padding: 20px 22px;
+  border: 1px solid #dfe3e8;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.ppc-response-context strong {
+  color: #24364b;
+  font-size: 0.85rem;
+}
+
+.ppc-response-context p {
+  margin: 6px 0 0;
+  color: #6d7786;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.ppc-supporting-section {
+  margin-top: 22px;
 }
 
 .ppc-page details > summary {
@@ -1725,6 +1823,26 @@ h3 {
 
 .ppc-page details > summary:hover {
   color: var(--workspace-accent-hover);
+}
+
+@media (max-width: 760px) {
+  .ppc-overview-header,
+  .ppc-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ppc-section-heading {
+    gap: 8px;
+  }
+
+  .ppc-section-heading > p {
+    text-align: left;
+  }
+
+  .ppc-response-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Email keeps the same calm reporting canvas while placing secondary
