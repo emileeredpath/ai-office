@@ -78,27 +78,28 @@ export function SocialScreen() {
 
   return (
     <div className="v2-page social-page">
-      <div className="max-w-7xl mx-auto social-page-inner">
-        <div className="v2-page-header">
+      <div className="social-page-inner">
+        <header className="social-overview-header">
           <div>
             <p className="social-page-eyebrow">Social media</p>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Social</h1>
+            <h1>Social</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Website traffic from social across MTech Group' : `Showing ${entityLabel}`}
             </p>
           </div>
           <PeriodSelector />
+        </header>
+
+        <div className="social-source-status">
+          <DataFreshnessBar entries={freshnessEntries} />
         </div>
 
-        <DataFreshnessBar entries={freshnessEntries} />
-
         {/* Headline KPIs */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Social traffic</h2>
-          <p className="text-sm text-text-secondary mb-4">
-            Real GA4 website traffic attributed to Organic/Paid Social via GA4's own channel classification — sessions
-            and users only. Impressions, reach, engagement, and followers are platform-side metrics GA4 can't see.
-          </p>
+        <section className="social-section">
+          <div className="social-section-heading">
+            <div><span>GA4 evidence</span><h2>Traffic arriving from social</h2></div>
+            <p>Website sessions and users classified by GA4 as Organic Social or Paid Social.</p>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               title="Social Sessions"
@@ -129,58 +130,14 @@ export function SocialScreen() {
               accent="var(--v2-orange)"
             />
           </div>
-        </div>
-
-        {/* Social Traffic by Source */}
-        <details className="card social-supporting-section mb-8">
-          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore social traffic by source</summary>
-          <div className="social-supporting-content">
-          <p className="text-xs text-text-secondary mb-4">
-            Raw GA4 sessionSource (referring domain) — GA4 doesn't provide a canonical platform name, so sources are
-            shown exactly as reported, never relabelled or bucketed into "LinkedIn"/"Facebook"/"Instagram".
-          </p>
-          {socialByNetwork.status === 'available' ? (
-            socialByNetwork.rows.length > 0 ? (
-              <div className="card p-0">
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table w-full text-sm" style={{ minWidth: 420 }}>
-                    <thead>
-                      <tr>
-                        <th>Source</th>
-                        <th style={{ textAlign: 'right' }}>Sessions</th>
-                        <th style={{ textAlign: 'right' }}>Users</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {socialByNetwork.rows.map((row) => (
-                        <tr key={row.source}>
-                          <td className="text-text-primary">{row.source}</td>
-                          <td style={{ textAlign: 'right' }}>{row.sessions}</td>
-                          <td style={{ textAlign: 'right' }}>{row.users}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No social traffic in the selected period.</p>
-            )
-          ) : (
-            <div className="card p-4">
-              <p className="text-sm text-text-secondary">{socialByNetwork.subtitle}</p>
-            </div>
-          )}
-          </div>
-        </details>
+        </section>
 
         {/* GA4 Enquiries from Social */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">GA4 enquiries from social</h2>
-          <p className="text-sm text-text-secondary mb-4">
-            Verified GA4 key events (see Reports → Website Enquiries) restricted to Organic/Paid Social sessions — a
-            website action, not a qualified marketing lead.
-          </p>
+        <section className="social-section">
+          <div className="social-section-heading">
+            <div><span>Website response</span><h2>Enquiries from social</h2></div>
+            <p>Verified GA4 key events from social sessions. These are website actions, not qualified marketing leads.</p>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <KpiCard
               title="GA4 Enquiries from Social"
@@ -212,92 +169,80 @@ export function SocialScreen() {
             />
           </div>
 
-          <h4 className="text-sm font-semibold text-text-primary mb-2">Enquiries from Social by Source</h4>
-          {socialEnquiriesBySource.status === 'available' ? (
-            socialEnquiriesBySource.rows.length > 0 ? (
-              <div className="card p-0">
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table w-full text-sm" style={{ minWidth: 360 }}>
-                    <thead>
-                      <tr>
-                        <th>Source</th>
-                        <th style={{ textAlign: 'right' }}>Enquiries</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {socialEnquiriesBySource.rows.map((row) => (
-                        <tr key={row.source}>
-                          <td className="text-text-primary">{row.source}</td>
-                          <td style={{ textAlign: 'right' }}>{row.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No social enquiries in the selected period.</p>
-            )
-          ) : (
-            <div className="card p-4">
-              <p className="text-sm text-text-secondary">{socialEnquiriesBySource.subtitle}</p>
+          <details className="card social-supporting-section">
+            <summary className="text-sm font-semibold text-text-primary cursor-pointer">View enquiries by reported source</summary>
+            <div className="social-supporting-content">
+              {socialEnquiriesBySource.status === 'available' ? (
+                socialEnquiriesBySource.rows.length > 0 ? (
+                  <div className="social-table-wrap">
+                    <table className="table w-full text-sm" style={{ minWidth: 360 }}>
+                      <thead><tr><th>Source</th><th style={{ textAlign: 'right' }}>Enquiries</th></tr></thead>
+                      <tbody>{socialEnquiriesBySource.rows.map((row) => (
+                        <tr key={row.source}><td className="text-text-primary">{row.source}</td><td style={{ textAlign: 'right' }}>{row.count}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <p className="v2-not-connected-text">No social enquiries in the selected period.</p>
+              ) : <p className="text-sm text-text-secondary">{socialEnquiriesBySource.subtitle}</p>}
             </div>
-          )}
-        </div>
+          </details>
+        </section>
 
-        {/* Top Landing Pages from Social */}
-        <details className="card social-supporting-section mb-8">
-          <summary className="text-sm font-semibold text-text-primary cursor-pointer">Explore landing pages from social</summary>
-          <div className="social-supporting-content">
-          {socialTopLandingPages.status === 'available' ? (
-            socialTopLandingPages.rows.length > 0 ? (
-              <div className="card p-0">
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table w-full text-sm" style={{ minWidth: 420 }}>
-                    <thead>
-                      <tr>
-                        <th>Landing Page</th>
-                        <th style={{ textAlign: 'right' }}>Sessions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {socialTopLandingPages.rows.map((row) => (
-                        <tr key={row.landingPage}>
-                          <td
-                            className="text-text-primary text-xs"
-                            style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={row.landingPage}
-                          >
-                            {row.landingPage}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>{row.sessions}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <p className="v2-not-connected-text" style={{ padding: '1.5rem' }}>No social landing pages recorded in the selected period.</p>
-            )
-          ) : (
-            <div className="card p-4">
-              <p className="text-sm text-text-secondary">{socialTopLandingPages.subtitle}</p>
-            </div>
-          )}
+        <section className="social-section">
+          <div className="social-section-heading">
+            <div><span>Journey detail</span><h2>Where social visitors came from and went</h2></div>
+            <p>Supporting GA4 evidence, kept separate from platform-side reporting.</p>
           </div>
-        </details>
+          <div className="social-evidence-grid">
+            <details className="card social-supporting-section">
+              <summary className="text-sm font-semibold text-text-primary cursor-pointer">Traffic by reported source</summary>
+              <div className="social-supporting-content">
+                <p className="social-data-note">Sources are shown exactly as GA4 reports them.</p>
+                {socialByNetwork.status === 'available' ? (
+                  socialByNetwork.rows.length > 0 ? (
+                    <div className="social-table-wrap">
+                      <table className="table w-full text-sm" style={{ minWidth: 420 }}>
+                        <thead><tr><th>Source</th><th style={{ textAlign: 'right' }}>Sessions</th><th style={{ textAlign: 'right' }}>Users</th></tr></thead>
+                        <tbody>{socialByNetwork.rows.map((row) => (
+                          <tr key={row.source}><td className="text-text-primary">{row.source}</td><td style={{ textAlign: 'right' }}>{row.sessions}</td><td style={{ textAlign: 'right' }}>{row.users}</td></tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  ) : <p className="v2-not-connected-text">No social traffic in the selected period.</p>
+                ) : <p className="text-sm text-text-secondary">{socialByNetwork.subtitle}</p>}
+              </div>
+            </details>
+
+            <details className="card social-supporting-section">
+              <summary className="text-sm font-semibold text-text-primary cursor-pointer">Landing pages reached from social</summary>
+              <div className="social-supporting-content">
+                {socialTopLandingPages.status === 'available' ? (
+                  socialTopLandingPages.rows.length > 0 ? (
+                    <div className="social-table-wrap">
+                      <table className="table w-full text-sm" style={{ minWidth: 420 }}>
+                        <thead><tr><th>Landing Page</th><th style={{ textAlign: 'right' }}>Sessions</th></tr></thead>
+                        <tbody>{socialTopLandingPages.rows.map((row) => (
+                          <tr key={row.landingPage}>
+                            <td className="text-text-primary text-xs social-landing-path" title={row.landingPage}>{row.landingPage}</td>
+                            <td style={{ textAlign: 'right' }}>{row.sessions}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  ) : <p className="v2-not-connected-text">No social landing pages recorded in the selected period.</p>
+                ) : <p className="text-sm text-text-secondary">{socialTopLandingPages.subtitle}</p>}
+              </div>
+            </details>
+          </div>
+        </section>
 
         {/* Platform Performance — reserved for a future Hootsuite
             integration. Every figure here is genuinely unavailable today;
             none are fabricated as zero. */}
-        <div className="card social-platform-boundary mb-4">
-          <h2 className="text-sm font-semibold text-text-primary mb-1">Platform performance is not connected</h2>
-          <p className="text-sm text-text-secondary">
-            Impressions, reach, engagement, followers, follower growth, posts published and top posts require a real
-            Hootsuite or direct platform API connection. No values are estimated or shown as zero.
-          </p>
-        </div>
+        <aside className="card social-platform-boundary">
+          <span>Connection needed</span>
+          <div><h2>Platform performance is not connected</h2><p>Reach, engagement, followers and post performance require Hootsuite or a direct platform connection.</p></div>
+        </aside>
       </div>
     </div>
   );

@@ -2050,12 +2050,32 @@ h3 {
 }
 
 .social-page-inner {
-  padding-bottom: 28px;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 34px clamp(16px, 3vw, 44px) 56px;
 }
 
-.social-page .v2-page-header {
-  padding-bottom: 20px;
+.social-overview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 26px;
   border-bottom: 1px solid #e1e5ea;
+}
+
+.social-overview-header h1 {
+  margin: 0;
+  color: #152338;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.social-overview-header p:not(.social-page-eyebrow) {
+  margin: 7px 0 0;
+  color: #687385;
+  font-size: 0.96rem;
 }
 
 .social-page-eyebrow {
@@ -2075,9 +2095,48 @@ h3 {
   box-shadow: none;
 }
 
-.social-page .v2-section-title {
-  color: #26384d;
-  letter-spacing: 0.08em;
+.social-source-status {
+  margin-top: 18px;
+}
+
+.social-section {
+  margin-top: 34px;
+}
+
+.social-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 15px;
+}
+
+.social-section-heading span,
+.social-platform-boundary > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--workspace-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.social-section-heading h2 {
+  margin: 0;
+  color: #1c2d43;
+  font-size: 1.25rem;
+  font-weight: 760;
+  letter-spacing: -0.025em;
+}
+
+.social-section-heading > p {
+  max-width: 620px;
+  margin: 0;
+  color: #6d7786;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: right;
 }
 
 .social-page .social-supporting-section > summary {
@@ -2094,9 +2153,81 @@ h3 {
   border-top: 1px solid #e8ebef;
 }
 
+.social-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.social-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e7eaee;
+  border-radius: 10px;
+}
+
+.social-data-note {
+  margin: 0 0 12px;
+  color: #6d7786;
+  font-size: 0.74rem;
+}
+
+.social-landing-path {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .social-page .social-platform-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 34px;
+  padding: 18px 20px;
   border-color: rgba(249, 112, 31, 0.28);
   background: #fffaf6;
+}
+
+.social-platform-boundary > span {
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+}
+
+.social-platform-boundary h2 {
+  margin: 0 0 3px;
+  color: #27384d;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.social-platform-boundary p {
+  margin: 0;
+  color: #6d7786;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 800px) {
+  .social-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .social-overview-header,
+  .social-section-heading,
+  .social-platform-boundary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .social-section-heading {
+    gap: 8px;
+  }
+
+  .social-section-heading > p {
+    text-align: left;
+  }
 }
 
 /* Call Tracking keeps the management-level Infinity measures visible and
