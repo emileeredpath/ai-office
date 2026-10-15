@@ -230,19 +230,19 @@ export function EmailScreen() {
 
   return (
     <div className="v2-page email-page">
-      <div className="max-w-7xl mx-auto email-page-inner">
-        <div className="v2-page-header">
+      <div className="email-page-inner">
+        <header className="email-overview-header">
           <div>
             <p className="email-page-eyebrow">Email marketing</p>
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Email</h1>
+            <h1>Email</h1>
             <p className="text-text-secondary">
               {isGroupView ? 'Real Campaign Monitor email performance across MTech Group' : `Showing ${entityLabel}`}
             </p>
           </div>
           <PeriodSelector />
-        </div>
+        </header>
 
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div className="email-source-status">
           <DataFreshnessBar entries={freshnessEntries} />
           {isEditor && (
             <button type="button" className="btn btn-secondary text-sm" onClick={handleSyncNow} disabled={cmSyncing}>
@@ -262,7 +262,9 @@ export function EmailScreen() {
         )}
         {cmSyncError && <p className="text-xs mb-6" style={{ color: 'var(--v2-red)' }}>{cmSyncError}</p>}
         {cmConfigured && cmCoverage && (
-          <p className="text-xs text-text-secondary mb-6">
+          <details className="email-sync-details">
+            <summary>Campaign Monitor coverage</summary>
+            <p>
             {cmCoverage.lastSuccessfulSyncAt
               ? `Last successful Campaign Monitor sync: ${formatDateShort(cmCoverage.lastSuccessfulSyncAt)}. `
               : 'No successful Campaign Monitor sync on record. '}
@@ -270,13 +272,16 @@ export function EmailScreen() {
             {cmCoverage.lastSyncError && (
               <span style={{ color: 'var(--v2-red)' }}> Last sync error: {cmCoverage.lastSyncError}</span>
             )}
-          </p>
+            </p>
+          </details>
         )}
 
         {/* Headline metrics */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Email performance</h2>
-          <p className="text-sm text-text-secondary mb-4">The measures needed for a quick view of send volume and engagement.</p>
+        <section className="email-section">
+          <div className="email-section-heading">
+            <div><span>Campaign Monitor</span><h2>Email performance</h2></div>
+            <p>Send volume, audience reach and the engagement measures needed for a quick management view.</p>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <KpiCard title="Emails Sent" value={headline.status === 'available' ? headline.campaignsSent : undefined} status={headline.status} subtitle={headline.subtitle} />
             <KpiCard title="Total Recipients" value={headline.status === 'available' ? headline.recipients?.toLocaleString('en-GB') : undefined} status={headline.status} subtitle={headline.subtitle} />
@@ -302,41 +307,45 @@ export function EmailScreen() {
               <KpiCard title="Unsubscribe Rate" value={headline.status === 'available' && headline.unsubscribeRate != null ? formatPercent(headline.unsubscribeRate) : undefined} status={headline.status === 'available' && headline.unsubscribeRate != null ? 'available' : 'not-connected'} subtitle={headline.subtitle} accent="var(--v2-red)" />
             </div>
           </details>
-        </div>
+        </section>
 
         {/* Filters */}
-        <div className="card mb-6">
-          <div className="flex gap-3 flex-wrap">
-            <select value={campaignGroupFilter} onChange={(e) => setCampaignGroupFilter(e.target.value as CampaignGroupFilter)} className="input flex-1 min-w-[160px]">
+        <section className="email-section">
+          <div className="email-section-heading">
+            <div><span>Send detail</span><h2>Individual sends</h2></div>
+            <p>{filteredSends.length} matching send{filteredSends.length === 1 ? '' : 's'}. Open a row for full delivery, click and mapping detail.</p>
+          </div>
+        <div className="card email-filter-toolbar">
+          <div className="email-filter-grid">
+            <label><span>Campaign</span><select value={campaignGroupFilter} onChange={(e) => setCampaignGroupFilter(e.target.value as CampaignGroupFilter)} className="input">
               <option value="all">All campaigns</option>
               <option value="education_2026">Education 2026</option>
-            </select>
-            <select value={geographyFilter} onChange={(e) => setGeographyFilter(e.target.value as GeographyFilter)} className="input flex-1 min-w-[160px]">
+            </select></label>
+            <label><span>Geography</span><select value={geographyFilter} onChange={(e) => setGeographyFilter(e.target.value as GeographyFilter)} className="input">
               <option value="all">All geographies</option>
               <option value="Scotland">Scotland</option>
               <option value="Northern Ireland">Northern Ireland</option>
               <option value="Republic of Ireland">Republic of Ireland</option>
-            </select>
-            <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value as LevelFilter)} className="input flex-1 min-w-[160px]">
+            </select></label>
+            <label><span>Education level</span><select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value as LevelFilter)} className="input">
               <option value="all">Primary &amp; Secondary</option>
               <option value="Primary">Primary</option>
               <option value="Secondary">Secondary</option>
-            </select>
-            <select value={audienceTypeFilter} onChange={(e) => setAudienceTypeFilter(e.target.value as AudienceTypeFilter)} className="input flex-1 min-w-[160px]">
+            </select></label>
+            <label><span>Audience</span><select value={audienceTypeFilter} onChange={(e) => setAudienceTypeFilter(e.target.value as AudienceTypeFilter)} className="input">
               <option value="all">New &amp; Existing</option>
               <option value="New">New prospect data</option>
               <option value="Existing">Existing data</option>
-            </select>
+            </select></label>
           </div>
         </div>
 
         {/* Individual send table */}
-        <div className="mb-8">
-          <h2 className="v2-section-title">Individual Sends</h2>
+        <div className="email-send-table">
           {baseSends.status === 'available' && filteredSends.length > 0 ? (
             <div className="card p-0">
               <div style={{ overflowX: 'auto' }}>
-                <table className="table w-full text-sm" style={{ minWidth: 900 }}>
+                <table className="table w-full text-sm" style={{ minWidth: 780 }}>
                   <thead>
                     <tr>
                       <th>Send</th>
@@ -344,14 +353,10 @@ export function EmailScreen() {
                       <th>Sent</th>
                       <th>Segment</th>
                       <th style={{ textAlign: 'right' }}>Recipients</th>
-                      <th style={{ textAlign: 'right' }}>Delivered</th>
-                      <th style={{ textAlign: 'right' }}>Unique Opens</th>
                       <th style={{ textAlign: 'right' }}>Open Rate</th>
-                      <th style={{ textAlign: 'right' }}>Clicks</th>
                       <th style={{ textAlign: 'right' }}>Click Rate</th>
                       <th style={{ textAlign: 'right' }}>Bounces</th>
                       <th style={{ textAlign: 'right' }}>Unsubs</th>
-                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -382,14 +387,10 @@ export function EmailScreen() {
                           {send.emailAudienceLevel ? ` · ${send.emailAudienceLevel}` : ''}
                         </td>
                         <td style={{ textAlign: 'right' }}>{send.recipients?.toLocaleString('en-GB') ?? '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{send.delivered != null ? send.delivered.toLocaleString('en-GB') : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>{send.uniqueOpens != null ? send.uniqueOpens.toLocaleString('en-GB') : '—'}</td>
                         <td style={{ textAlign: 'right' }}>{formatPercent(send.uniqueOpenRate)}</td>
-                        <td style={{ textAlign: 'right' }}>{send.clicks?.toLocaleString('en-GB') ?? '—'}</td>
                         <td style={{ textAlign: 'right' }}>{formatPercent(send.clickRate)}</td>
                         <td style={{ textAlign: 'right' }}>{send.bounces?.toLocaleString('en-GB') ?? '—'}</td>
                         <td style={{ textAlign: 'right' }}>{send.unsubscribes?.toLocaleString('en-GB') ?? '—'}</td>
-                        <td className="text-text-secondary text-xs">Sent</td>
                       </tr>
                     ))}
                   </tbody>
@@ -404,6 +405,7 @@ export function EmailScreen() {
             </div>
           )}
         </div>
+        </section>
 
         {/* Education 2026 roll-up */}
         <details className="card email-supporting-section mb-8">

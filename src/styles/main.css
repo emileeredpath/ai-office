@@ -1855,12 +1855,32 @@ h3 {
 }
 
 .email-page-inner {
-  padding-bottom: 28px;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 34px clamp(16px, 3vw, 44px) 56px;
 }
 
-.email-page .v2-page-header {
-  padding-bottom: 20px;
+.email-overview-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 26px;
   border-bottom: 1px solid #e1e5ea;
+}
+
+.email-overview-header h1 {
+  margin: 0;
+  color: #152338;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.email-overview-header p:not(.email-page-eyebrow) {
+  margin: 7px 0 0;
+  color: #687385;
+  font-size: 0.96rem;
 }
 
 .email-page-eyebrow {
@@ -1885,6 +1905,92 @@ h3 {
   letter-spacing: 0.08em;
 }
 
+.email-source-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.email-sync-details {
+  margin-top: 8px;
+  color: #6d7786;
+  font-size: 0.72rem;
+}
+
+.email-sync-details summary {
+  width: fit-content;
+  color: #536174;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.email-sync-details p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+.email-section {
+  margin-top: 34px;
+}
+
+.email-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 15px;
+}
+
+.email-section-heading span,
+.email-filter-grid label > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--workspace-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.email-section-heading h2 {
+  margin: 0;
+  color: #1c2d43;
+  font-size: 1.25rem;
+  font-weight: 760;
+  letter-spacing: -0.025em;
+}
+
+.email-section-heading > p {
+  max-width: 620px;
+  margin: 0;
+  color: #6d7786;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.email-filter-toolbar {
+  padding: 15px;
+  background: #fafbfc !important;
+}
+
+.email-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.email-filter-grid label > span {
+  color: #687385;
+  letter-spacing: 0.04em;
+}
+
+.email-send-table {
+  margin-top: 12px;
+}
+
 .email-page .email-supporting-section > summary {
   transition: color 0.15s ease;
 }
@@ -1902,6 +2008,37 @@ h3 {
 .email-page .input {
   background: #ffffff;
   border-color: #d9dee5;
+}
+
+@media (max-width: 900px) {
+  .email-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .email-overview-header,
+  .email-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .email-section-heading {
+    gap: 8px;
+  }
+
+  .email-section-heading > p {
+    text-align: left;
+  }
+
+  .email-source-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .email-filter-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Social prioritises the GA4 evidence that exists and compresses unsupported
